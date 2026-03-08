@@ -87,21 +87,26 @@ export const generateQuestions = async (
   const lessonContext = config.customLesson ? config.customLesson : (config.lessons.length > 0 ? config.lessons.join(", ") : "Tổng hợp");
   const prompt = `Soạn ${config.questionCount} câu hỏi Toán Lớp ${config.grade}. Chủ đề: ${lessonContext}. Mức độ: ${config.selectedDifficulties.join(", ")}. Khoảng ${config.imageRatio}% có hình vẽ SVG minh họa cực kỳ chính xác tọa độ.`;
 
-  const result = await ai.models.generateContent({
-    model: 'gemini-3-pro-preview',
-    contents: prompt,
-    config: {
+  try {
+    const result = await ai.getGenerativeModel({
+      model: 'gemini-1.5-flash',
       systemInstruction,
-      responseMimeType: "application/json",
-      responseSchema: questionSchema,
-      temperature: 0.2 // Giảm nhiệt độ xuống thấp nhất để AI tập trung vào tính toán tọa độ chính xác
-    },
-  });
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: questionSchema,
+        temperature: 0.2
+      }
+    }).generateContent(prompt);
 
-  const parsed = JSON.parse(result.text);
-  return parsed.questions.map((q: any, i: number) => ({
-    ...q, id: `q_${Date.now()}_${i}`, number: i + 1, grade: config.grade
-  }));
+    const text = result.response.text();
+    const parsed = JSON.parse(text);
+    return parsed.questions.map((q: any, i: number) => ({
+      ...q, id: `q_${Date.now()}_${i}`, number: i + 1, grade: config.grade
+    }));
+  } catch (error: any) {
+    console.error("Alla Debug - Gemini Error:", error);
+    throw error;
+  }
 };
 
 export const generateMillionaireQuestions = async (grade: number, lessons: string[]): Promise<Question[]> => {
@@ -110,13 +115,20 @@ export const generateMillionaireQuestions = async (grade: number, lessons: strin
   const ai = new GoogleGenAI(apiKey);
   const lessonContext = lessons.length > 0 ? lessons.join(", ") : "Kiến thức tổng hợp";
   const systemInstruction = `Host Triệu Phú Toán Học. Tạo 16 câu hỏi trắc nghiệm. ${MATH_FORMAT_INSTRUCTION} ${GRAPHING_INSTRUCTION} ${ANSWER_DISTRIBUTION_INSTRUCTION}`;
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-pro-preview',
-    contents: `Tạo 16 câu hỏi Triệu phú Toán lớp ${grade}: ${lessonContext}. Đảm bảo hình vẽ SVG chuẩn pixel.`,
-    config: { systemInstruction, responseMimeType: "application/json", responseSchema: questionSchema, temperature: 0.3 },
-  });
-  const parsed = JSON.parse(response.text);
-  return parsed.questions.map((q: any, i: number) => ({
-    ...q, id: `game_${Date.now()}_${i}`, number: i + 1, type: QuestionType.MultipleChoice
-  }));
+  try {
+    const response = await ai.getGenerativeModel({
+      model: 'gemini-1.5-flash',
+      systemInstruction,
+      generationConfig: { responseMimeType: "application/json", responseSchema: questionSchema, temperature: 0.3 }
+    }).generateContent(`Tạo 16 câu hỏi Triệu phú Toán lớp ${grade}: ${lessonContext}. Đảm bảo hình vẽ SVG chuẩn pixel.`);
+
+    const text = response.response.text();
+    const parsed = JSON.parse(text);
+    return parsed.questions.map((q: any, i: number) => ({
+      ...q, id: `game_${Date.now()}_${i}`, number: i + 1, type: QuestionType.MultipleChoice
+    }));
+  } catch (error: any) {
+    console.error("Alla Debug - Game Gemini Error:", error);
+    throw error;
+  }
 };
