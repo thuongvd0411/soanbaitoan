@@ -65,8 +65,13 @@ export const generateQuestions = async (
   previousQuestions: Question[] = [],
   onProgress?: (percent: number) => void
 ): Promise<Question[]> => {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!apiKey) throw new Error("Missing API Key");
+  const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY;
+
+  if (!apiKey || apiKey === "undefined" || apiKey === "null" || apiKey === "") {
+    console.error("Alla Debug - API Key is missing or invalid string.");
+    throw new Error("API Key chưa được nạp từ GitHub. Vui lòng chờ 1 phút hoặc kiểm tra Secrets.");
+  }
+
   const ai = new GoogleGenAI(apiKey);
 
   const systemInstruction = `
@@ -110,8 +115,12 @@ export const generateQuestions = async (
 };
 
 export const generateMillionaireQuestions = async (grade: number, lessons: string[]): Promise<Question[]> => {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!apiKey) throw new Error("Missing API Key");
+  const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY;
+
+  if (!apiKey || apiKey === "undefined" || apiKey === "null" || apiKey === "") {
+    throw new Error("API Key cho Game chưa được nạp.");
+  }
+
   const ai = new GoogleGenAI(apiKey);
   const lessonContext = lessons.length > 0 ? lessons.join(", ") : "Kiến thức tổng hợp";
   const systemInstruction = `Host Triệu Phú Toán Học. Tạo 16 câu hỏi trắc nghiệm. ${MATH_FORMAT_INSTRUCTION} ${GRAPHING_INSTRUCTION} ${ANSWER_DISTRIBUTION_INSTRUCTION}`;
