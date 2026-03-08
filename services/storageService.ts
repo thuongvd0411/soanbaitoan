@@ -1,5 +1,6 @@
 // services/storageService.ts
-import { Question } from '../types';
+import { Question, HistoryItem } from '../types';
+import { firebaseService } from './firebaseService';
 
 const BANK_KEY = 'math_app_question_bank_v1';
 const DEVICE_ID_KEY = 'math_app_device_id';
@@ -78,6 +79,11 @@ export const storageService = {
 
       const updatedBank = [newSavedQuestion, ...bank];
       localStorage.setItem(BANK_KEY, JSON.stringify(updatedBank));
+
+      // Đồng bộ lên Cloud (Firebase)
+      const deviceId = storageService.getDeviceId();
+      firebaseService.saveQuestion(deviceId, newSavedQuestion).catch(console.error);
+
       return true;
     } catch (error) {
       console.error("Error saving to bank:", error);
@@ -118,6 +124,13 @@ export const storageService = {
       });
 
       localStorage.setItem(BANK_KEY, JSON.stringify(newBank));
+
+      // Đồng bộ hàng loạt lên Cloud
+      const deviceId = storageService.getDeviceId();
+      addedCount > 0 && newBank.forEach(q => {
+        firebaseService.saveQuestion(deviceId, q).catch(console.error);
+      });
+
       return { success: addedCount, failed: duplicateCount };
     } catch (error) {
       console.error("Error importing bank:", error);
@@ -130,6 +143,11 @@ export const storageService = {
     const bank = storageService.getBank();
     const updatedBank = bank.filter(q => q.id !== id);
     localStorage.setItem(BANK_KEY, JSON.stringify(updatedBank));
+
+    // Xóa trên Cloud
+    const deviceId = storageService.getDeviceId();
+    firebaseService.deleteQuestion(deviceId, id).catch(console.error);
+
     return updatedBank;
   },
 
@@ -163,5 +181,39 @@ export const storageService = {
     }
 
     return bank;
+  },
+
+  // Hàm đồng bộ toàn diện từ Local lên Cloud
+  syncCloud: async (): Promise<void> => {
+    try {
+      const deviceId = storageService.getDeviceId();
+      const localBank = storageService.getBank();
+
+      // Đẩy từng câu hỏi lên
+      for (const q of localBank) {
+        await firebaseService.saveQuestion(deviceId, q);
+      }
+
+      console.log("Alla Sync - Cloud Pushed Successfully");
+    } catch (error) {
+      console.error("Alla Sync - Error during pushing to cloud:", error);
+      throw error;
+    }
+  },
+
+  // Hàm tải dữ liệu từ Cloud về Local
+  pullCloud: async (): Promise<void> => {
+    try {
+      const deviceId = storageService.getDeviceId();
+      const cloudBank = await firebaseService.getBank(deviceId);
+
+      if (cloudBank.length > 0) {
+        localStorage.setItem(BANK_KEY, JSON.stringify(cloudBank));
+        console.log("Alla Sync - Cloud Pulled Successfully", cloudBank.length, "questions");
+      }
+    } catch (error) {
+      console.error("Alla Sync - Error during pulling from cloud:", error);
+      throw error;
+    }
   }
 };

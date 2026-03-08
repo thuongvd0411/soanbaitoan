@@ -5,7 +5,8 @@ import { AppState, Difficulty, Question, QuestionType, HistoryItem, AnswerMode, 
 import { generateQuestions, generateMillionaireQuestions } from './services/geminiService';
 import { getLessonOptions } from './services/syllabusData';
 import { storageService } from './services/storageService';
-import { Download, PlusCircle, BookOpen, Loader2, X, FileSignature, Menu, Trophy, Sparkles, RotateCcw, Home, HelpCircle, FastForward, HeartPulse, HandMetal, PartyPopper, Volume2, VolumeX, ArrowRight, Wallet, Info, Flame, ShieldAlert, Crown, History, Search, Upload, CheckSquare, Save, Database, ChevronRight, ListChecks, BrainCircuit, Star, Award, FileCode, Printer, RefreshCw, LogOut, PenLine, PenTool, ChevronDown, ChevronUp, Play, Gift, ImageIcon } from 'lucide-react';
+import { firebaseService } from './services/firebaseService';
+import { Download, PlusCircle, BookOpen, Loader2, X, FileSignature, Menu, Trophy, Sparkles, RotateCcw, Home, HelpCircle, FastForward, HeartPulse, HandMetal, PartyPopper, Volume2, VolumeX, ArrowRight, Wallet, Info, Flame, ShieldAlert, Crown, History, Search, Upload, CheckSquare, Save, Database, ChevronRight, ListChecks, BrainCircuit, Star, Award, FileCode, Printer, RefreshCw, LogOut, PenLine, PenTool, ChevronDown, ChevronUp, Play, Gift, ImageIcon, CloudLightning } from 'lucide-react';
 
 declare global {
   interface Window {
@@ -584,6 +585,7 @@ export default function App() {
   const [showActivateModal, setShowActivateModal] = useState(false);
   const [activationToken, setActivationToken] = useState('');
   const [isActivating, setIsActivating] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const LICENSE_SERVER_URL = 'https://script.google.com/macros/s/AKfycbzojyLK8je1IsaOZWh18ljiw4Nb7sQt4wcWITrn6HmRIAAw2iZ0sw0Z4RBWqf3JIdeDwA/exec';
 
   const handleActivate = async () => {
@@ -621,6 +623,10 @@ export default function App() {
         }));
         alert("Kích hoạt thành công! Chào mừng anh Thưởng.");
         setShowActivateModal(false);
+
+        // Kích hoạt đồng bộ Cloud ngay lập tức sau khi có License
+        setIsSyncing(true);
+        storageService.syncCloud().finally(() => setIsSyncing(false));
       } else if (result.error === 'TOKEN_CLONED' || result.message === 'TOKEN_CLONED' || result.status === 'TOKEN_CLONED') {
         localStorage.removeItem('math_app_license_session');
         alert("LỖI: Token này đã được sử dụng cho thiết bị khác (TOKEN_CLONED). Ứng dụng sẽ bị khóa.");
@@ -654,6 +660,17 @@ export default function App() {
         localStorage.removeItem('math_app_license_session');
         setShowActivateModal(true);
         alert("Phát hiện thay đổi thiết bị hoặc sao chép dữ liệu trái phép. Vui lòng kích hoạt lại.");
+        return;
+      }
+
+      // Nếu đã có license, thực hiện đồng bộ từ Cloud về máy
+      setIsSyncing(true);
+      try {
+        await storageService.pullCloud();
+      } catch (err) {
+        console.error("Initial cloud pull failed:", err);
+      } finally {
+        setIsSyncing(false);
       }
     };
     checkSecurity();
@@ -758,6 +775,15 @@ export default function App() {
           <div className="fixed bottom-8 right-8 flex flex-col gap-4 no-print z-40"> <button onClick={triggerMath} title="Làm mới" className="bg-blue-600 text-white p-5 rounded-2xl shadow-2xl border-b-4 border-blue-800"><RefreshCw size={28} /></button> <button onClick={handleExportHTML} title="Xuất HTML" className="bg-amber-600 text-white p-5 rounded-2xl shadow-2xl border-b-4 border-amber-800"><FileCode size={28} /></button> <button onClick={() => window.print()} title="In" className="bg-green-600 text-white p-5 rounded-2xl shadow-2xl border-b-4 border-green-800"><Printer size={28} /></button> <button onClick={handleGenerate} title="Soạn lại" className="bg-primary text-white p-5 rounded-2xl shadow-2xl hover:scale-110 transition-all active:scale-90 border-b-4 border-blue-900"><PlusCircle size={28} /></button> </div>
         )}
       </main>
+      {isSyncing && (
+        <div className="fixed top-24 right-8 z-[60] animate-in slide-in-from-right-10 duration-500">
+          <div className="bg-white/90 backdrop-blur-md border border-blue-100 px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
+            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+            <span className="text-[10px] font-black uppercase text-blue-600 tracking-widest whitespace-nowrap">Đang đồng bộ Cloud...</span>
+            <CloudLightning size={12} className="text-blue-500 animate-bounce" />
+          </div>
+        </div>
+      )}
       {isLoading && (
         <div className="fixed inset-0 bg-black/50 z-[100] flex flex-col items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white p-8 rounded-3xl shadow-2xl max-w-md w-full text-center space-y-6 border-4 border-white animate-in zoom-in-95">
