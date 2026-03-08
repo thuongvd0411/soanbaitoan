@@ -577,8 +577,9 @@ export default function App() {
       const updated = [{ id: Date.now().toString(), timestamp: Date.now(), config: { ...config }, questions: balancedRes }, ...history].slice(0, 15);
       setHistory(updated); localStorage.setItem('math_app_history', JSON.stringify(updated));
     } catch (e: any) {
+      console.error("Alla Debug - Generate Error:", e);
       if (e.message === "LICENSE_REQUIRED") alert("Vui lòng kích hoạt bản quyền!");
-      else alert("Lỗi AI.");
+      else alert("Lỗi AI: " + (e.message || "Vui lòng kiểm tra console"));
     } finally { clearInterval(progressTimer); setIsLoading(false); }
   };
 
