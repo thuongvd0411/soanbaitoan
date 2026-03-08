@@ -611,7 +611,7 @@ export default function App() {
       const result = await response.json();
       console.log("Alla Debug - Server Result:", result);
 
-      if (result.status === 'ACTIVE' || result.status === 'SUCCESS') {
+      if (result.status === 'ACTIVE' || result.status === 'SUCCESS' || result.ok === true) {
         localStorage.setItem('math_app_license_session', JSON.stringify({
           status: 'ACTIVE',
           token: activationToken.trim(),
@@ -621,7 +621,7 @@ export default function App() {
         }));
         alert("Kích hoạt thành công! Chào mừng anh Thưởng.");
         setShowActivateModal(false);
-      } else if (result.error === 'TOKEN_CLONED' || result.message === 'TOKEN_CLONED') {
+      } else if (result.error === 'TOKEN_CLONED' || result.message === 'TOKEN_CLONED' || result.status === 'TOKEN_CLONED') {
         localStorage.removeItem('math_app_license_session');
         alert("LỖI: Token này đã được sử dụng cho thiết bị khác (TOKEN_CLONED). Ứng dụng sẽ bị khóa.");
       } else {
