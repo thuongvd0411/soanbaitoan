@@ -65,8 +65,9 @@ export const generateQuestions = async (
   previousQuestions: Question[] = [],
   onProgress?: (percent: number) => void
 ): Promise<Question[]> => {
-  if (!process.env.API_KEY) throw new Error("Missing API Key");
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!apiKey) throw new Error("Missing API Key");
+  const ai = new GoogleGenAI(apiKey);
 
   const systemInstruction = `
     Bạn là một chuyên gia giáo dục Toán học Việt Nam.
@@ -89,10 +90,10 @@ export const generateQuestions = async (
   const result = await ai.models.generateContent({
     model: 'gemini-3-pro-preview',
     contents: prompt,
-    config: { 
-      systemInstruction, 
-      responseMimeType: "application/json", 
-      responseSchema: questionSchema, 
+    config: {
+      systemInstruction,
+      responseMimeType: "application/json",
+      responseSchema: questionSchema,
       temperature: 0.2 // Giảm nhiệt độ xuống thấp nhất để AI tập trung vào tính toán tọa độ chính xác
     },
   });
@@ -104,8 +105,9 @@ export const generateQuestions = async (
 };
 
 export const generateMillionaireQuestions = async (grade: number, lessons: string[]): Promise<Question[]> => {
-  if (!process.env.API_KEY) throw new Error("Missing API Key");
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!apiKey) throw new Error("Missing API Key");
+  const ai = new GoogleGenAI(apiKey);
   const lessonContext = lessons.length > 0 ? lessons.join(", ") : "Kiến thức tổng hợp";
   const systemInstruction = `Host Triệu Phú Toán Học. Tạo 16 câu hỏi trắc nghiệm. ${MATH_FORMAT_INSTRUCTION} ${GRAPHING_INSTRUCTION} ${ANSWER_DISTRIBUTION_INSTRUCTION}`;
   const response = await ai.models.generateContent({
