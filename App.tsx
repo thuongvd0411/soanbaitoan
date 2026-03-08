@@ -598,24 +598,34 @@ export default function App() {
         throw new Error("MISSING_SECURITY_INFO");
       }
 
-      const response = await fetch(`${LICENSE_SERVER_URL}?token=${activationToken}&deviceId=${deviceId}&fingerprint=${fingerprint}&action=activate`);
-      const result = await response.json();
+      const params = new URLSearchParams({
+        token: activationToken.trim(),
+        deviceId: deviceId,
+        fingerprint: fingerprint,
+        action: 'activate'
+      });
 
-      if (result.status === 'ACTIVE') {
+      console.log("Alla Debug - Activating with URL:", `${LICENSE_SERVER_URL}?${params.toString()}`);
+
+      const response = await fetch(`${LICENSE_SERVER_URL}?${params.toString()}`);
+      const result = await response.json();
+      console.log("Alla Debug - Server Result:", result);
+
+      if (result.status === 'ACTIVE' || result.status === 'SUCCESS') {
         localStorage.setItem('math_app_license_session', JSON.stringify({
           status: 'ACTIVE',
-          token: activationToken,
+          token: activationToken.trim(),
           deviceId,
           fingerprint,
-          expiry: result.expiry
+          expiry: result.expiry || 'Vĩnh viễn'
         }));
         alert("Kích hoạt thành công! Chào mừng anh Thưởng.");
         setShowActivateModal(false);
-      } else if (result.error === 'TOKEN_CLONED') {
+      } else if (result.error === 'TOKEN_CLONED' || result.message === 'TOKEN_CLONED') {
         localStorage.removeItem('math_app_license_session');
         alert("LỖI: Token này đã được sử dụng cho thiết bị khác (TOKEN_CLONED). Ứng dụng sẽ bị khóa.");
       } else {
-        alert("Lỗi: " + (result.message || "Token không hợp lệ"));
+        alert("Lỗi: " + (result.message || result.error || "Token không hợp lệ"));
       }
     } catch (error) {
       console.error("Activation error:", error);
