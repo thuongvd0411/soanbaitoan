@@ -70,7 +70,7 @@ export const generateQuestions = async (
   const userKey = config.customApiKey;
 
   // Ưu tiên customApiKey từ config, sau đó mới đến biến môi trường
-  const apiKey = userKey || sysKey;
+  const apiKey = (userKey || sysKey)?.trim();
 
   console.log(`Alla Debug - [v5.2.3] API Key Check:
     - User/Custom Key: ${userKey ? "Sẵn sàng (Đầu: " + userKey.substring(0, 5) + "...)" : "Trống"}
