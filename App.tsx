@@ -518,6 +518,25 @@ const Sidebar = ({ config, setConfig, onGenerate, onStartGame, isLoading, onShow
             <div className="grid grid-cols-2 gap-4"> <div> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest">Số câu hỏi</label> <input type="number" min={1} max={50} className="w-full border border-gray-300 rounded-lg p-2 font-bold focus:ring-2 ring-primary/20 outline-none" value={config.questionCount} onChange={(e) => setConfig({ ...config, questionCount: Number(e.target.value) })} /> </div> <div> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest">Lời giải</label> <select className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 ring-primary/20 outline-none" value={config.answerMode} onChange={(e) => setConfig({ ...config, answerMode: e.target.value as AnswerMode })}> <option value={AnswerMode.None}>Không hiển thị</option> <option value={AnswerMode.Basic}>Đáp án ngắn gọn</option> <option value={AnswerMode.Detailed}>Lời giải chi tiết</option> </select> </div> </div>
             <div> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest flex items-center justify-between"> <span>Tỷ lệ hình vẽ (SVG)</span> <span className="bg-gray-200 text-gray-700 px-1.5 rounded">{config.imageRatio}%</span> </label> <div className="flex items-center gap-2"> <ImageIcon size={14} className="text-gray-400" /> <input type="range" min="0" max="100" step="10" className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary" value={config.imageRatio} onChange={(e) => setConfig({ ...config, imageRatio: Number(e.target.value) })} /> </div> </div>
             <div> <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-widest">Mức độ nhận thức</label> <div className="flex flex-wrap gap-1.5"> {Object.values(Difficulty).map(diff => (<button key={diff} onClick={() => handleDifficultyChange(diff)} className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase border transition-all ${config.selectedDifficulties.includes(diff) ? 'bg-primary text-white border-primary shadow-md' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>{diff}</button>))} </div> </div>
+
+            <div className="pt-4 border-t border-gray-100">
+              <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-widest flex items-center gap-2">
+                <ShieldAlert size={12} className="text-orange-500" /> Cài đặt Gemini API Key
+              </label>
+              <input
+                type="password"
+                placeholder="Dán API Key cá nhân (nếu có)..."
+                className="w-full border border-gray-300 rounded-lg p-2 text-[10px] focus:ring-2 ring-primary/20 outline-none bg-gray-50"
+                value={config.customApiKey || ''}
+                onChange={(e) => {
+                  const newKey = e.target.value;
+                  setConfig({ ...config, customApiKey: newKey });
+                  localStorage.setItem('math_app_custom_api_key', newKey);
+                }}
+              />
+              <p className="text-[9px] text-gray-400 mt-1 italic">Mặc định sẽ dùng Key hệ thống nếu bỏ trống.</p>
+            </div>
+
             <div className="bg-purple-50 p-4 rounded-2xl border border-purple-100 shadow-sm text-center relative overflow-hidden group"> <Trophy size={28} className="mx-auto text-purple-600 mb-1" /> <p className="text-[10px] font-black text-purple-700 uppercase mb-3 tracking-tighter italic">Ai Là Triệu Phú Toán Học</p> <button onClick={() => { onStartGame(); onClose(); }} disabled={isLoading} className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-black py-3 rounded-xl shadow-lg active:scale-95 transition-all text-[10px] uppercase border-b-4 border-indigo-800">BẮT ĐẦU CHƠI</button> </div>
           </div>
         </div>
@@ -556,7 +575,16 @@ export default function App() {
   const [showBankModal, setShowBankModal] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  useEffect(() => { const saved = localStorage.getItem('math_app_history'); if (saved) setHistory(JSON.parse(saved)); }, []);
+  useEffect(() => {
+    const saved = localStorage.getItem('math_app_history');
+    if (saved) setHistory(JSON.parse(saved));
+
+    // Load Custom API Key
+    const savedKey = localStorage.getItem('math_app_custom_api_key');
+    if (savedKey) {
+      setConfig(prev => ({ ...prev, customApiKey: savedKey }));
+    }
+  }, []);
   useLayoutEffect(() => { const timer = setTimeout(triggerMath, 200); return () => clearTimeout(timer); }, [questions, gameQuestions, config.gameStatus, isLoading]);
 
   const handleGenerate = async () => {
@@ -571,11 +599,28 @@ export default function App() {
       }
 
       const res = await generateQuestions(config, questions);
-      // ÁP DỤNG CÂN BẰNG ĐÁP ÁN TUYỆT ĐỐI (DÙ AI CÓ TRẢ VỀ TOÀN A THÌ FRONTEND VẪN SẼ TRÁO RA ĐỀU)
+      // ÁP DỤNG CÂN BẰNG ĐÁP ÁN TUYỆT ĐỐI
       const balancedRes = distributeAnswersEvenly(res);
       setQuestions(balancedRes);
-      const updated = [{ id: Date.now().toString(), timestamp: Date.now(), config: { ...config }, questions: balancedRes }, ...history].slice(0, 15);
-      setHistory(updated); localStorage.setItem('math_app_history', JSON.stringify(updated));
+
+      const newHistoryItem: HistoryItem = {
+        id: Date.now().toString(),
+        timestamp: Date.now(),
+        config: { ...config },
+        questions: balancedRes
+      };
+
+      const updated = [newHistoryItem, ...history].slice(0, 15);
+      setHistory(updated);
+      localStorage.setItem('math_app_history', JSON.stringify(updated));
+
+      // TỰ ĐỘNG LƯU CLOUD (Save Quota)
+      const { deviceId } = await storageService.getSecurityParams();
+      if (deviceId) {
+        firebaseService.saveHistory(deviceId, newHistoryItem).catch(err => console.error("Cloud Auto-save failed:", err));
+        // Đồng thời lưu từng câu vào kho tư liệu nếu anh muốn - Ở đây em lưu cả bộ vào History trước
+      }
+
     } catch (e: any) {
       console.error("Alla Debug - Generate Error:", e);
       if (e.message === "LICENSE_REQUIRED") alert("Vui lòng kích hoạt bản quyền!");
@@ -677,6 +722,16 @@ export default function App() {
       setIsSyncing(true);
       try {
         await storageService.pullCloud();
+        // Tải thêm lịch sử soạn thảo từ Cloud
+        const cloudHistory = await firebaseService.getHistory(deviceId);
+        if (cloudHistory.length > 0) {
+          setHistory(prev => {
+            // Hợp nhất và loại bỏ trùng lặp (ví dụ theo timestamp)
+            const combined = [...cloudHistory, ...prev];
+            const unique = Array.from(new Map(combined.map(item => [item.id, item])).values());
+            return unique.sort((a, b) => b.timestamp - a.timestamp).slice(0, 20);
+          });
+        }
       } catch (err) {
         console.error("Initial cloud pull failed:", err);
       } finally {
@@ -696,11 +751,22 @@ export default function App() {
     setIsLoading(true); setProgress(0);
     const progressTimer = setInterval(() => setProgress(prev => prev >= 98 ? 98 : prev + 4), 500);
     try {
-      const res = await generateMillionaireQuestions(config.grade, config.lessons.length > 0 ? config.lessons : [config.customLesson || "Tổng hợp"]);
+      const res = await generateMillionaireQuestions(config.grade, config.lessons.length > 0 ? config.lessons : [config.customLesson || "Tổng hợp"], config);
       const balancedRes = distributeAnswersEvenly(res);
       setGameQuestions(balancedRes);
       setConfig(prev => ({ ...prev, gameStatus: GameStatus.Playing }));
-    } catch (e) { alert("Lỗi trò chơi."); } finally { clearInterval(progressTimer); setIsLoading(false); }
+
+      // Tự động lưu Cloud
+      const { deviceId } = await storageService.getSecurityParams();
+      if (deviceId) {
+        firebaseService.saveHistory(deviceId, {
+          id: 'game_' + Date.now(),
+          timestamp: Date.now(),
+          config: { ...config },
+          questions: balancedRes
+        }).catch(console.error);
+      }
+    } catch (e) { alert("Lỗi trò chơi: " + (e as Error).message); } finally { clearInterval(progressTimer); setIsLoading(false); }
   };
 
   const handleBackup = () => { const data = storageService.getBank(); const blob = new Blob([JSON.stringify(data)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'math_bank.json'; a.click(); };

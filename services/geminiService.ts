@@ -66,9 +66,10 @@ export const generateQuestions = async (
   onProgress?: (percent: number) => void
 ): Promise<Question[]> => {
   const env = (import.meta as any).env;
-  const apiKey = env?.VITE_GEMINI_API_KEY;
+  // Ưu tiên customApiKey từ config, sau đó mới đến biến môi trường
+  const apiKey = config.customApiKey || env?.VITE_GEMINI_API_KEY;
 
-  console.log("Alla Debug - [v5.1b] Checking API Key...");
+  console.log("Alla Debug - [v5.2] Checking API Key...");
 
   if (!apiKey || apiKey === "undefined" || apiKey === "null" || apiKey === "") {
     const errorMsg = `Lỗi AI: API Key (VITE_GEMINI_API_KEY) hiện tại là [${apiKey}].
@@ -121,12 +122,16 @@ Vui lòng kiểm tra:
   }
 };
 
-export const generateMillionaireQuestions = async (grade: number, lessons: string[]): Promise<Question[]> => {
+export const generateMillionaireQuestions = async (
+  grade: number,
+  lessons: string[],
+  config: AppState
+): Promise<Question[]> => {
   const env = (import.meta as any).env;
-  const apiKey = env?.VITE_GEMINI_API_KEY;
+  const apiKey = config.customApiKey || env?.VITE_GEMINI_API_KEY;
 
   if (!apiKey || apiKey === "undefined" || apiKey === "null" || apiKey === "") {
-    console.error("Alla Debug - [v5.1b] Game API Key is missing.");
+    console.error("Alla Debug - [v5.2] Game API Key is missing.");
     throw new Error("API Key cho Game chưa được nạp. (VITE_GEMINI_API_KEY)");
   }
 

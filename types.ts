@@ -74,6 +74,8 @@ export interface AppState {
   imageMode: ImageMode;
   answerMode: AnswerMode;
   imageRatio: number;
+  // API Key tùy chỉnh
+  customApiKey?: string;
   // Game state
   gameStatus: GameStatus;
 }
