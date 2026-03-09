@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
-import { GoogleGenAI, Modality } from "@google/genai";
 import { AppState, Difficulty, Question, QuestionType, HistoryItem, AnswerMode, ExamType, ImageMode, GameStatus } from './types';
 import { generateQuestions, generateMillionaireQuestions } from './services/geminiService';
 import { getLessonOptions } from './services/syllabusData';
@@ -923,7 +922,7 @@ export default function App() {
               </button>
             </div>
 
-            <p className="mt-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Alla Security Engine v5.2.4 (SDK Optimized)</p>
+            <p className="mt-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Alla Security Engine v5.2.5 (Official Standard)</p>
           </div>
         </div>
       )}
