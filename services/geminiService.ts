@@ -65,11 +65,18 @@ export const generateQuestions = async (
   previousQuestions: Question[] = [],
   onProgress?: (percent: number) => void
 ): Promise<Question[]> => {
-  const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY;
+  const env = (import.meta as any).env;
+  const apiKey = env?.VITE_GEMINI_API_KEY;
+
+  console.log("Alla Debug - [v5.1b] Checking API Key...");
 
   if (!apiKey || apiKey === "undefined" || apiKey === "null" || apiKey === "") {
-    console.error("Alla Debug - API Key is missing or invalid string.");
-    throw new Error("API Key chưa được nạp từ GitHub. Vui lòng chờ 1 phút hoặc kiểm tra Secrets.");
+    const errorMsg = `Lỗi AI: API Key (VITE_GEMINI_API_KEY) hiện tại là [${apiKey}].
+Vui lòng kiểm tra:
+1. GitHub Repo Settings -> Secrets -> Actions đã có VITE_GEMINI_API_KEY chưa.
+2. Đảm bảo tên Secret KHÔNG có dấu cách thừa.`;
+    console.error("Alla Debug - " + errorMsg);
+    throw new Error(errorMsg);
   }
 
   const ai = new GoogleGenAI(apiKey);
@@ -115,10 +122,12 @@ export const generateQuestions = async (
 };
 
 export const generateMillionaireQuestions = async (grade: number, lessons: string[]): Promise<Question[]> => {
-  const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY;
+  const env = (import.meta as any).env;
+  const apiKey = env?.VITE_GEMINI_API_KEY;
 
   if (!apiKey || apiKey === "undefined" || apiKey === "null" || apiKey === "") {
-    throw new Error("API Key cho Game chưa được nạp.");
+    console.error("Alla Debug - [v5.1b] Game API Key is missing.");
+    throw new Error("API Key cho Game chưa được nạp. (VITE_GEMINI_API_KEY)");
   }
 
   const ai = new GoogleGenAI(apiKey);

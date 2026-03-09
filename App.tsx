@@ -647,6 +647,15 @@ export default function App() {
       // Đảm bảo sinh fingerprint ngay khi load
       await storageService.getFingerprint();
 
+      // Alla Debug - Kiểm tra biến môi trường (không log giá trị)
+      const env = (import.meta as any).env;
+      console.log("Alla Debug - [v5.1b] Environment Check:", {
+        VITE_GEMINI_API_KEY: !!env?.VITE_GEMINI_API_KEY,
+        VITE_FIREBASE_API_KEY: !!env?.VITE_FIREBASE_API_KEY,
+        BASE_URL: env?.BASE_URL,
+        MODE: env?.MODE
+      });
+
       const sessionStr = localStorage.getItem('math_app_license_session');
       if (!sessionStr) {
         setShowActivateModal(true);
