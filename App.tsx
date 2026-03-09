@@ -524,7 +524,7 @@ const Sidebar = ({ config, setConfig, onGenerate, onStartGame, isLoading, onShow
                 value={config.customApiKey || ''}
                 onChange={(e) => {
                   const newKey = e.target.value;
-                  setConfig({ ...config, customApiKey: newKey });
+                  setConfig((prev: AppState) => ({ ...prev, customApiKey: newKey }));
                   localStorage.setItem('math_app_custom_api_key', newKey);
                 }}
               />
@@ -600,6 +600,11 @@ export default function App() {
         throw new Error("LICENSE_REQUIRED");
       }
 
+      console.log("Alla Debug - handleGenerate triggering with config:", {
+        hasCustomKey: !!config.customApiKey,
+        grade: config.grade,
+        lessons: config.lessons
+      });
       const res = await generateQuestions(config, questions);
       // ÁP DỤNG CÂN BẰNG ĐÁP ÁN TUYỆT ĐỐI
       const balancedRes = distributeAnswersEvenly(res);
@@ -918,7 +923,7 @@ export default function App() {
               </button>
             </div>
 
-            <p className="mt-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Alla Security Engine v5.2.2 (Cloud Ready)</p>
+            <p className="mt-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Alla Security Engine v5.2.3 (Diagnostic Mode)</p>
           </div>
         </div>
       )}

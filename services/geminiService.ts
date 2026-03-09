@@ -65,18 +65,24 @@ export const generateQuestions = async (
   previousQuestions: Question[] = [],
   onProgress?: (percent: number) => void
 ): Promise<Question[]> => {
-  const env = (import.meta as any).env;
-  // Ưu tiên customApiKey từ config, sau đó mới đến biến môi trường
-  const apiKey = config.customApiKey || env?.VITE_GEMINI_API_KEY;
+  const env = (import.meta as any).env || {};
+  const sysKey = env.VITE_GEMINI_API_KEY;
+  const userKey = config.customApiKey;
 
-  console.log("Alla Debug - [v5.2] Checking API Key...");
+  // Ưu tiên customApiKey từ config, sau đó mới đến biến môi trường
+  const apiKey = userKey || sysKey;
+
+  console.log(`Alla Debug - [v5.2.3] API Key Check:
+    - User/Custom Key: ${userKey ? "Sẵn sàng (Đầu: " + userKey.substring(0, 5) + "...)" : "Trống"}
+    - System Key: ${sysKey ? "Sẵn sàng (Đầu: " + sysKey.substring(0, 5) + "...)" : "Trống (Lỗi deploy?)"}
+    - Final Key used: ${apiKey ? "Đã chọn" : "KHÔNG CÓ"}
+  `);
 
   if (!apiKey || apiKey === "undefined" || apiKey === "null" || apiKey === "") {
-    const errorMsg = `Lỗi AI: API Key (VITE_GEMINI_API_KEY) hiện tại là [${apiKey}].
-Vui lòng kiểm tra:
-1. GitHub Repo Settings -> Secrets -> Actions đã có VITE_GEMINI_API_KEY chưa.
-2. Đảm bảo tên Secret KHÔNG có dấu cách thừa.`;
-    console.error("Alla Debug - " + errorMsg);
+    const errorMsg = `Lỗi AI: Không tìm thấy API Key hợp lệ. 
+    [Dành cho anh Thưởng]:
+    - Nếu anh đã nhập Key cá nhân: Có thể Key bị lỗi hoặc chưa lưu. Hãy thử xóa đi nhập lại.
+    - Nếu dùng Key hệ thống: GitHub chưa cấp Key hoặc Secret bị sai tên.`;
     throw new Error(errorMsg);
   }
 
@@ -127,12 +133,11 @@ export const generateMillionaireQuestions = async (
   lessons: string[],
   config: AppState
 ): Promise<Question[]> => {
-  const env = (import.meta as any).env;
-  const apiKey = config.customApiKey || env?.VITE_GEMINI_API_KEY;
+  const env = (import.meta as any).env || {};
+  const apiKey = config.customApiKey || env.VITE_GEMINI_API_KEY;
 
   if (!apiKey || apiKey === "undefined" || apiKey === "null" || apiKey === "") {
-    console.error("Alla Debug - [v5.2] Game API Key is missing.");
-    throw new Error("API Key cho Game chưa được nạp. (VITE_GEMINI_API_KEY)");
+    throw new Error("API Key cho Game chưa được nạp. Vui lòng kiểm tra Cấu hình.");
   }
 
   const ai = new GoogleGenAI(apiKey);
