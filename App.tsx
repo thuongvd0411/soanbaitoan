@@ -936,7 +936,7 @@ export default function App() {
               </button>
             </div>
 
-            <p className="mt-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Alla v5.3 (SDK Final)</p>
+            <p className="mt-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Alla v5.3.1 (Gemini 2.5 Flash)</p>
           </div>
         </div>
       )}
