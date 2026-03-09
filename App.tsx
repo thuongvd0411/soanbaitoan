@@ -513,20 +513,14 @@ const Sidebar = ({ config, setConfig, onGenerate, onStartGame, isLoading, onShow
         <div className="flex items-center justify-between mb-6 text-primary"> <div className="flex items-center gap-2"><BookOpen size={28} /><h1 className="text-xl font-black uppercase tracking-tighter text-blue-900">Soạn Toán AI</h1></div> <button onClick={onClose} className="md:hidden p-2"><X size={24} /></button> </div>
         <div className="space-y-6 flex-1">
           <div className="space-y-4">
-            <div> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest">Khối Lớp</label> <select className="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50 font-bold focus:ring-2 ring-primary/20 outline-none" value={config.grade} onChange={(e) => setConfig({ ...config, grade: Number(e.target.value), lessons: [] })}> {Array.from({ length: 12 }, (_, i) => i + 1).map(g => <option key={g} value={g}>Toán Lớp {g}</option>)} </select> </div>
-            {config.examType === ExamType.None && (<div> <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-widest">Nội dung bài học (Chọn nhiều)</label> <LessonPicker grade={config.grade} selectedLessons={config.lessons} onChange={(lessons) => setConfig({ ...config, lessons })} /> <div className="mt-3"> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest">Hoặc nhập yêu cầu riêng</label> <input type="text" placeholder="Nhập chủ đề tùy chỉnh..." className="w-full border border-gray-300 rounded-lg p-2.5 text-xs focus:ring-2 ring-primary/20 outline-none" value={config.customLesson} onChange={(e) => setConfig({ ...config, customLesson: e.target.value })} /> </div> </div>)}
-            <div className="grid grid-cols-2 gap-4"> <div> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest">Số câu hỏi</label> <input type="number" min={1} max={50} className="w-full border border-gray-300 rounded-lg p-2 font-bold focus:ring-2 ring-primary/20 outline-none" value={config.questionCount} onChange={(e) => setConfig({ ...config, questionCount: Number(e.target.value) })} /> </div> <div> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest">Lời giải</label> <select className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 ring-primary/20 outline-none" value={config.answerMode} onChange={(e) => setConfig({ ...config, answerMode: e.target.value as AnswerMode })}> <option value={AnswerMode.None}>Không hiển thị</option> <option value={AnswerMode.Basic}>Đáp án ngắn gọn</option> <option value={AnswerMode.Detailed}>Lời giải chi tiết</option> </select> </div> </div>
-            <div> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest flex items-center justify-between"> <span>Tỷ lệ hình vẽ (SVG)</span> <span className="bg-gray-200 text-gray-700 px-1.5 rounded">{config.imageRatio}%</span> </label> <div className="flex items-center gap-2"> <ImageIcon size={14} className="text-gray-400" /> <input type="range" min="0" max="100" step="10" className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary" value={config.imageRatio} onChange={(e) => setConfig({ ...config, imageRatio: Number(e.target.value) })} /> </div> </div>
-            <div> <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-widest">Mức độ nhận thức</label> <div className="flex flex-wrap gap-1.5"> {Object.values(Difficulty).map(diff => (<button key={diff} onClick={() => handleDifficultyChange(diff)} className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase border transition-all ${config.selectedDifficulties.includes(diff) ? 'bg-primary text-white border-primary shadow-md' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>{diff}</button>))} </div> </div>
-
-            <div className="pt-4 border-t border-gray-100">
-              <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-widest flex items-center gap-2">
-                <ShieldAlert size={12} className="text-orange-500" /> Cài đặt Gemini API Key
+            <div className="p-4 bg-orange-50 rounded-2xl border border-orange-100 shadow-sm mb-4">
+              <label className="block text-[10px] font-black text-orange-600 mb-2 uppercase tracking-widest flex items-center gap-2">
+                <ShieldAlert size={14} /> Cấu hình Gemini API Key
               </label>
               <input
                 type="password"
-                placeholder="Dán API Key cá nhân (nếu có)..."
-                className="w-full border border-gray-300 rounded-lg p-2 text-[10px] focus:ring-2 ring-primary/20 outline-none bg-gray-50"
+                placeholder="Dán API Key của anh vào đây..."
+                className="w-full border border-orange-200 rounded-xl p-3 text-xs focus:ring-2 ring-orange-500/20 outline-none bg-white shadow-inner"
                 value={config.customApiKey || ''}
                 onChange={(e) => {
                   const newKey = e.target.value;
@@ -534,8 +528,12 @@ const Sidebar = ({ config, setConfig, onGenerate, onStartGame, isLoading, onShow
                   localStorage.setItem('math_app_custom_api_key', newKey);
                 }}
               />
-              <p className="text-[9px] text-gray-400 mt-1 italic">Mặc định sẽ dùng Key hệ thống nếu bỏ trống.</p>
+              <p className="text-[9px] text-orange-400 mt-2 leading-relaxed">
+                Nhập Key cá nhân để không bị phụ thuộc vào hệ thống. Alla sẽ ưu tiên dùng Key này của anh.
+              </p>
             </div>
+
+            <div> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest">Khối Lớp</label> <select className="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50 font-bold focus:ring-2 ring-primary/20 outline-none" value={config.grade} onChange={(e) => setConfig({ ...config, grade: Number(e.target.value), lessons: [] })}> {Array.from({ length: 12 }, (_, i) => i + 1).map(g => <option key={g} value={g}>Toán Lớp {g}</option>)} </select> </div>
 
             <div className="bg-purple-50 p-4 rounded-2xl border border-purple-100 shadow-sm text-center relative overflow-hidden group"> <Trophy size={28} className="mx-auto text-purple-600 mb-1" /> <p className="text-[10px] font-black text-purple-700 uppercase mb-3 tracking-tighter italic">Ai Là Triệu Phú Toán Học</p> <button onClick={() => { onStartGame(); onClose(); }} disabled={isLoading} className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-black py-3 rounded-xl shadow-lg active:scale-95 transition-all text-[10px] uppercase border-b-4 border-indigo-800">BẮT ĐẦU CHƠI</button> </div>
           </div>
