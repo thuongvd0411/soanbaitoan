@@ -936,7 +936,7 @@ export default function App() {
               </button>
             </div>
 
-            <p className="mt-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Alla Security Engine v5.2.7-Stable (Quota Optimized)</p>
+            <p className="mt-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Alla v5.2.8 (Gemini 2.0)</p>
           </div>
         </div>
       )}

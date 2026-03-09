@@ -71,8 +71,8 @@ export const generateQuestions = async (
 
   const apiKey = (userKey || sysKey)?.trim();
 
-  // Diagnostic Logs cho v5.2.6
-  console.log(`Alla Debug - [v5.2.6] (Gemini 2.0 Upgrade) API Key Check:
+  // Diagnostic Logs cho v5.2.8
+  console.log(`Alla Debug - [v5.2.8] API Key Check:
     - User/Custom Key: ${userKey ? "OK (" + userKey.substring(0, 5) + "...)" : "None"}
     - System Key: ${sysKey ? "OK (" + sysKey.substring(0, 5) + "...)" : "None"}
     - Active Key: ${apiKey ? "Selected" : "FAIL"}
@@ -84,7 +84,7 @@ export const generateQuestions = async (
 
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash',
+    model: 'gemini-2.0-flash',
     systemInstruction: `
       Bạn là một chuyên gia giáo dục Toán học Việt Nam.
       NHIỆM VỤ: Tạo câu hỏi Toán chuẩn chương trình GDPT 2018.
@@ -136,7 +136,7 @@ export const generateMillionaireQuestions = async (
 
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash', // Quay lại 1.5-flash nhưng dùng SDK chuẩn
+    model: 'gemini-2.0-flash',
     systemInstruction: `Host Triệu Phú Toán Học. Tạo 16 câu hỏi trắc nghiệm. ${MATH_FORMAT_INSTRUCTION} ${GRAPHING_INSTRUCTION} ${ANSWER_DISTRIBUTION_INSTRUCTION}`,
     generationConfig: { responseMimeType: "application/json", responseSchema: questionSchema, temperature: 0.3 }
   });
