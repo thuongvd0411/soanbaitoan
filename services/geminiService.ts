@@ -72,7 +72,7 @@ export const generateQuestions = async (
   // Ưu tiên customApiKey từ config, sau đó mới đến biến môi trường
   const apiKey = (userKey || sysKey)?.trim();
 
-  console.log(`Alla Debug - [v5.2.3] API Key Check:
+  console.log(`Alla Debug - [v5.2.4] API Key Check:
     - User/Custom Key: ${userKey ? "Sẵn sàng (Đầu: " + userKey.substring(0, 5) + "...)" : "Trống"}
     - System Key: ${sysKey ? "Sẵn sàng (Đầu: " + sysKey.substring(0, 5) + "...)" : "Trống (Lỗi deploy?)"}
     - Final Key used: ${apiKey ? "Đã chọn" : "KHÔNG CÓ"}
@@ -86,7 +86,8 @@ export const generateQuestions = async (
     throw new Error(errorMsg);
   }
 
-  const ai = new GoogleGenAI(apiKey);
+  // FIX v5.2.4: SDK @google/genai yêu cầu truyền Object { apiKey: string, dangerouslyAllowBrowser: true }
+  const ai = new GoogleGenAI({ apiKey, dangerouslyAllowBrowser: true });
 
   const systemInstruction = `
     Bạn là một chuyên gia giáo dục Toán học Việt Nam.
@@ -134,13 +135,13 @@ export const generateMillionaireQuestions = async (
   config: AppState
 ): Promise<Question[]> => {
   const env = (import.meta as any).env || {};
-  const apiKey = config.customApiKey || env.VITE_GEMINI_API_KEY;
+  const apiKey = (config.customApiKey || env.VITE_GEMINI_API_KEY)?.trim();
 
   if (!apiKey || apiKey === "undefined" || apiKey === "null" || apiKey === "") {
     throw new Error("API Key cho Game chưa được nạp. Vui lòng kiểm tra Cấu hình.");
   }
 
-  const ai = new GoogleGenAI(apiKey);
+  const ai = new GoogleGenAI({ apiKey, dangerouslyAllowBrowser: true });
   const lessonContext = lessons.length > 0 ? lessons.join(", ") : "Kiến thức tổng hợp";
   const systemInstruction = `Host Triệu Phú Toán Học. Tạo 16 câu hỏi trắc nghiệm. ${MATH_FORMAT_INSTRUCTION} ${GRAPHING_INSTRUCTION} ${ANSWER_DISTRIBUTION_INSTRUCTION}`;
   try {
