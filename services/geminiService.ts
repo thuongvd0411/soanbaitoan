@@ -91,7 +91,7 @@ export const generateQuestions = async (
   try {
     // API mới: ai.models.generateContent()
     const result = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-preview-04-17',
+      model: 'gemini-3-flash-preview',
       contents: prompt,
       config: {
         temperature: 0.2,
@@ -133,7 +133,7 @@ export const generateMillionaireQuestions = async (
 
   try {
     const result = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-preview-04-17',
+      model: 'gemini-3-flash-preview',
       contents: prompt,
       config: {
         temperature: 0.3,
