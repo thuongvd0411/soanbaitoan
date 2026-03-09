@@ -916,7 +916,7 @@ export default function App() {
               </button>
             </div>
 
-            <p className="mt-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Alla Security Engine v5.1b (Cloud Ready)</p>
+            <p className="mt-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Alla Security Engine v5.2 (Cloud Ready)</p>
           </div>
         </div>
       )}
