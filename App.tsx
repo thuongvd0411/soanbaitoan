@@ -516,17 +516,31 @@ const Sidebar = ({ config, setConfig, onGenerate, onStartGame, isLoading, onShow
               <label className="block text-[10px] font-black text-orange-600 mb-2 uppercase tracking-widest flex items-center gap-2">
                 <ShieldAlert size={14} /> Cấu hình Gemini API Key
               </label>
-              <input
-                type="password"
-                placeholder="Dán API Key của anh vào đây..."
-                className="w-full border border-orange-200 rounded-xl p-3 text-xs focus:ring-2 ring-orange-500/20 outline-none bg-white shadow-inner"
-                value={config.customApiKey || ''}
-                onChange={(e) => {
-                  const newKey = e.target.value;
-                  setConfig((prev: AppState) => ({ ...prev, customApiKey: newKey }));
-                  localStorage.setItem('math_app_custom_api_key', newKey);
-                }}
-              />
+              <div className="relative">
+                <input
+                  type="password"
+                  placeholder="Dán API Key của anh vào đây..."
+                  className="w-full border border-orange-200 rounded-xl p-3 pr-10 text-xs focus:ring-2 ring-orange-500/20 outline-none bg-white shadow-inner"
+                  value={config.customApiKey || ''}
+                  onChange={(e) => {
+                    const newKey = e.target.value;
+                    setConfig((prev: AppState) => ({ ...prev, customApiKey: newKey }));
+                    localStorage.setItem('math_app_custom_api_key', newKey);
+                  }}
+                />
+                {config.customApiKey && (
+                  <button
+                    onClick={() => {
+                      setConfig((prev: AppState) => ({ ...prev, customApiKey: '' }));
+                      localStorage.removeItem('math_app_custom_api_key');
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-orange-400 hover:text-orange-600 transition-colors"
+                    title="Xóa Key để dùng mặc định"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
               <p className="text-[9px] text-orange-400 mt-2 leading-relaxed">
                 Nhập Key cá nhân để không bị phụ thuộc vào hệ thống. Alla sẽ ưu tiên dùng Key này của anh.
               </p>
@@ -922,7 +936,7 @@ export default function App() {
               </button>
             </div>
 
-            <p className="mt-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Alla Security Engine v5.2.6 (Gemini 2.0 Flash)</p>
+            <p className="mt-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Alla Security Engine v5.2.7-Stable (Quota Optimized)</p>
           </div>
         </div>
       )}

@@ -84,7 +84,7 @@ export const generateQuestions = async (
 
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-1.5-flash',
     systemInstruction: `
       Bạn là một chuyên gia giáo dục Toán học Việt Nam.
       NHIỆM VỤ: Tạo câu hỏi Toán chuẩn chương trình GDPT 2018.
@@ -117,6 +117,9 @@ export const generateQuestions = async (
     }));
   } catch (error: any) {
     console.error("Alla Debug - Gemini Error:", error);
+    if (error.message?.includes("429") || error.message?.includes("quota")) {
+      throw new Error("Lỗi: API Key này đã HẾT LƯỢT DÙNG (Quota Exceeded). Anh vui lòng đổi Key khác hoặc chờ 1 lúc ạ.");
+    }
     throw error;
   }
 };
@@ -133,7 +136,7 @@ export const generateMillionaireQuestions = async (
 
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-1.5-flash', // Quay lại 1.5-flash nhưng dùng SDK chuẩn
     systemInstruction: `Host Triệu Phú Toán Học. Tạo 16 câu hỏi trắc nghiệm. ${MATH_FORMAT_INSTRUCTION} ${GRAPHING_INSTRUCTION} ${ANSWER_DISTRIBUTION_INSTRUCTION}`,
     generationConfig: { responseMimeType: "application/json", responseSchema: questionSchema, temperature: 0.3 }
   });
