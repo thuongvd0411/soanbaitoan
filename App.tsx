@@ -669,23 +669,14 @@ export default function App() {
         rem -= CHUNK_SIZE;
       }
 
-      let progressInterval: any = null;
-      setProgress(5);
+      setProgress(0);
 
       let completedChunks = 0;
       const updateProgress = () => {
         completedChunks++;
         const targetProgress = (completedChunks / chunks.length) * 100;
-        setProgress(Math.max(progress, targetProgress));
+        setProgress(targetProgress);
       };
-
-      progressInterval = setInterval(() => {
-        setProgress(prev => {
-          const nextTarget = ((completedChunks + 1) / chunks.length) * 100 - 2;
-          if (prev < nextTarget) return prev + 0.3;
-          return prev;
-        });
-      }, 500);
 
       const chunkPromises = chunks.map((size, index) => {
         return (async () => {
@@ -702,7 +693,6 @@ export default function App() {
       });
 
       const results = await Promise.all(chunkPromises);
-      if (progressInterval) clearInterval(progressInterval);
       const allQuestions = results.flat();
 
       const finalQuestions = distributeAnswersEvenly(allQuestions).map((q, idx) => ({

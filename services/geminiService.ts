@@ -45,9 +45,9 @@ async function retryWithFallback(
   ai: GoogleGenAI,
   prompt: string,
   config: { temperature: number },
-  maxRetries: number = 3
+  maxRetries: number = 2 // Giảm số lần retry để báo lỗi nhanh hơn
 ): Promise<string> {
-  const models = ['gemini-3-flash-preview', 'gemini-2.0-flash'];
+  const models = ['gemini-2.0-flash', 'gemini-1.5-flash']; // Ưu tiên bản 2.0 ổn định
 
   for (const modelName of models) {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -70,37 +70,32 @@ async function retryWithFallback(
         const msg = error.message || "";
         console.warn(`Alla Debug - Attempt ${attempt} failed (${modelName}):`, msg.substring(0, 100));
 
-        // 503 = server busy → chờ rồi thử lại
+        // 429 = quota → báo lỗi ngay lập tức, không thử lại model khác
+        if (msg.includes("429") || msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED")) {
+          throw new Error("API Key của anh đã hết lượt (Quota Limit). Anh vui lòng đổi Key mới ở mục Cấu hình nhé.");
+        }
+
+        // 503 = server busy → chỉ chờ nếu chưa phải lần cuối
         if (msg.includes("503") || msg.includes("overloaded") || msg.includes("high demand")) {
           if (attempt < maxRetries) {
-            const waitMs = attempt * 2000; // 2s, 4s, 6s
+            const waitMs = attempt * 1500;
             console.log(`Alla Debug - Waiting ${waitMs}ms before retry...`);
             await new Promise(r => setTimeout(r, waitMs));
             continue;
           }
         }
 
-        // 404 = model not found → chuyển model tiếp theo
+        // 404 = model not found → chuyển model tiếp theo ngay
         if (msg.includes("404") || msg.includes("not found")) {
-          console.log(`Alla Debug - Model ${modelName} not available, trying next...`);
-          break; // Chuyển sang model tiếp theo
-        }
-
-        // 429 = quota → báo lỗi ngay
-        if (msg.includes("429") || msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED")) {
-          throw new Error("API Key đã hết lượt. Anh vui lòng đổi Key mới ở mục Cấu hình.");
-        }
-
-        // Lỗi khác → thử lại hoặc throw
-        if (attempt === maxRetries) {
-          // Thử model tiếp theo
           break;
         }
+
+        // Lỗi khác -> nếu là model cuối và attempt cuối thì sẽ throw sau vòng lặp
       }
     }
   }
 
-  throw new Error("Tất cả model AI đều đang quá tải. Anh thử lại sau 30 giây nhé.");
+  throw new Error("Máy chủ AI đang bận hoặc Key không khả dụng. Anh vui lòng kiểm tra lại Key hoặc thử lại sau 30 giây.");
 }
 
 export const generateQuestions = async (
