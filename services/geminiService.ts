@@ -47,7 +47,7 @@ async function retryWithFallback(
   config: { temperature: number },
   maxRetries: number = 2 // Giảm số lần retry để báo lỗi nhanh hơn
 ): Promise<string> {
-  const models = ['gemini-2.0-flash', 'gemini-1.5-flash']; // Ưu tiên bản 2.0 ổn định
+  const models = ['gemini-2.0-flash', 'gemini-2.0-flash-lite'];
 
   for (const modelName of models) {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {

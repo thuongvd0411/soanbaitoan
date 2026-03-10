@@ -674,37 +674,34 @@ export default function App() {
         rem -= CHUNK_SIZE;
       }
 
-      setProgress(0);
+      let allQuestions: Question[] = [];
 
-      let completedChunks = 0;
-      const updateProgress = () => {
-        completedChunks++;
-        const targetProgress = (completedChunks / chunks.length) * 100;
-        setProgress(targetProgress);
-      };
-
-      const chunkPromises = chunks.map((size, index) => {
-        return (async () => {
-          try {
-            const chunkConfig = { ...config, questionCount: size };
-            const res = await generateQuestions(chunkConfig, [], index + 1);
-            updateProgress();
-            return res;
-          } catch (err) {
-            console.error(`Lỗi chunk ${index + 1}:`, err);
-            throw err;
+      for (let i = 0; i < chunks.length; i++) {
+        const chunkSize = chunks[i];
+        try {
+          const chunkConfig = { ...config, questionCount: chunkSize };
+          const res = await generateQuestions(chunkConfig, allQuestions, i + 1);
+          allQuestions = [...allQuestions, ...res];
+          setProgress(((i + 1) / chunks.length) * 100);
+        } catch (err: any) {
+          console.error(`Lỗi chunk ${i + 1}:`, err);
+          if (allQuestions.length > 0) {
+            alert(`AI chỉ tạo được ${allQuestions.length} câu. Phần còn lại bị lỗi: ${err.message}`);
+            break;
           }
-        })();
-      });
-
-      const results = await Promise.all(chunkPromises);
-      const allQuestions = results.flat();
+          throw err;
+        }
+      }
 
       const finalQuestions = distributeAnswersEvenly(allQuestions).map((q, idx) => ({
         ...q,
         id: `q_${Date.now()}_${idx}`,
         number: idx + 1
       }));
+
+      if (finalQuestions.length === 0) {
+        throw new Error("Không tạo được câu hỏi nào. Anh vui lòng thử lại.");
+      }
 
       setQuestions(finalQuestions);
       setProgress(100);
