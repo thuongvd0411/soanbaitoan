@@ -551,11 +551,11 @@ const Sidebar = ({ config, setConfig, onGenerate, onStartGame, isLoading, onShow
             </p>
           </div>
 
-          <div className="pb-4 border-b border-gray-100">
+          <div className="pb-4 border-b border-gray-100 italic">
             <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest flex items-center justify-between">
               <span>Mã đồng bộ (Sync ID)</span>
               <span className="text-primary hover:underline cursor-pointer lowercase" onClick={() => {
-                const newId = 'device_' + Math.random().toString(36).substring(2, 11);
+                const newId = 'device_' + Math.random().toString(36).substring(2, 12);
                 setConfig({ ...config, syncKey: newId });
               }}>Làm mới</span>
             </label>
@@ -566,34 +566,36 @@ const Sidebar = ({ config, setConfig, onGenerate, onStartGame, isLoading, onShow
               value={config.syncKey || ''}
               onChange={(e) => setConfig({ ...config, syncKey: e.target.value })}
             />
-            <p className="text-[9px] text-gray-400 mt-1 leading-tight italic">
+            <p className="text-[9px] text-gray-400 mt-1 leading-tight">
               * Copy mã này dán vào máy khác để thấy Lịch sử và Kho lưu của anh.
             </p>
           </div>
 
-          <div> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest">Khối Lớp</label> <select className="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50 font-bold focus:ring-2 ring-primary/20 outline-none" value={config.grade} onChange={(e) => setConfig({ ...config, grade: Number(e.target.value), lessons: [] })}> {Array.from({ length: 12 }, (_, i) => i + 1).map(g => <option key={g} value={g}>Toán Lớp {g}</option>)} </select> </div>
-          {config.examType === ExamType.None && (<div> <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-widest">Nội dung bài học (Chọn nhiều)</label> <LessonPicker grade={config.grade} selectedLessons={config.lessons} onChange={(lessons) => setConfig({ ...config, lessons })} /> <div className="mt-3"> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest">Hoặc nhập yêu cầu riêng</label> <input type="text" placeholder="Nhập chủ đề tùy chỉnh..." className="w-full border border-gray-300 rounded-lg p-2.5 text-xs focus:ring-2 ring-primary/20 outline-none" value={config.customLesson} onChange={(e) => setConfig({ ...config, customLesson: e.target.value })} /> </div> </div>)}
-          <div className="grid grid-cols-2 gap-4"> <div> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest">Số câu hỏi</label> <input type="number" min={1} max={50} className="w-full border border-gray-300 rounded-lg p-2 font-bold focus:ring-2 ring-primary/20 outline-none" value={config.questionCount} onChange={(e) => setConfig({ ...config, questionCount: Number(e.target.value) })} /> </div> <div> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest">Lời giải</label> <select className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 ring-primary/20 outline-none" value={config.answerMode} onChange={(e) => setConfig({ ...config, answerMode: e.target.value as AnswerMode })}> <option value={AnswerMode.None}>Không hiển thị</option> <option value={AnswerMode.Basic}>Đáp án ngắn gọn</option> <option value={AnswerMode.Detailed}>Lời giải chi tiết</option> </select> </div> </div>
-          <div> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest flex items-center justify-between"> <span>Tỷ lệ hình vẽ (SVG)</span> <span className="bg-gray-200 text-gray-700 px-1.5 rounded">{config.imageRatio}%</span> </label> <div className="flex items-center gap-2"> <ImageIcon size={14} className="text-gray-400" /> <input type="range" min="0" max="100" step="10" className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary" value={config.imageRatio} onChange={(e) => setConfig({ ...config, imageRatio: Number(e.target.value) })} /> </div> </div>
-          <div> <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-widest">Mức độ nhận thức</label> <div className="flex flex-wrap gap-1.5"> {Object.values(Difficulty).map(diff => (<button key={diff} onClick={() => handleDifficultyChange(diff)} className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase border transition-all ${config.selectedDifficulties.includes(diff) ? 'bg-primary text-white border-primary shadow-md' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>{diff}</button>))} </div> </div>
-
-          <div className="bg-purple-50 p-4 rounded-2xl border border-purple-100 shadow-sm text-center relative overflow-hidden group"> <Trophy size={28} className="mx-auto text-purple-600 mb-1" /> <p className="text-[10px] font-black text-purple-700 uppercase mb-3 tracking-tighter italic">Ai Là Triệu Phú Toán Học</p> <button onClick={() => { onStartGame(); onClose(); }} disabled={isLoading} className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-black py-3 rounded-xl shadow-lg active:scale-95 transition-all text-[10px] uppercase border-b-4 border-indigo-800">BẮT ĐẦU CHƠI</button> </div>
         </div>
-        <div className="mt-8 space-y-3">
-          <button onClick={() => { onGenerate(); onClose(); }} disabled={isLoading} className="w-full bg-primary hover:bg-blue-800 text-white font-black py-4 rounded-xl shadow-xl flex items-center justify-center gap-2 uppercase tracking-tight transition-all border-b-4 border-blue-900"> {isLoading ? <Loader2 className="animate-spin" /> : <PlusCircle size={22} />} Soạn bộ câu hỏi AI </button>
 
-          <button
-            onClick={() => { onSync(); }}
-            disabled={isSyncing}
-            className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 font-black py-3 rounded-xl flex items-center justify-center gap-2 uppercase text-[10px] transition-all border border-blue-100"
-          >
-            <Cloud className={isSyncing ? "animate-pulse" : ""} size={18} />
-            {isSyncing ? "Đang đồng bộ..." : "Đồng bộ đám mây"}
-          </button>
+        <div> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest">Khối Lớp</label> <select className="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50 font-bold focus:ring-2 ring-primary/20 outline-none" value={config.grade} onChange={(e) => setConfig({ ...config, grade: Number(e.target.value), lessons: [] })}> {Array.from({ length: 12 }, (_, i) => i + 1).map(g => <option key={g} value={g}>Toán Lớp {g}</option>)} </select> </div>
+        {config.examType === ExamType.None && (<div> <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-widest">Nội dung bài học (Chọn nhiều)</label> <LessonPicker grade={config.grade} selectedLessons={config.lessons} onChange={(lessons) => setConfig({ ...config, lessons })} /> <div className="mt-3"> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest">Hoặc nhập yêu cầu riêng</label> <input type="text" placeholder="Nhập chủ đề tùy chỉnh..." className="w-full border border-gray-300 rounded-lg p-2.5 text-xs focus:ring-2 ring-primary/20 outline-none" value={config.customLesson} onChange={(e) => setConfig({ ...config, customLesson: e.target.value })} /> </div> </div>)}
+        <div className="grid grid-cols-2 gap-4"> <div> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest">Số câu hỏi</label> <input type="number" min={1} max={50} className="w-full border border-gray-300 rounded-lg p-2 font-bold focus:ring-2 ring-primary/20 outline-none" value={config.questionCount} onChange={(e) => setConfig({ ...config, questionCount: Number(e.target.value) })} /> </div> <div> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest">Lời giải</label> <select className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 ring-primary/20 outline-none" value={config.answerMode} onChange={(e) => setConfig({ ...config, answerMode: e.target.value as AnswerMode })}> <option value={AnswerMode.None}>Không hiển thị</option> <option value={AnswerMode.Basic}>Đáp án ngắn gọn</option> <option value={AnswerMode.Detailed}>Lời giải chi tiết</option> </select> </div> </div>
+        <div> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest flex items-center justify-between"> <span>Tỷ lệ hình vẽ (SVG)</span> <span className="bg-gray-200 text-gray-700 px-1.5 rounded">{config.imageRatio}%</span> </label> <div className="flex items-center gap-2"> <ImageIcon size={14} className="text-gray-400" /> <input type="range" min="0" max="100" step="10" className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary" value={config.imageRatio} onChange={(e) => setConfig({ ...config, imageRatio: Number(e.target.value) })} /> </div> </div>
+        <div> <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-widest">Mức độ nhận thức</label> <div className="flex flex-wrap gap-1.5"> {Object.values(Difficulty).map(diff => (<button key={diff} onClick={() => handleDifficultyChange(diff)} className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase border transition-all ${config.selectedDifficulties.includes(diff) ? 'bg-primary text-white border-primary shadow-md' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>{diff}</button>))} </div> </div>
 
-          <div className="flex gap-2"> <button onClick={onShowHistory} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2.5 rounded-xl text-[10px] uppercase flex items-center justify-center gap-1 transition-colors"><History size={14} /> Lịch sử</button> <button onClick={onShowBank} className="flex-1 bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold py-2.5 rounded-xl text-[10px] border border-amber-200 uppercase flex items-center justify-center gap-1 transition-colors"><Database size={14} /> Kho lưu</button> </div>
-        </div>
+        <div className="bg-purple-50 p-4 rounded-2xl border border-purple-100 shadow-sm text-center relative overflow-hidden group"> <Trophy size={28} className="mx-auto text-purple-600 mb-1" /> <p className="text-[10px] font-black text-purple-700 uppercase mb-3 tracking-tighter italic">Ai Là Triệu Phú Toán Học</p> <button onClick={() => { onStartGame(); onClose(); }} disabled={isLoading} className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-black py-3 rounded-xl shadow-lg active:scale-95 transition-all text-[10px] uppercase border-b-4 border-indigo-800">BẮT ĐẦU CHƠI</button> </div>
       </div>
+      <div className="mt-8 space-y-3">
+        <button onClick={() => { onGenerate(); onClose(); }} disabled={isLoading} className="w-full bg-primary hover:bg-blue-800 text-white font-black py-4 rounded-xl shadow-xl flex items-center justify-center gap-2 uppercase tracking-tight transition-all border-b-4 border-blue-900"> {isLoading ? <Loader2 className="animate-spin" /> : <PlusCircle size={22} />} Soạn bộ câu hỏi AI </button>
+
+        <button
+          onClick={() => { onSync(); }}
+          disabled={isSyncing}
+          className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 font-black py-3 rounded-xl flex items-center justify-center gap-2 uppercase text-[10px] transition-all border border-blue-100"
+        >
+          <Cloud className={isSyncing ? "animate-pulse" : ""} size={18} />
+          {isSyncing ? "Đang đồng bộ..." : "Đồng bộ đám mây"}
+        </button>
+
+        <div className="flex gap-2"> <button onClick={onShowHistory} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2.5 rounded-xl text-[10px] uppercase flex items-center justify-center gap-1 transition-colors"><History size={14} /> Lịch sử</button> <button onClick={onShowBank} className="flex-1 bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold py-2.5 rounded-xl text-[10px] border border-amber-200 uppercase flex items-center justify-center gap-1 transition-colors"><Database size={14} /> Kho lưu</button> </div>
+      </div>
+    </div >
     </>
   );
 };
@@ -702,6 +704,15 @@ export default function App() {
     })();
 
   }, []);
+
+  // Tự động lưu cấu hình
+  useEffect(() => {
+    if (config.customApiKey !== undefined) {
+      if (config.customApiKey) localStorage.setItem('math_app_custom_api_key', config.customApiKey);
+      else localStorage.removeItem('math_app_custom_api_key');
+    }
+    if (config.syncKey) localStorage.setItem('math_app_sync_key', config.syncKey);
+  }, [config.customApiKey, config.syncKey]);
   useLayoutEffect(() => {
     const timer = setTimeout(triggerMath, 200);
     return () => clearTimeout(timer);
@@ -778,9 +789,9 @@ export default function App() {
       setHistory(updated);
       localStorage.setItem('math_app_history', JSON.stringify(updated));
 
-      const { deviceId } = await storageService.getSecurityParams();
-      if (deviceId) {
-        firebaseService.saveHistory(deviceId, newHistoryItem).catch(console.error);
+      const { syncId } = await storageService.getSecurityParams(config.syncKey);
+      if (syncId) {
+        firebaseService.saveHistory(syncId, newHistoryItem).catch(console.error);
       }
 
     } catch (e: any) {
