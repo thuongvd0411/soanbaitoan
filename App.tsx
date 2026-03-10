@@ -641,110 +641,97 @@ export default function App() {
     setProgress(0);
 
     try {
-      // Kiểm tra bảo mật trước khi gọi AI
       const session = localStorage.getItem('math_app_license_session');
       if (!session || JSON.parse(session).status !== 'ACTIVE') {
         throw new Error("LICENSE_REQUIRED");
       }
 
-      console.log("Alla Debug - handleGenerate triggering with config:", {
-        hasCustomKey: !!config.customApiKey,
-        grade: config.grade,
-        lessons: config.lessons,
-        totalQuestions: config.questionCount
-      });
-
-      // === LOGIC CHIA NHỎ (CHUNKING) ===
       const CHUNK_SIZE = 10;
       const totalRequested = config.questionCount;
       const chunks = [];
-      let remaining = totalRequested;
-
-      while (remaining > 0) {
-        chunks.push(Math.min(remaining, CHUNK_SIZE));
-        remaining -= CHUNK_SIZE;
+      let rem = totalRequested;
+      while (rem > 0) {
+        chunks.push(Math.min(rem, CHUNK_SIZE));
+        rem -= CHUNK_SIZE;
       }
 
-      let allBalancedQuestions: Question[] = [];
+      let completedChunks = 0;
+      const updateProgress = () => {
+        completedChunks++;
+        setProgress((completedChunks / chunks.length) * 100);
+      };
 
-      for (let i = 0; i < chunks.length; i++) {
-        const chunkSize = chunks[i];
+      // Chạy song song tất cả các lô
+      const chunkPromises = chunks.map((size, index) => {
+        return (async () => {
+          try {
+            const chunkConfig = { ...config, questionCount: size };
+            const res = await generateQuestions(chunkConfig, [], index + 1);
+            updateProgress();
+            return res;
+          } catch (err) {
+            console.error(`Lỗi chunk ${index + 1}:`, err);
+            throw err;
+          }
+        })();
+      });
 
-        // Tính % hiển thị
-        const baseProgress = (i / chunks.length) * 100;
-        setProgress(baseProgress);
+      const results = await Promise.all(chunkPromises);
+      const allQuestions = results.flat();
 
-        // Progress ảo cho lượt đang chạy
-        const progressTimer = setInterval(() => {
-          setProgress(prev => {
-            const maxForThisChunk = baseProgress + (100 / chunks.length) - 2;
-            return prev >= maxForThisChunk ? maxForThisChunk : prev + 2;
-          });
-        }, 500);
+      // Đánh số lại và cân bằng đáp án cuối cùng
+      const finalQuestions = distributeAnswersEvenly(allQuestions).map((q, idx) => ({
+        ...q,
+        id: `q_${Date.now()}_${idx}`,
+        number: idx + 1
+      }));
 
-        try {
-          const chunkConfig = { ...config, questionCount: chunkSize };
-          const res = await generateQuestions(chunkConfig, allBalancedQuestions);
-          const balancedRes = distributeAnswersEvenly(res);
-
-          // Nối tiếp ID để không trùng
-          const offsetQuestions = balancedRes.map((q, idx) => ({
-            ...q,
-            id: `q_${Date.now()}_${allBalancedQuestions.length + idx}`,
-            number: allBalancedQuestions.length + idx + 1
-          }));
-
-          allBalancedQuestions = [...allBalancedQuestions, ...offsetQuestions];
-          // Cập nhật lại list trên UI liên tục để user có cảm giác đang tải dần dần
-          setQuestions([...allBalancedQuestions]);
-        } catch (err: any) {
-          console.error(`Lỗi ở chunk thứ ${i + 1}:`, err);
-          // NẾU CÓ THREOW THÌ BỊ DỪNG HẲN. TA BÁO LỖI LÊN MÀN HÌNH VÀ BREAK LOOP ĐỂ LƯU NHỮNG CÂU ĐÃ LÀM ĐƯỢC
-          alert(`Hệ thống AI đang quá tải, Alla chỉ có thể làm được ${allBalancedQuestions.length} câu. Anh tạm dừng xíu chờ mạng ổn định nhé!`);
-          break;
-        } finally {
-          clearInterval(progressTimer);
-        }
-      }
-
+      setQuestions(finalQuestions);
       setProgress(100);
 
       const newHistoryItem: HistoryItem = {
         id: Date.now().toString(),
         timestamp: Date.now(),
         config: { ...config },
-        questions: allBalancedQuestions
+        questions: finalQuestions
       };
 
       const updated = [newHistoryItem, ...history].slice(0, 15);
       setHistory(updated);
       localStorage.setItem('math_app_history', JSON.stringify(updated));
 
-      // TỰ ĐỘNG LƯU CLOUD (Save Quota)
       const { deviceId } = await storageService.getSecurityParams();
       if (deviceId) {
-        firebaseService.saveHistory(deviceId, newHistoryItem).catch(err => console.error("Cloud Auto-save failed:", err));
+        firebaseService.saveHistory(deviceId, newHistoryItem).catch(console.error);
       }
 
     } catch (e: any) {
-      console.error("Alla Debug - Generate Error:", e);
+      console.error("Generate Error:", e);
       if (e.message === "LICENSE_REQUIRED") alert("Vui lòng kích hoạt bản quyền!");
-      else alert("Lỗi AI: " + (e.message || "Vui lòng kiểm tra console. (Gợi ý: Nếu bị kẹt, hãy thử nhập Key API cá nhân)"));
+      else alert("Lỗi soạn thảo: " + (e.message || "Vui lòng thử lại sau ít phút."));
+      setProgress(0);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleShareLink = async () => {
-    if (questions.length === 0) return alert("Chưa có câu hỏi nào để chia sẻ!");
+    if (questions.length === 0) return alert("Chưa có đề để chia sẻ!");
     setIsSharing(true);
     try {
       const id = await firebaseService.saveSharedExam(questions, config);
       const shareUrl = `${window.location.origin}${window.location.pathname}?share=${id}`;
-      await navigator.clipboard.writeText(shareUrl);
-      alert("Đã tạo link chia sẻ bài tập và sao chép vào bộ nhớ tạm!\n\n" + shareUrl);
+
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        alert("Thành công! Link đã được copy vào bộ nhớ tạm:\n" + shareUrl);
+      } catch (copyErr) {
+        // Fallback nếu clipboard API bị chặn
+        window.prompt("Vui lòng copy link bên dưới để gửi cho học sinh:", shareUrl);
+      }
     } catch (err) {
-      alert("Có lỗi khi tạo link chia sẻ.");
+      console.error("Share error:", err);
+      alert("Lỗi khi tạo link chia sẻ. Anh kiểm tra lại kết nối mạng nhé.");
     } finally {
       setIsSharing(false);
     }

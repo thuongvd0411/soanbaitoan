@@ -106,18 +106,12 @@ async function retryWithFallback(
 export const generateQuestions = async (
   config: AppState,
   previousQuestions: Question[] = [],
-  onProgress?: (percent: number) => void
+  seed: number = 0
 ): Promise<Question[]> => {
   const env = (import.meta as any).env || {};
   const sysKey = env.VITE_GEMINI_API_KEY;
   const userKey = config.customApiKey;
   const apiKey = (userKey || sysKey)?.trim();
-
-  console.log(`Alla Debug - [v5.3.3] API Key Check:
-    - User Key: ${userKey ? "OK (" + userKey.substring(0, 5) + "...)" : "None"}
-    - Sys Key: ${sysKey ? "OK" : "None"}
-    - Active: ${apiKey ? "Selected" : "FAIL"}
-  `);
 
   if (!apiKey) {
     throw new Error("Lỗi: Không tìm thấy API Key. Anh vui lòng nhập Key ở Sidebar.");
@@ -127,9 +121,13 @@ export const generateQuestions = async (
 
   const lessonContext = config.customLesson ? config.customLesson : (config.lessons.length > 0 ? config.lessons.join(", ") : "Tổng hợp");
 
+  // Tạo thêm hướng dẫn biến đổi dựa trên seed để tránh trùng lặp khi chạy song song
+  const entropyInstruction = seed > 0 ? `Lưu ý: Bạn hãy ưu tiên các khía cạnh khác nhau của chủ đề (Biến thể số ${seed}) để bộ câu hỏi không trùng với các bộ khác.` : "";
+
   const prompt = `Bạn là chuyên gia Toán học Việt Nam. Soạn ${config.questionCount} câu hỏi trắc nghiệm Toán Lớp ${config.grade}.
 Chủ đề: ${lessonContext}. Mức độ: ${config.selectedDifficulties.join(", ")}.
 ${config.imageRatio > 0 ? `Khoảng ${config.imageRatio}% câu có hình SVG.` : ""}
+${entropyInstruction}
 ${MATH_FORMAT_INSTRUCTION}
 ${config.imageRatio > 0 ? GRAPHING_INSTRUCTION : ""}
 ${ANSWER_DISTRIBUTION_INSTRUCTION}
