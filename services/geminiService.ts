@@ -45,14 +45,15 @@ async function retryWithFallback(
   ai: GoogleGenAI,
   prompt: string,
   config: { temperature: number },
-  maxRetries: number = 2 // Giảm số lần retry để báo lỗi nhanh hơn
+  maxRetries: number = 3
 ): Promise<string> {
   const models = ['gemini-2.0-flash', 'gemini-2.0-flash-lite'];
+  let lastError = "";
 
   for (const modelName of models) {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        console.log(`Alla Debug - Attempt ${attempt}/${maxRetries} with model: ${modelName}`);
+        console.log(`Alla - Try ${attempt}/${maxRetries}, model: ${modelName}`);
         const result = await ai.models.generateContent({
           model: modelName,
           contents: prompt,
@@ -63,39 +64,45 @@ async function retryWithFallback(
         });
         const text = result.text || "";
         if (text.length > 10) {
-          console.log(`Alla Debug - Success! Model: ${modelName}, Response: ${text.length} chars`);
           return text;
         }
       } catch (error: any) {
         const msg = error.message || "";
-        console.warn(`Alla Debug - Attempt ${attempt} failed (${modelName}):`, msg.substring(0, 100));
+        lastError = msg;
+        console.warn(`Alla - Failed (${modelName}, attempt ${attempt}):`, msg.substring(0, 150));
 
-        // 429 = quota → báo lỗi ngay lập tức, không thử lại model khác
-        if (msg.includes("429") || msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED")) {
-          throw new Error("API Key của anh đã hết lượt (Quota Limit). Anh vui lòng đổi Key mới ở mục Cấu hình nhé.");
-        }
-
-        // 503 = server busy → chỉ chờ nếu chưa phải lần cuối
-        if (msg.includes("503") || msg.includes("overloaded") || msg.includes("high demand")) {
-          if (attempt < maxRetries) {
-            const waitMs = attempt * 1500;
-            console.log(`Alla Debug - Waiting ${waitMs}ms before retry...`);
-            await new Promise(r => setTimeout(r, waitMs));
-            continue;
-          }
-        }
-
-        // 404 = model not found → chuyển model tiếp theo ngay
+        // 404 = model not found → chuyển model ngay
         if (msg.includes("404") || msg.includes("not found")) {
           break;
         }
 
-        // Lỗi khác -> nếu là model cuối và attempt cuối thì sẽ throw sau vòng lặp
+        // 429 hoặc 503 = tạm thời quá tải → chờ rồi thử lại
+        if (msg.includes("429") || msg.includes("503") || msg.includes("overloaded") ||
+          msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED") || msg.includes("high demand")) {
+          if (attempt < maxRetries) {
+            const waitMs = attempt * 2000;
+            console.log(`Alla - Waiting ${waitMs}ms before retry...`);
+            await new Promise(r => setTimeout(r, waitMs));
+            continue;
+          }
+          // Hết retry cho model này → thử model tiếp theo
+          break;
+        }
+
+        // Lỗi khác → thử lại nếu còn attempt
+        if (attempt < maxRetries) {
+          await new Promise(r => setTimeout(r, 1000));
+          continue;
+        }
       }
     }
   }
 
-  throw new Error("Máy chủ AI đang bận hoặc Key không khả dụng. Anh vui lòng kiểm tra lại Key hoặc thử lại sau 30 giây.");
+  // Tất cả model đều thất bại
+  if (lastError.includes("429") || lastError.includes("quota") || lastError.includes("RESOURCE_EXHAUSTED")) {
+    throw new Error("Hệ thống AI đang quá tải. Anh vui lòng đợi 1 phút rồi thử lại nhé.");
+  }
+  throw new Error("Không kết nối được AI. Anh kiểm tra mạng hoặc thử lại sau 30 giây.");
 }
 
 export const generateQuestions = async (
