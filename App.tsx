@@ -590,6 +590,12 @@ export default function App() {
   const [showBankModal, setShowBankModal] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  // States cho tính năng Chia sẻ bài tập qua Link
+  const [isViewerMode, setIsViewerMode] = useState(false);
+  const [shareConfig, setShareConfig] = useState<any>(null);
+  const [shareId, setShareId] = useState<string | null>(null);
+  const [isSharing, setIsSharing] = useState(false);
+
   useEffect(() => {
     const saved = localStorage.getItem('math_app_history');
     if (saved) setHistory(JSON.parse(saved));
@@ -599,13 +605,41 @@ export default function App() {
     if (savedKey) {
       setConfig(prev => ({ ...prev, customApiKey: savedKey }));
     }
+
+    // Xử lý Share Link
+    const params = new URLSearchParams(window.location.search);
+    const sharedId = params.get('share');
+    if (sharedId) {
+      setIsViewerMode(true);
+      setShareId(sharedId);
+      setIsLoading(true);
+      firebaseService.getSharedExam(sharedId).then(data => {
+        if (data && data.questions && data.questions.length > 0) {
+          setQuestions(data.questions);
+          setShareConfig(data.config);
+          // Loại bỏ đáp án để học sinh không xem được
+          const studentQuestions = data.questions.map(q => ({ ...q, correctAnswer: '?', explanation: 'Vui lòng nộp bài để xem lời giải.' }));
+          // Thực tế có thể để nguyên, hoặc ẩn đi ở UI. Tạm thời mình ẩn qua UI.
+        } else {
+          alert("Link bài tập không hợp lệ hoặc đã bị xóa!");
+          window.location.href = window.location.pathname; // xóa tham số share
+        }
+      }).catch(err => {
+        console.error("Lỗi khi tải bài tập chia sẻ", err);
+        alert("Lỗi khi tải bài tập. Vui lòng thử lại sau.");
+      }).finally(() => {
+        setIsLoading(false);
+      });
+    }
+
   }, []);
   useLayoutEffect(() => { const timer = setTimeout(triggerMath, 200); return () => clearTimeout(timer); }, [questions, gameQuestions, config.gameStatus, isLoading]);
 
   const handleGenerate = async () => {
     if (config.examType === ExamType.None && config.lessons.length === 0 && !config.customLesson) return alert("Vui lòng chọn chủ đề!");
-    setIsLoading(true); setProgress(0);
-    const progressTimer = setInterval(() => setProgress(prev => prev >= 98 ? 98 : prev + (prev < 30 ? 3 : 0.5)), 600);
+    setIsLoading(true);
+    setProgress(0);
+
     try {
       // Kiểm tra bảo mật trước khi gọi AI
       const session = localStorage.getItem('math_app_license_session');
@@ -616,18 +650,67 @@ export default function App() {
       console.log("Alla Debug - handleGenerate triggering with config:", {
         hasCustomKey: !!config.customApiKey,
         grade: config.grade,
-        lessons: config.lessons
+        lessons: config.lessons,
+        totalQuestions: config.questionCount
       });
-      const res = await generateQuestions(config, questions);
-      // ÁP DỤNG CÂN BẰNG ĐÁP ÁN TUYỆT ĐỐI
-      const balancedRes = distributeAnswersEvenly(res);
-      setQuestions(balancedRes);
+
+      // === LOGIC CHIA NHỎ (CHUNKING) ===
+      const CHUNK_SIZE = 10;
+      const totalRequested = config.questionCount;
+      const chunks = [];
+      let remaining = totalRequested;
+
+      while (remaining > 0) {
+        chunks.push(Math.min(remaining, CHUNK_SIZE));
+        remaining -= CHUNK_SIZE;
+      }
+
+      let allBalancedQuestions: Question[] = [];
+
+      for (let i = 0; i < chunks.length; i++) {
+        const chunkSize = chunks[i];
+
+        // Tính % hiển thị
+        const baseProgress = (i / chunks.length) * 100;
+        setProgress(baseProgress);
+
+        // Progress ảo cho lượt đang chạy
+        const progressTimer = setInterval(() => {
+          setProgress(prev => {
+            const maxForThisChunk = baseProgress + (100 / chunks.length) - 2;
+            return prev >= maxForThisChunk ? maxForThisChunk : prev + 2;
+          });
+        }, 500);
+
+        try {
+          const chunkConfig = { ...config, questionCount: chunkSize };
+          const res = await generateQuestions(chunkConfig, allBalancedQuestions);
+          const balancedRes = distributeAnswersEvenly(res);
+
+          // Nối tiếp ID để không trùng
+          const offsetQuestions = balancedRes.map((q, idx) => ({
+            ...q,
+            id: `q_${Date.now()}_${allBalancedQuestions.length + idx}`,
+            number: allBalancedQuestions.length + idx + 1
+          }));
+
+          allBalancedQuestions = [...allBalancedQuestions, ...offsetQuestions];
+          // Cập nhật lại list trên UI liên tục để user có cảm giác đang tải dần dần
+          setQuestions([...allBalancedQuestions]);
+        } catch (err) {
+          throw err; // văng lỗi ra ngoài loop
+        } finally {
+          clearInterval(progressTimer);
+        }
+      }
+
+      setProgress(100);
 
       const newHistoryItem: HistoryItem = {
         id: Date.now().toString(),
         timestamp: Date.now(),
         config: { ...config },
-        questions: balancedRes
+        questions: allBalancedQuestions
       };
 
       const updated = [newHistoryItem, ...history].slice(0, 15);
@@ -638,14 +721,30 @@ export default function App() {
       const { deviceId } = await storageService.getSecurityParams();
       if (deviceId) {
         firebaseService.saveHistory(deviceId, newHistoryItem).catch(err => console.error("Cloud Auto-save failed:", err));
-        // Đồng thời lưu từng câu vào kho tư liệu nếu anh muốn - Ở đây em lưu cả bộ vào History trước
       }
 
     } catch (e: any) {
       console.error("Alla Debug - Generate Error:", e);
       if (e.message === "LICENSE_REQUIRED") alert("Vui lòng kích hoạt bản quyền!");
-      else alert("Lỗi AI: " + (e.message || "Vui lòng kiểm tra console"));
-    } finally { clearInterval(progressTimer); setIsLoading(false); }
+      else alert("Lỗi AI: " + (e.message || "Vui lòng kiểm tra console. (Gợi ý: Nếu bị kẹt, hãy thử nhập Key API cá nhân)"));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleShareLink = async () => {
+    if (questions.length === 0) return alert("Chưa có câu hỏi nào để chia sẻ!");
+    setIsSharing(true);
+    try {
+      const id = await firebaseService.saveSharedExam(questions, config);
+      const shareUrl = `${window.location.origin}${window.location.pathname}?share=${id}`;
+      await navigator.clipboard.writeText(shareUrl);
+      alert("Đã tạo link chia sẻ bài tập và sao chép vào bộ nhớ tạm!\n\n" + shareUrl);
+    } catch (err) {
+      alert("Có lỗi khi tạo link chia sẻ.");
+    } finally {
+      setIsSharing(false);
+    }
   };
 
   const [showActivateModal, setShowActivateModal] = useState(false);
@@ -847,8 +946,14 @@ export default function App() {
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-gray-100 font-sans overflow-hidden">
-      <header className="md:hidden bg-primary text-white p-4 flex justify-between items-center sticky top-0 z-30 shadow-lg"> <div className="flex items-center gap-2 font-black uppercase"><BookOpen size={24} /> Soạn Toán AI</div> <div className="flex items-center gap-2"> <button onClick={triggerMath} className="p-2 bg-white/20 rounded-full"><RefreshCw size={20} /></button> <button onClick={() => setIsSidebarOpen(true)} className="p-2"><Menu size={28} /></button> </div> </header>
-      <Sidebar config={config} setConfig={setConfig} onGenerate={handleGenerate} onStartGame={handleStartGame} isLoading={isLoading} onShowHistory={() => setShowHistoryModal(true)} onShowBank={() => setShowBankModal(true)} isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+      <header className="md:hidden bg-primary text-white p-4 flex justify-between items-center sticky top-0 z-30 shadow-lg">
+        <div className="flex items-center gap-2 font-black uppercase"><BookOpen size={24} /> {isViewerMode ? 'BÀI TẬP VỀ NHÀ' : 'Soạn Toán AI'}</div>
+        <div className="flex items-center gap-2">
+          <button onClick={triggerMath} className="p-2 bg-white/20 rounded-full"><RefreshCw size={20} /></button>
+          {!isViewerMode && <button onClick={() => setIsSidebarOpen(true)} className="p-2"><Menu size={28} /></button>}
+        </div>
+      </header>
+      {!isViewerMode && <Sidebar config={config} setConfig={setConfig} onGenerate={handleGenerate} onStartGame={handleStartGame} isLoading={isLoading} onShowHistory={() => setShowHistoryModal(true)} onShowBank={() => setShowBankModal(true)} isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />}
       <main className="flex-1 p-3 md:p-10 overflow-y-auto h-screen relative bg-gray-200/40 no-print">
         {config.gameStatus === GameStatus.Playing && gameQuestions.length > 0 ? (
           <MillionaireGame questions={gameQuestions} grade={config.grade} lessonName={config.customLesson || (config.lessons.length > 0 ? config.lessons.join(", ") : "")} onClose={() => setConfig(prev => ({ ...prev, gameStatus: GameStatus.Idle }))} onRestart={handleStartGame} />
@@ -856,9 +961,30 @@ export default function App() {
           <div className="h-full flex flex-col items-center justify-center text-gray-400 p-8 text-center max-w-lg mx-auto animate-in fade-in duration-700"> <div className="bg-white p-12 rounded-full shadow-2xl mb-8"><PartyPopper size={100} className="text-primary/15" /></div> <h2 className="text-2xl font-black text-gray-700 mb-3 uppercase tracking-tighter">AI Assistant Sẵn sàng!</h2> <p className="text-base text-gray-500 font-medium italic">Chọn bài học để bắt đầu.</p> </div>
         ) : (
           <div className="max-w-4xl mx-auto bg-white shadow-2xl p-6 md:p-16 min-h-[29.7cm] rounded-none md:rounded-lg animate-in slide-in-from-bottom-6 duration-500 relative">
-            <div className="text-center mb-16 border-b-2 border-black pb-8"> <h1 className="text-2xl md:text-4xl font-black uppercase font-serif text-gray-900 leading-tight">Phiếu Bài Tập Toán Lớp {config.grade}</h1> <p className="text-xl text-gray-500 italic font-serif mt-2">{config.customLesson || (config.lessons.length > 0 ? config.lessons.join(", ") : "Kiểm tra kiến thức")}</p> </div>
-            <div className="content-area"> {questions.map(q => <QuestionItem key={q.id} question={q} onSave={storageService.saveQuestion} />)}
-              {config.answerMode !== AnswerMode.None && (
+            <div className="text-center mb-16 border-b-2 border-black pb-8 relative">
+              <h1 className="text-2xl md:text-4xl font-black uppercase font-serif text-gray-900 leading-tight">
+                {isViewerMode ? 'PHIẾU BÀI TẬP VỀ NHÀ' : `Phiếu Bài Tập Toán Lớp ${config.grade}`}
+              </h1>
+              <p className="text-xl text-gray-500 italic font-serif mt-2">
+                {isViewerMode ? (shareConfig?.customLesson || 'Bài tập được giao') : (config.customLesson || (config.lessons.length > 0 ? config.lessons.join(", ") : "Kiểm tra kiến thức"))}
+              </p>
+            </div>
+
+            {/* NÚT CHIA SẺ DÀNH CHO GIÁO VIÊN */}
+            {!isViewerMode && (
+              <div className="flex justify-end mb-8 no-print">
+                <button
+                  onClick={handleShareLink}
+                  disabled={isSharing}
+                  className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-2.5 px-6 rounded-full shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all text-sm uppercase tracking-wider disabled:opacity-50"
+                >
+                  {isSharing ? <Loader2 size={16} className="animate-spin" /> : <div className="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg> <span>Chia sẻ Link Học Sinh</span></div>}
+                </button>
+              </div>
+            )}
+
+            <div className="content-area"> {questions.map(q => <QuestionItem key={q.id} question={q} onSave={!isViewerMode ? storageService.saveQuestion : undefined} readOnly={isViewerMode} />)}
+              {(!isViewerMode && config.answerMode !== AnswerMode.None) && (
                 <div className="mt-20 pt-10 border-t-2 border-dashed border-gray-300 break-before-page">
                   <div className="flex items-center justify-center gap-4 mb-10"> <div className="h-0.5 flex-1 bg-gray-200"></div> <h2 className="text-2xl font-black uppercase tracking-widest text-gray-400">ĐÁP ÁN VÀ LỜI GIẢI</h2> <div className="h-0.5 flex-1 bg-gray-200"></div> </div>
                   <div className="space-y-10"> {questions.map(q => (<div key={`ans_${q.id}`} className="p-6 bg-gray-50 rounded-3xl border border-gray-200"> <div className="flex items-center gap-3 mb-3"> <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-black">C{q.number}</div> <span className="font-black text-lg text-green-600 uppercase">Đáp án: {q.correctAnswer}</span> </div> {config.answerMode === AnswerMode.Detailed && (<div className="text-base text-gray-700 leading-relaxed font-serif bg-white p-5 rounded-2xl border border-gray-100 shadow-inner" dangerouslySetInnerHTML={{ __html: q.explanation }}></div>)} </div>))} </div>
@@ -867,8 +993,14 @@ export default function App() {
             </div>
           </div>
         )}
-        {questions.length > 0 && config.gameStatus === GameStatus.Idle && (
-          <div className="fixed bottom-8 right-8 flex flex-col gap-4 no-print z-40"> <button onClick={triggerMath} title="Làm mới" className="bg-blue-600 text-white p-5 rounded-2xl shadow-2xl border-b-4 border-blue-800"><RefreshCw size={28} /></button> <button onClick={handleExportHTML} title="Xuất HTML" className="bg-amber-600 text-white p-5 rounded-2xl shadow-2xl border-b-4 border-amber-800"><FileCode size={28} /></button> <button onClick={() => window.print()} title="In" className="bg-green-600 text-white p-5 rounded-2xl shadow-2xl border-b-4 border-green-800"><Printer size={28} /></button> <button onClick={handleGenerate} title="Soạn lại" className="bg-primary text-white p-5 rounded-2xl shadow-2xl hover:scale-110 transition-all active:scale-90 border-b-4 border-blue-900"><PlusCircle size={28} /></button> </div>
+        {questions.length > 0 && config.gameStatus === GameStatus.Idle && !isViewerMode && (
+          <div className="fixed bottom-8 right-8 flex flex-col gap-4 no-print z-40">
+            <button onClick={handleShareLink} title="Chia sẻ Link cho Phụ huynh/Học sinh" className="bg-indigo-600 text-white p-5 rounded-2xl shadow-2xl border-b-4 border-indigo-800 flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg></button>
+            <button onClick={triggerMath} title="Làm mới" className="bg-blue-600 text-white p-5 rounded-2xl shadow-2xl border-b-4 border-blue-800"><RefreshCw size={28} /></button>
+            <button onClick={handleExportHTML} title="Xuất HTML" className="bg-amber-600 text-white p-5 rounded-2xl shadow-2xl border-b-4 border-amber-800"><FileCode size={28} /></button>
+            <button onClick={() => window.print()} title="In" className="bg-green-600 text-white p-5 rounded-2xl shadow-2xl border-b-4 border-green-800"><Printer size={28} /></button>
+            <button onClick={handleGenerate} title="Soạn lại" className="bg-primary text-white p-5 rounded-2xl shadow-2xl hover:scale-110 transition-all active:scale-90 border-b-4 border-blue-900"><PlusCircle size={28} /></button>
+          </div>
         )}
       </main>
       {isSyncing && (

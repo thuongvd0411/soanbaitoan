@@ -14,13 +14,14 @@ import {
 import { Question, HistoryItem } from "../types";
 
 // Cấu hình Firebase sẽ được nạp từ biến môi trường
+const env = (import.meta as any).env;
 const firebaseConfig = {
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-    appId: import.meta.env.VITE_FIREBASE_APP_ID
+    apiKey: env.VITE_FIREBASE_API_KEY,
+    authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: env.VITE_FIREBASE_APP_ID
 };
 
 // Khởi tạo Firebase
@@ -111,6 +112,48 @@ export const firebaseService = {
         } catch (error) {
             console.error("Firebase getHistory error:", error);
             return [];
+        }
+    },
+
+    /**
+     * Lưu phiếu bài tập chia sẻ cho học sinh (Public Read)
+     */
+    async saveSharedExam(questions: Question[], config: any): Promise<string> {
+        try {
+            const shareId = "share_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+            const sRef = doc(db, "shared_exams", shareId);
+            await setDoc(sRef, {
+                shareId,
+                questions,
+                config,
+                createdAt: new Date().toISOString()
+            });
+            return shareId;
+        } catch (error) {
+            console.error("Firebase saveSharedExam error:", error);
+            throw error;
+        }
+    },
+
+    /**
+     * Tải phiếu bài tập chia sẻ theo shareId
+     */
+    async getSharedExam(shareId: string): Promise<{ questions: Question[], config: any } | null> {
+        if (!shareId) return null;
+        try {
+            const sRef = doc(db, "shared_exams", shareId);
+            const docSnap = await getDoc(sRef);
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                return {
+                    questions: data.questions || [],
+                    config: data.config || {}
+                };
+            }
+            return null;
+        } catch (error) {
+            console.error("Firebase getSharedExam error:", error);
+            return null;
         }
     }
 };
