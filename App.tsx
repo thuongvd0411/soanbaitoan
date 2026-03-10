@@ -609,6 +609,7 @@ export default function App() {
   const [shareConfig, setShareConfig] = useState<any>(null);
   const [shareId, setShareId] = useState<string | null>(null);
   const [isSharing, setIsSharing] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("AI Đang soạn thảo...");
 
   useEffect(() => {
     const saved = localStorage.getItem('math_app_history');
@@ -625,7 +626,7 @@ export default function App() {
     const sharedId = params.get('share');
     if (sharedId) {
       setIsViewerMode(true);
-      setShareId(sharedId);
+      setLoadingMessage("Đang mở link bài tập...");
       setIsLoading(true);
       firebaseService.getSharedExam(sharedId).then(data => {
         if (data && data.questions && data.questions.length > 0) {
@@ -670,6 +671,7 @@ export default function App() {
 
   const handleGenerate = async () => {
     if (config.examType === ExamType.None && config.lessons.length === 0 && !config.customLesson) return alert("Vui lòng chọn chủ đề!");
+    setLoadingMessage("AI Đang soạn thảo...");
     setIsLoading(true);
     setProgress(0);
 
@@ -790,10 +792,14 @@ export default function App() {
     if (!currentShareId) {
       currentShareId = "share_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
       setShareId(currentShareId);
-      // Upload lên Firebase ở background, không chờ
-      firebaseService.saveSharedExam(questions, config)
+      // Upload lên Firebase ở background, không chờ, truyền đúng currentShareId
+      firebaseService.saveSharedExam(questions, config, currentShareId)
         .then(() => console.log("Shared exam saved:", currentShareId))
-        .catch(err => console.error("Share save failed:", err));
+        .catch(err => {
+          console.error("Share save failed:", err);
+          alert("Lỗi: Không thể lưu bài tập lên đám mây. Anh thử giảm số câu hỏi hoặc hình vẽ nhé!");
+          setShareId(null); // Reset để có thể thử lại
+        });
     }
 
     const shareUrl = `${window.location.origin}${window.location.pathname}?share=${currentShareId}`;
@@ -1090,7 +1096,7 @@ export default function App() {
         <div className="fixed inset-0 bg-black/50 z-[100] flex flex-col items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white p-8 rounded-3xl shadow-2xl max-w-md w-full text-center space-y-6 border-4 border-white animate-in zoom-in-95">
             <div className="relative w-24 h-24 mx-auto"> <div className="absolute inset-0 rounded-full border-8 border-gray-100"></div> <div className="absolute inset-0 rounded-full border-8 border-primary border-t-transparent animate-spin"></div> <div className="absolute inset-0 flex items-center justify-center font-black text-2xl text-primary">{Math.round(progress)}%</div> </div>
-            <h3 className="text-xl font-black text-gray-800 uppercase tracking-tighter">AI Đang soạn thảo...</h3>
+            <h3 className="text-xl font-black text-gray-800 uppercase tracking-tighter">{loadingMessage}</h3>
             <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden shadow-inner"><div className="bg-primary h-full transition-all duration-300" style={{ width: `${progress}%` }}></div></div>
           </div>
         </div>

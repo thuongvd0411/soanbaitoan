@@ -47,7 +47,8 @@ async function retryWithFallback(
   config: { temperature: number },
   maxRetries: number = 3
 ): Promise<string> {
-  const models = ['gemini-2.0-flash', 'gemini-2.0-flash-lite'];
+  // Sử dụng các model cao cấp nhất hiện nay
+  const models = ['gemini-2.0-flash', 'gemini-1.5-pro'];
   let lastError = "";
 
   for (const modelName of models) {
@@ -76,12 +77,12 @@ async function retryWithFallback(
           break;
         }
 
-        // 429 hoặc 503 = tạm thời quá tải → chờ rồi thử lại
+        // 429 hoặc 503 = tạm thời quá tải → chờ lâu hơn rồi thử lại
         if (msg.includes("429") || msg.includes("503") || msg.includes("overloaded") ||
           msg.includes("quota") || msg.includes("RESOURCE_EXHAUSTED") || msg.includes("high demand")) {
           if (attempt < maxRetries) {
-            const waitMs = attempt * 2000;
-            console.log(`Alla - Waiting ${waitMs}ms before retry...`);
+            const waitMs = attempt * 3000; // Đợi lâu hơn (3s, 6s, 9s)
+            console.log(`Alla - Server busy, waiting ${waitMs}ms...`);
             await new Promise(r => setTimeout(r, waitMs));
             continue;
           }
@@ -89,9 +90,9 @@ async function retryWithFallback(
           break;
         }
 
-        // Lỗi khác → thử lại nếu còn attempt
+        // Lỗi khác
         if (attempt < maxRetries) {
-          await new Promise(r => setTimeout(r, 1000));
+          await new Promise(r => setTimeout(r, 1500));
           continue;
         }
       }
@@ -100,9 +101,9 @@ async function retryWithFallback(
 
   // Tất cả model đều thất bại
   if (lastError.includes("429") || lastError.includes("quota") || lastError.includes("RESOURCE_EXHAUSTED")) {
-    throw new Error("Hệ thống AI đang quá tải. Anh vui lòng đợi 1 phút rồi thử lại nhé.");
+    throw new Error("Hệ thống AI của Google đang quá tải. Anh vui lòng đợi 1-2 phút rồi thử lại, hoặc thử dùng một API Key khác nhé.");
   }
-  throw new Error("Không kết nối được AI. Anh kiểm tra mạng hoặc thử lại sau 30 giây.");
+  throw new Error("Không kết nối được AI. Anh kiểm tra mạng hoặc thử lại sau.");
 }
 
 export const generateQuestions = async (

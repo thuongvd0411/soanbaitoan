@@ -118,7 +118,7 @@ export const firebaseService = {
     /**
      * Lưu phiếu bài tập chia sẻ cho học sinh (Public Read)
      */
-    async saveSharedExam(questions: Question[], config: any): Promise<string> {
+    async saveSharedExam(questions: Question[], config: any, existingShareId?: string): Promise<string> {
         try {
             // Tối ưu hóa dung lượng: Loại bỏ khoảng trắng thừa trong SVG nếu có
             const optimizedQuestions = questions.map(q => {
@@ -143,7 +143,7 @@ export const firebaseService = {
                 throw new Error("Bộ đề này quá lớn (nhiều hình vẽ). Anh vui lòng giảm số câu hỏi hoặc giảm tỷ lệ hình vẽ xuống nhé.");
             }
 
-            const shareId = "share_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+            const shareId = existingShareId || ("share_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36));
             const sRef = doc(db, "shared_exams", shareId);
             await setDoc(sRef, {
                 shareId,
