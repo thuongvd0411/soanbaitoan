@@ -5,13 +5,7 @@ import { generateQuestions, generateMillionaireQuestions } from './services/gemi
 import { getLessonOptions } from './services/syllabusData';
 import { storageService } from './services/storageService';
 import { firebaseService } from './services/firebaseService';
-import {
-  Download, PlusCircle, BookOpen, Loader2, X, FileSignature, Menu, Trophy, Sparkles, RotateCcw, Home, HelpCircle, FastForward, HeartPulse, HandMetal, PartyPopper, Volume2, VolumeX, ArrowRight, Wallet, Info, Flame, ShieldAlert, Crown, History, Search,
-  Database,
-  Cloud,
-  CheckSquare,
-  Save, ChevronRight, ListChecks, BrainCircuit, Star, Award, FileCode, Printer, RefreshCw, LogOut, PenLine, PenTool, ChevronDown, ChevronUp, Play, Gift, ImageIcon, CloudLightning
-} from 'lucide-react';
+import { Download, PlusCircle, BookOpen, Loader2, X, FileSignature, Menu, Trophy, Sparkles, RotateCcw, Home, HelpCircle, FastForward, HeartPulse, HandMetal, PartyPopper, Volume2, VolumeX, ArrowRight, Wallet, Info, Flame, ShieldAlert, Crown, History, Search, Upload, CheckSquare, Save, Database, ChevronRight, ListChecks, BrainCircuit, Star, Award, FileCode, Printer, RefreshCw, LogOut, PenLine, PenTool, ChevronDown, ChevronUp, Play, Gift, ImageIcon, CloudLightning } from 'lucide-react';
 
 declare global {
   interface Window {
@@ -508,7 +502,7 @@ const LessonPicker = ({ grade, selectedLessons, onChange }: { grade: number, sel
   );
 };
 
-const Sidebar = ({ config, setConfig, onGenerate, onStartGame, isLoading, onShowHistory, onShowBank, onSync, isSyncing, isOpen, onClose }: any) => {
+const Sidebar = ({ config, setConfig, onGenerate, onStartGame, isLoading, onShowHistory, onShowBank, isOpen, onClose }: any) => {
   const handleDifficultyChange = (diff: Difficulty) => { setConfig((prev: AppState) => { const exists = prev.selectedDifficulties.includes(diff); if (exists) return { ...prev, selectedDifficulties: prev.selectedDifficulties.filter(d => d !== diff) }; return { ...prev, selectedDifficulties: [...prev.selectedDifficulties, diff] }; }); };
   const handleTypeChange = (type: QuestionType) => { setConfig((prev: AppState) => { const exists = prev.questionTypes.includes(type); if (exists) { if (prev.questionTypes.length === 1) return prev; return { ...prev, questionTypes: prev.questionTypes.filter(t => t !== type) }; } return { ...prev, questionTypes: [...prev.questionTypes, type] }; }); };
   return (
@@ -517,80 +511,52 @@ const Sidebar = ({ config, setConfig, onGenerate, onStartGame, isLoading, onShow
       <div className={`fixed md:relative inset-y-0 left-0 w-80 bg-white border-r border-gray-200 h-screen overflow-y-auto p-4 flex flex-col no-print z-50 transition-transform duration-300 ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className="flex items-center justify-between mb-6 text-primary"> <div className="flex items-center gap-2"><BookOpen size={28} /><h1 className="text-xl font-black uppercase tracking-tighter text-blue-900">Soạn Toán AI</h1></div> <button onClick={onClose} className="md:hidden p-2"><X size={24} /></button> </div>
         <div className="space-y-6 flex-1">
-          <div className="p-4 bg-orange-50 rounded-2xl border border-orange-100 shadow-sm mb-4">
-            <label className="block text-[10px] font-black text-orange-600 mb-2 uppercase tracking-widest flex items-center gap-2">
-              <ShieldAlert size={14} /> Cấu hình Gemini API Key
-            </label>
-            <div className="relative">
-              <input
-                type="password"
-                placeholder="Dán API Key của anh vào đây..."
-                className="w-full border border-orange-200 rounded-xl p-3 pr-10 text-xs focus:ring-2 ring-orange-500/20 outline-none bg-white shadow-inner"
-                value={config.customApiKey || ''}
-                onChange={(e) => {
-                  const newKey = e.target.value;
-                  setConfig((prev: AppState) => ({ ...prev, customApiKey: newKey }));
-                  localStorage.setItem('math_app_custom_api_key', newKey);
-                }}
-              />
-              {config.customApiKey && (
-                <button
-                  onClick={() => {
-                    setConfig((prev: AppState) => ({ ...prev, customApiKey: '' }));
-                    localStorage.removeItem('math_app_custom_api_key');
+          <div className="space-y-4">
+            <div className="p-4 bg-orange-50 rounded-2xl border border-orange-100 shadow-sm mb-4">
+              <label className="block text-[10px] font-black text-orange-600 mb-2 uppercase tracking-widest flex items-center gap-2">
+                <ShieldAlert size={14} /> Cấu hình Gemini API Key
+              </label>
+              <div className="relative">
+                <input
+                  type="password"
+                  placeholder="Dán API Key của anh vào đây..."
+                  className="w-full border border-orange-200 rounded-xl p-3 pr-10 text-xs focus:ring-2 ring-orange-500/20 outline-none bg-white shadow-inner"
+                  value={config.customApiKey || ''}
+                  onChange={(e) => {
+                    const newKey = e.target.value;
+                    setConfig((prev: AppState) => ({ ...prev, customApiKey: newKey }));
+                    localStorage.setItem('math_app_custom_api_key', newKey);
                   }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-orange-400 hover:text-orange-600 transition-colors"
-                  title="Xóa Key để dùng mặc định"
-                >
-                  <X size={16} />
-                </button>
-              )}
+                />
+                {config.customApiKey && (
+                  <button
+                    onClick={() => {
+                      setConfig((prev: AppState) => ({ ...prev, customApiKey: '' }));
+                      localStorage.removeItem('math_app_custom_api_key');
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-orange-400 hover:text-orange-600 transition-colors"
+                    title="Xóa Key để dùng mặc định"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+              <p className="text-[9px] text-orange-400 mt-2 leading-relaxed">
+                Nhập Key cá nhân để không bị phụ thuộc vào hệ thống. Alla sẽ ưu tiên dùng Key này của anh.
+              </p>
             </div>
-            <p className="text-[9px] text-orange-400 mt-2 leading-relaxed">
-              Nhập Key cá nhân để không bị phụ thuộc vào hệ thống. Alla sẽ ưu tiên dùng Key này của anh.
-            </p>
+
+            <div> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest">Khối Lớp</label> <select className="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50 font-bold focus:ring-2 ring-primary/20 outline-none" value={config.grade} onChange={(e) => setConfig({ ...config, grade: Number(e.target.value), lessons: [] })}> {Array.from({ length: 12 }, (_, i) => i + 1).map(g => <option key={g} value={g}>Toán Lớp {g}</option>)} </select> </div>
+            {config.examType === ExamType.None && (<div> <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-widest">Nội dung bài học (Chọn nhiều)</label> <LessonPicker grade={config.grade} selectedLessons={config.lessons} onChange={(lessons) => setConfig({ ...config, lessons })} /> <div className="mt-3"> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest">Hoặc nhập yêu cầu riêng</label> <input type="text" placeholder="Nhập chủ đề tùy chỉnh..." className="w-full border border-gray-300 rounded-lg p-2.5 text-xs focus:ring-2 ring-primary/20 outline-none" value={config.customLesson} onChange={(e) => setConfig({ ...config, customLesson: e.target.value })} /> </div> </div>)}
+            <div className="grid grid-cols-2 gap-4"> <div> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest">Số câu hỏi</label> <input type="number" min={1} max={50} className="w-full border border-gray-300 rounded-lg p-2 font-bold focus:ring-2 ring-primary/20 outline-none" value={config.questionCount} onChange={(e) => setConfig({ ...config, questionCount: Number(e.target.value) })} /> </div> <div> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest">Lời giải</label> <select className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 ring-primary/20 outline-none" value={config.answerMode} onChange={(e) => setConfig({ ...config, answerMode: e.target.value as AnswerMode })}> <option value={AnswerMode.None}>Không hiển thị</option> <option value={AnswerMode.Basic}>Đáp án ngắn gọn</option> <option value={AnswerMode.Detailed}>Lời giải chi tiết</option> </select> </div> </div>
+            <div> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest flex items-center justify-between"> <span>Tỷ lệ hình vẽ (SVG)</span> <span className="bg-gray-200 text-gray-700 px-1.5 rounded">{config.imageRatio}%</span> </label> <div className="flex items-center gap-2"> <ImageIcon size={14} className="text-gray-400" /> <input type="range" min="0" max="100" step="10" className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary" value={config.imageRatio} onChange={(e) => setConfig({ ...config, imageRatio: Number(e.target.value) })} /> </div> </div>
+            <div> <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-widest">Mức độ nhận thức</label> <div className="flex flex-wrap gap-1.5"> {Object.values(Difficulty).map(diff => (<button key={diff} onClick={() => handleDifficultyChange(diff)} className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase border transition-all ${config.selectedDifficulties.includes(diff) ? 'bg-primary text-white border-primary shadow-md' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>{diff}</button>))} </div> </div>
+
+            <div className="bg-purple-50 p-4 rounded-2xl border border-purple-100 shadow-sm text-center relative overflow-hidden group"> <Trophy size={28} className="mx-auto text-purple-600 mb-1" /> <p className="text-[10px] font-black text-purple-700 uppercase mb-3 tracking-tighter italic">Ai Là Triệu Phú Toán Học</p> <button onClick={() => { onStartGame(); onClose(); }} disabled={isLoading} className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-black py-3 rounded-xl shadow-lg active:scale-95 transition-all text-[10px] uppercase border-b-4 border-indigo-800">BẮT ĐẦU CHƠI</button> </div>
           </div>
-
-          <div className="pb-4 border-b border-gray-100">
-            <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest flex items-center justify-between">
-              <span>Mã đồng bộ (Sync ID)</span>
-              <span className="text-primary hover:underline cursor-pointer lowercase" onClick={() => {
-                const newId = 'device_' + Math.random().toString(36).substring(2, 11);
-                setConfig({ ...config, syncKey: newId });
-              }}>Làm mới</span>
-            </label>
-            <input
-              type="text"
-              placeholder="Dùng để đồng bộ giữa các máy..."
-              className="w-full border border-gray-300 rounded-lg p-2.5 font-mono text-[10px] focus:ring-2 ring-primary/20 outline-none bg-blue-50/30"
-              value={config.syncKey || ''}
-              onChange={(e) => setConfig({ ...config, syncKey: e.target.value })}
-            />
-            <p className="text-[9px] text-gray-400 mt-1 leading-tight italic">
-              * Copy mã này dán vào máy khác để thấy Lịch sử và Kho lưu của anh.
-            </p>
-          </div>
-
-          <div> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest">Khối Lớp</label> <select className="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50 font-bold focus:ring-2 ring-primary/20 outline-none" value={config.grade} onChange={(e) => setConfig({ ...config, grade: Number(e.target.value), lessons: [] })}> {Array.from({ length: 12 }, (_, i) => i + 1).map(g => <option key={g} value={g}>Toán Lớp {g}</option>)} </select> </div>
-          {config.examType === ExamType.None && (<div> <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-widest">Nội dung bài học (Chọn nhiều)</label> <LessonPicker grade={config.grade} selectedLessons={config.lessons} onChange={(lessons) => setConfig({ ...config, lessons })} /> <div className="mt-3"> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest">Hoặc nhập yêu cầu riêng</label> <input type="text" placeholder="Nhập chủ đề tùy chỉnh..." className="w-full border border-gray-300 rounded-lg p-2.5 text-xs focus:ring-2 ring-primary/20 outline-none" value={config.customLesson} onChange={(e) => setConfig({ ...config, customLesson: e.target.value })} /> </div> </div>)}
-          <div className="grid grid-cols-2 gap-4"> <div> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest">Số câu hỏi</label> <input type="number" min={1} max={50} className="w-full border border-gray-300 rounded-lg p-2 font-bold focus:ring-2 ring-primary/20 outline-none" value={config.questionCount} onChange={(e) => setConfig({ ...config, questionCount: Number(e.target.value) })} /> </div> <div> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest">Lời giải</label> <select className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 ring-primary/20 outline-none" value={config.answerMode} onChange={(e) => setConfig({ ...config, answerMode: e.target.value as AnswerMode })}> <option value={AnswerMode.None}>Không hiển thị</option> <option value={AnswerMode.Basic}>Đáp án ngắn gọn</option> <option value={AnswerMode.Detailed}>Lời giải chi tiết</option> </select> </div> </div>
-          <div> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest flex items-center justify-between"> <span>Tỷ lệ hình vẽ (SVG)</span> <span className="bg-gray-200 text-gray-700 px-1.5 rounded">{config.imageRatio}%</span> </label> <div className="flex items-center gap-2"> <ImageIcon size={14} className="text-gray-400" /> <input type="range" min="0" max="100" step="10" className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary" value={config.imageRatio} onChange={(e) => setConfig({ ...config, imageRatio: Number(e.target.value) })} /> </div> </div>
-          <div> <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-widest">Mức độ nhận thức</label> <div className="flex flex-wrap gap-1.5"> {Object.values(Difficulty).map(diff => (<button key={diff} onClick={() => handleDifficultyChange(diff)} className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase border transition-all ${config.selectedDifficulties.includes(diff) ? 'bg-primary text-white border-primary shadow-md' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>{diff}</button>))} </div> </div>
-
-          <div className="bg-purple-50 p-4 rounded-2xl border border-purple-100 shadow-sm text-center relative overflow-hidden group"> <Trophy size={28} className="mx-auto text-purple-600 mb-1" /> <p className="text-[10px] font-black text-purple-700 uppercase mb-3 tracking-tighter italic">Ai Là Triệu Phú Toán Học</p> <button onClick={() => { onStartGame(); onClose(); }} disabled={isLoading} className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-black py-3 rounded-xl shadow-lg active:scale-95 transition-all text-[10px] uppercase border-b-4 border-indigo-800">BẮT ĐẦU CHƠI</button> </div>
         </div>
         <div className="mt-8 space-y-3">
           <button onClick={() => { onGenerate(); onClose(); }} disabled={isLoading} className="w-full bg-primary hover:bg-blue-800 text-white font-black py-4 rounded-xl shadow-xl flex items-center justify-center gap-2 uppercase tracking-tight transition-all border-b-4 border-blue-900"> {isLoading ? <Loader2 className="animate-spin" /> : <PlusCircle size={22} />} Soạn bộ câu hỏi AI </button>
-
-          <button
-            onClick={() => { onSync(); }}
-            disabled={isSyncing}
-            className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 font-black py-3 rounded-xl flex items-center justify-center gap-2 uppercase text-[10px] transition-all border border-blue-100"
-          >
-            <Cloud className={isSyncing ? "animate-pulse" : ""} size={18} />
-            {isSyncing ? "Đang đồng bộ..." : "Đồng bộ đám mây"}
-          </button>
-
           <div className="flex gap-2"> <button onClick={onShowHistory} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2.5 rounded-xl text-[10px] uppercase flex items-center justify-center gap-1 transition-colors"><History size={14} /> Lịch sử</button> <button onClick={onShowBank} className="flex-1 bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold py-2.5 rounded-xl text-[10px] border border-amber-200 uppercase flex items-center justify-center gap-1 transition-colors"><Database size={14} /> Kho lưu</button> </div>
         </div>
       </div>
@@ -614,20 +580,7 @@ const QuestionItem = ({ question, onSave, readOnly = false }: any) => {
 };
 
 export default function App() {
-  const [config, setConfig] = useState<AppState>({
-    grade: 12,
-    questionCount: 10,
-    selectedDifficulties: [Difficulty.NB, Difficulty.TH],
-    lessons: [],
-    customLesson: '',
-    questionTypes: [QuestionType.MultipleChoice],
-    answerMode: AnswerMode.Basic,
-    imageRatio: 30,
-    examType: ExamType.None,
-    imageMode: ImageMode.None,
-    gameStatus: GameStatus.Idle,
-    syncKey: storageService.getDeviceId() // Mặc định dùng Device ID
-  });
+  const [config, setConfig] = useState<AppState>({ grade: 12, questionCount: 10, selectedDifficulties: [Difficulty.NB, Difficulty.TH], lessons: [], customLesson: '', questionTypes: [QuestionType.MultipleChoice], answerMode: AnswerMode.Basic, imageRatio: 30, examType: ExamType.None, imageMode: ImageMode.None, gameStatus: GameStatus.Idle });
   const [questions, setQuestions] = useState<Question[]>([]);
   const [gameQuestions, setGameQuestions] = useState<Question[]>([]);
   const [history, setHistory] = useState<HistoryItem[]>([]);
@@ -637,226 +590,62 @@ export default function App() {
   const [showBankModal, setShowBankModal] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // States cho tính năng Chia sẻ bài tập qua Link
-  const [isViewerMode, setIsViewerMode] = useState(false);
-  const [shareConfig, setShareConfig] = useState<any>(null);
-  const [shareId, setShareId] = useState<string | null>(null);
-  const [isSharing, setIsSharing] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState("AI Đang soạn thảo...");
-
   useEffect(() => {
     const saved = localStorage.getItem('math_app_history');
     if (saved) setHistory(JSON.parse(saved));
 
-    // Load Custom API Key & Sync Key
+    // Load Custom API Key
     const savedKey = localStorage.getItem('math_app_custom_api_key');
-    const savedSyncKey = localStorage.getItem('math_app_sync_key');
-    if (savedKey || savedSyncKey) {
-      setConfig(prev => ({
-        ...prev,
-        customApiKey: savedKey || prev.customApiKey,
-        syncKey: savedSyncKey || prev.syncKey
-      }));
+    if (savedKey) {
+      setConfig(prev => ({ ...prev, customApiKey: savedKey }));
     }
-
-    // Xử lý Share Link
-    const params = new URLSearchParams(window.location.search);
-    const sharedId = params.get('share');
-    if (sharedId) {
-      setIsViewerMode(true);
-      setLoadingMessage("Đang mở link bài tập...");
-      setIsLoading(true);
-      firebaseService.getSharedExam(sharedId).then(data => {
-        if (data && data.questions && data.questions.length > 0) {
-          setQuestions(data.questions);
-          setShareConfig(data.config);
-          // Loại bỏ đáp án để học sinh không xem được
-          const studentQuestions = data.questions.map(q => ({ ...q, correctAnswer: '?', explanation: 'Vui lòng nộp bài để xem lời giải.' }));
-          // Thực tế có thể để nguyên, hoặc ẩn đi ở UI. Tạm thời mình ẩn qua UI.
-        } else {
-          alert("Link bài tập không hợp lệ hoặc đã bị xóa!");
-          window.location.href = window.location.pathname; // xóa tham số share
-        }
-      }).catch(err => {
-        console.error("Lỗi khi tải bài tập chia sẻ", err);
-        alert("Lỗi khi tải bài tập. Vui lòng thử lại sau.");
-      }).finally(() => {
-        setIsLoading(false);
-      });
-    }
-
-    // === FIREBASE SYNC: Tải lịch sử từ Cloud ===
-    (async () => {
-      try {
-        const { deviceId } = await storageService.getSecurityParams();
-        if (deviceId) {
-          const cloudHistory = await firebaseService.getHistory(deviceId);
-          if (cloudHistory.length > 0) {
-            setHistory(cloudHistory);
-            localStorage.setItem('math_app_history', JSON.stringify(cloudHistory));
-          }
-        }
-      } catch (err) {
-        console.error("Firebase sync failed, using local:", err);
-      }
-    })();
-
   }, []);
-  useLayoutEffect(() => {
-    const timer = setTimeout(triggerMath, 200);
-    return () => clearTimeout(timer);
-  }, [questions, gameQuestions, config.gameStatus, config.answerMode, isLoading, isViewerMode]);
+  useLayoutEffect(() => { const timer = setTimeout(triggerMath, 200); return () => clearTimeout(timer); }, [questions, gameQuestions, config.gameStatus, isLoading]);
 
   const handleGenerate = async () => {
     if (config.examType === ExamType.None && config.lessons.length === 0 && !config.customLesson) return alert("Vui lòng chọn chủ đề!");
-    setLoadingMessage("AI Đang soạn thảo...");
-    setIsLoading(true);
-    setProgress(0);
-
+    setIsLoading(true); setProgress(0);
+    const progressTimer = setInterval(() => setProgress(prev => prev >= 98 ? 98 : prev + (prev < 30 ? 3 : 0.5)), 600);
     try {
+      // Kiểm tra bảo mật trước khi gọi AI
       const session = localStorage.getItem('math_app_license_session');
       if (!session || JSON.parse(session).status !== 'ACTIVE') {
         throw new Error("LICENSE_REQUIRED");
       }
 
-      const CHUNK_SIZE = 10;
-      const totalRequested = config.questionCount;
-      const chunks = [];
-      let rem = totalRequested;
-      while (rem > 0) {
-        chunks.push(Math.min(rem, CHUNK_SIZE));
-        rem -= CHUNK_SIZE;
-      }
-
-      let allQuestions: Question[] = [];
-
-      for (let i = 0; i < chunks.length; i++) {
-        const chunkSize = chunks[i];
-        try {
-          const chunkConfig = { ...config, questionCount: chunkSize };
-          const res = await generateQuestions(chunkConfig, allQuestions, i + 1);
-          allQuestions = [...allQuestions, ...res];
-          setProgress(((i + 1) / chunks.length) * 100);
-        } catch (err: any) {
-          console.error(`Lỗi chunk ${i + 1}:`, err);
-          if (allQuestions.length > 0) {
-            alert(`AI chỉ tạo được ${allQuestions.length} câu. Phần còn lại bị lỗi: ${err.message}`);
-            break;
-          }
-          throw err;
-        }
-      }
-
-      const finalQuestions = distributeAnswersEvenly(allQuestions).map((q, idx) => ({
-        ...q,
-        id: `q_${Date.now()}_${idx}`,
-        number: idx + 1
-      }));
-
-      if (finalQuestions.length === 0) {
-        throw new Error("Không tạo được câu hỏi nào. Anh vui lòng thử lại.");
-      }
-
-      setQuestions(finalQuestions);
-      setProgress(100);
-
-      firebaseService.saveSharedExam(finalQuestions, config)
-        .then(id => {
-          setShareId(id);
-          console.log("Auto-shared exam ID:", id);
-        })
-        .catch(err => console.error("Auto-share failed:", err));
+      console.log("Alla Debug - handleGenerate triggering with config:", {
+        hasCustomKey: !!config.customApiKey,
+        grade: config.grade,
+        lessons: config.lessons
+      });
+      const res = await generateQuestions(config, questions);
+      // ÁP DỤNG CÂN BẰNG ĐÁP ÁN TUYỆT ĐỐI
+      const balancedRes = distributeAnswersEvenly(res);
+      setQuestions(balancedRes);
 
       const newHistoryItem: HistoryItem = {
         id: Date.now().toString(),
         timestamp: Date.now(),
         config: { ...config },
-        questions: finalQuestions
+        questions: balancedRes
       };
 
       const updated = [newHistoryItem, ...history].slice(0, 15);
       setHistory(updated);
       localStorage.setItem('math_app_history', JSON.stringify(updated));
 
+      // TỰ ĐỘNG LƯU CLOUD (Save Quota)
       const { deviceId } = await storageService.getSecurityParams();
       if (deviceId) {
-        firebaseService.saveHistory(deviceId, newHistoryItem).catch(console.error);
+        firebaseService.saveHistory(deviceId, newHistoryItem).catch(err => console.error("Cloud Auto-save failed:", err));
+        // Đồng thời lưu từng câu vào kho tư liệu nếu anh muốn - Ở đây em lưu cả bộ vào History trước
       }
 
     } catch (e: any) {
-      console.error("Generate Error:", e);
+      console.error("Alla Debug - Generate Error:", e);
       if (e.message === "LICENSE_REQUIRED") alert("Vui lòng kích hoạt bản quyền!");
-      else alert("Lỗi soạn thảo: " + (e.message || "Vui lòng thử lại sau ít phút."));
-      setProgress(0);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSync = async () => {
-    setIsSyncing(true);
-    try {
-      const { syncId } = await storageService.getSecurityParams(config.syncKey);
-      if (!syncId) throw new Error("Không xác định được mã đồng bộ.");
-
-      const [cloudHistory, cloudBank] = await Promise.all([
-        firebaseService.getHistory(syncId),
-        firebaseService.getBank(syncId)
-      ]);
-
-      if (cloudHistory.length > 0) {
-        setHistory(prev => {
-          const combined = [...cloudHistory, ...prev];
-          const unique = Array.from(new Map(combined.map(item => [item.id, item])).values());
-          return unique.sort((a, b) => b.timestamp - a.timestamp).slice(0, 50);
-        });
-        localStorage.setItem('math_app_history', JSON.stringify(cloudHistory));
-      }
-
-      if (cloudBank.length > 0) {
-        // Hợp nhất kho lưu hiện tại với đám mây
-        const currentLocalBank = storageService.getBank();
-        const combinedBank = [...cloudBank, ...currentLocalBank];
-        const uniqueBank = Array.from(new Map(combinedBank.map(q => [q.content, q])).values());
-        localStorage.setItem('math_app_question_bank_v1', JSON.stringify(uniqueBank));
-      }
-
-      alert("Đồng bộ thành công! Dữ liệu đã được cập nhật từ đám mây.");
-    } catch (err: any) {
-      alert("Lỗi đồng bộ: " + err.message);
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  const handleShareLink = async () => {
-    if (questions.length === 0) return alert("Chưa có đề để chia sẻ!");
-
-    setIsSharing(true);
-    try {
-      let currentShareId = shareId;
-      if (!currentShareId) {
-        currentShareId = "share_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
-        // Đảm bảo lưu thành công lên Firebase trước khi cung cấp Link
-        await firebaseService.saveSharedExam(questions, config, currentShareId);
-        setShareId(currentShareId);
-        console.log("Shared exam saved successfully:", currentShareId);
-      }
-
-      const shareUrl = `${window.location.origin}${window.location.pathname}?share=${currentShareId}`;
-
-      try {
-        await navigator.clipboard.writeText(shareUrl);
-        alert("Thành công! Link bài tập đã được lưu lên đám mây và copy vào bộ nhớ tạm:\n" + shareUrl);
-      } catch (copyErr) {
-        window.prompt("Vui lòng copy link bên dưới để gửi cho học sinh:", shareUrl);
-      }
-    } catch (err: any) {
-      console.error("Share failed:", err);
-      alert("Lỗi chia sẻ: " + (err.message || "Không thể lưu bộ đề lên đám mây. Có thể do nội dung quá lớn."));
-    } finally {
-      setIsSharing(false);
-    }
+      else alert("Lỗi AI: " + (e.message || "Vui lòng kiểm tra console"));
+    } finally { clearInterval(progressTimer); setIsLoading(false); }
   };
 
   const [showActivateModal, setShowActivateModal] = useState(false);
@@ -906,7 +695,6 @@ export default function App() {
         storageService.syncCloud().finally(() => setIsSyncing(false));
       } else if (result.error === 'TOKEN_CLONED' || result.message === 'TOKEN_CLONED' || result.status === 'TOKEN_CLONED') {
         localStorage.removeItem('math_app_license_session');
-        setShowActivateModal(true); // Re-open activation modal
         alert("LỖI: Token này đã được sử dụng cho thiết bị khác (TOKEN_CLONED). Ứng dụng sẽ bị khóa.");
       } else {
         alert("Lỗi: " + (result.message || result.error || "Token không hợp lệ"));
@@ -1059,28 +847,8 @@ export default function App() {
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-gray-100 font-sans overflow-hidden">
-      <header className="md:hidden bg-primary text-white p-4 flex justify-between items-center sticky top-0 z-30 shadow-lg">
-        <div className="flex items-center gap-2 font-black uppercase"><BookOpen size={24} /> {isViewerMode ? 'BÀI TẬP VỀ NHÀ' : 'Soạn Toán AI'}</div>
-        <div className="flex items-center gap-2">
-          <button onClick={triggerMath} className="p-2 bg-white/20 rounded-full"><RefreshCw size={20} /></button>
-          {!isViewerMode && <button onClick={() => setIsSidebarOpen(true)} className="p-2"><Menu size={28} /></button>}
-        </div>
-      </header>
-      {!isViewerMode ? (
-        <Sidebar
-          config={config}
-          setConfig={setConfig}
-          onGenerate={handleGenerate}
-          onStartGame={handleStartGame}
-          isLoading={isLoading}
-          onShowHistory={() => setShowHistoryModal(true)}
-          onShowBank={() => setShowBankModal(true)}
-          onSync={handleSync}
-          isSyncing={isSyncing}
-          isOpen={isSidebarOpen}
-          onClose={() => setIsSidebarOpen(false)}
-        />
-      ) : null}
+      <header className="md:hidden bg-primary text-white p-4 flex justify-between items-center sticky top-0 z-30 shadow-lg"> <div className="flex items-center gap-2 font-black uppercase"><BookOpen size={24} /> Soạn Toán AI</div> <div className="flex items-center gap-2"> <button onClick={triggerMath} className="p-2 bg-white/20 rounded-full"><RefreshCw size={20} /></button> <button onClick={() => setIsSidebarOpen(true)} className="p-2"><Menu size={28} /></button> </div> </header>
+      <Sidebar config={config} setConfig={setConfig} onGenerate={handleGenerate} onStartGame={handleStartGame} isLoading={isLoading} onShowHistory={() => setShowHistoryModal(true)} onShowBank={() => setShowBankModal(true)} isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
       <main className="flex-1 p-3 md:p-10 overflow-y-auto h-screen relative bg-gray-200/40 no-print">
         {config.gameStatus === GameStatus.Playing && gameQuestions.length > 0 ? (
           <MillionaireGame questions={gameQuestions} grade={config.grade} lessonName={config.customLesson || (config.lessons.length > 0 ? config.lessons.join(", ") : "")} onClose={() => setConfig(prev => ({ ...prev, gameStatus: GameStatus.Idle }))} onRestart={handleStartGame} />
@@ -1088,30 +856,9 @@ export default function App() {
           <div className="h-full flex flex-col items-center justify-center text-gray-400 p-8 text-center max-w-lg mx-auto animate-in fade-in duration-700"> <div className="bg-white p-12 rounded-full shadow-2xl mb-8"><PartyPopper size={100} className="text-primary/15" /></div> <h2 className="text-2xl font-black text-gray-700 mb-3 uppercase tracking-tighter">AI Assistant Sẵn sàng!</h2> <p className="text-base text-gray-500 font-medium italic">Chọn bài học để bắt đầu.</p> </div>
         ) : (
           <div className="max-w-4xl mx-auto bg-white shadow-2xl p-6 md:p-16 min-h-[29.7cm] rounded-none md:rounded-lg animate-in slide-in-from-bottom-6 duration-500 relative">
-            <div className="text-center mb-16 border-b-2 border-black pb-8 relative">
-              <h1 className="text-2xl md:text-4xl font-black uppercase font-serif text-gray-900 leading-tight">
-                {isViewerMode ? 'PHIẾU BÀI TẬP VỀ NHÀ' : `Phiếu Bài Tập Toán Lớp ${config.grade}`}
-              </h1>
-              <p className="text-xl text-gray-500 italic font-serif mt-2">
-                {isViewerMode ? (shareConfig?.customLesson || 'Bài tập được giao') : (config.customLesson || (config.lessons.length > 0 ? config.lessons.join(", ") : "Kiểm tra kiến thức"))}
-              </p>
-            </div>
-
-            {/* NÚT CHIA SẺ DÀNH CHO GIÁO VIÊN */}
-            {!isViewerMode && (
-              <div className="flex justify-end mb-8 no-print">
-                <button
-                  onClick={handleShareLink}
-                  disabled={isSharing}
-                  className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-2.5 px-6 rounded-full shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all text-sm uppercase tracking-wider disabled:opacity-50"
-                >
-                  {isSharing ? <Loader2 size={16} className="animate-spin" /> : <div className="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg> <span>Chia sẻ Link Học Sinh</span></div>}
-                </button>
-              </div>
-            )}
-
-            <div className="content-area"> {questions.map(q => <QuestionItem key={q.id} question={q} onSave={!isViewerMode ? (quest: any) => storageService.saveQuestion(quest, config.syncKey) : undefined} readOnly={isViewerMode} />)}
-              {(!isViewerMode && config.answerMode !== AnswerMode.None) && (
+            <div className="text-center mb-16 border-b-2 border-black pb-8"> <h1 className="text-2xl md:text-4xl font-black uppercase font-serif text-gray-900 leading-tight">Phiếu Bài Tập Toán Lớp {config.grade}</h1> <p className="text-xl text-gray-500 italic font-serif mt-2">{config.customLesson || (config.lessons.length > 0 ? config.lessons.join(", ") : "Kiểm tra kiến thức")}</p> </div>
+            <div className="content-area"> {questions.map(q => <QuestionItem key={q.id} question={q} onSave={storageService.saveQuestion} />)}
+              {config.answerMode !== AnswerMode.None && (
                 <div className="mt-20 pt-10 border-t-2 border-dashed border-gray-300 break-before-page">
                   <div className="flex items-center justify-center gap-4 mb-10"> <div className="h-0.5 flex-1 bg-gray-200"></div> <h2 className="text-2xl font-black uppercase tracking-widest text-gray-400">ĐÁP ÁN VÀ LỜI GIẢI</h2> <div className="h-0.5 flex-1 bg-gray-200"></div> </div>
                   <div className="space-y-10"> {questions.map(q => (<div key={`ans_${q.id}`} className="p-6 bg-gray-50 rounded-3xl border border-gray-200"> <div className="flex items-center gap-3 mb-3"> <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-black">C{q.number}</div> <span className="font-black text-lg text-green-600 uppercase">Đáp án: {q.correctAnswer}</span> </div> {config.answerMode === AnswerMode.Detailed && (<div className="text-base text-gray-700 leading-relaxed font-serif bg-white p-5 rounded-2xl border border-gray-100 shadow-inner" dangerouslySetInnerHTML={{ __html: q.explanation }}></div>)} </div>))} </div>
@@ -1120,14 +867,8 @@ export default function App() {
             </div>
           </div>
         )}
-        {questions.length > 0 && config.gameStatus === GameStatus.Idle && !isViewerMode && (
-          <div className="fixed bottom-8 right-8 flex flex-col gap-4 no-print z-40">
-            <button onClick={handleShareLink} title="Chia sẻ Link cho Phụ huynh/Học sinh" className="bg-indigo-600 text-white p-5 rounded-2xl shadow-2xl border-b-4 border-indigo-800 flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg></button>
-            <button onClick={triggerMath} title="Làm mới" className="bg-blue-600 text-white p-5 rounded-2xl shadow-2xl border-b-4 border-blue-800"><RefreshCw size={28} /></button>
-            <button onClick={handleExportHTML} title="Xuất HTML" className="bg-amber-600 text-white p-5 rounded-2xl shadow-2xl border-b-4 border-amber-800"><FileCode size={28} /></button>
-            <button onClick={() => window.print()} title="In" className="bg-green-600 text-white p-5 rounded-2xl shadow-2xl border-b-4 border-green-800"><Printer size={28} /></button>
-            <button onClick={handleGenerate} title="Soạn lại" className="bg-primary text-white p-5 rounded-2xl shadow-2xl hover:scale-110 transition-all active:scale-90 border-b-4 border-blue-900"><PlusCircle size={28} /></button>
-          </div>
+        {questions.length > 0 && config.gameStatus === GameStatus.Idle && (
+          <div className="fixed bottom-8 right-8 flex flex-col gap-4 no-print z-40"> <button onClick={triggerMath} title="Làm mới" className="bg-blue-600 text-white p-5 rounded-2xl shadow-2xl border-b-4 border-blue-800"><RefreshCw size={28} /></button> <button onClick={handleExportHTML} title="Xuất HTML" className="bg-amber-600 text-white p-5 rounded-2xl shadow-2xl border-b-4 border-amber-800"><FileCode size={28} /></button> <button onClick={() => window.print()} title="In" className="bg-green-600 text-white p-5 rounded-2xl shadow-2xl border-b-4 border-green-800"><Printer size={28} /></button> <button onClick={handleGenerate} title="Soạn lại" className="bg-primary text-white p-5 rounded-2xl shadow-2xl hover:scale-110 transition-all active:scale-90 border-b-4 border-blue-900"><PlusCircle size={28} /></button> </div>
         )}
       </main>
       {isSyncing && (
@@ -1143,7 +884,7 @@ export default function App() {
         <div className="fixed inset-0 bg-black/50 z-[100] flex flex-col items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white p-8 rounded-3xl shadow-2xl max-w-md w-full text-center space-y-6 border-4 border-white animate-in zoom-in-95">
             <div className="relative w-24 h-24 mx-auto"> <div className="absolute inset-0 rounded-full border-8 border-gray-100"></div> <div className="absolute inset-0 rounded-full border-8 border-primary border-t-transparent animate-spin"></div> <div className="absolute inset-0 flex items-center justify-center font-black text-2xl text-primary">{Math.round(progress)}%</div> </div>
-            <h3 className="text-xl font-black text-gray-800 uppercase tracking-tighter">{loadingMessage}</h3>
+            <h3 className="text-xl font-black text-gray-800 uppercase tracking-tighter">AI Đang soạn thảo...</h3>
             <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden shadow-inner"><div className="bg-primary h-full transition-all duration-300" style={{ width: `${progress}%` }}></div></div>
           </div>
         </div>

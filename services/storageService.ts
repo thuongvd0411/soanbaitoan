@@ -44,11 +44,12 @@ export const storageService = {
     return hashHex;
   },
 
-  // Lấy Security Headers/Params
-  getSecurityParams: async () => {
+  // Lấy Security Headers/Params (Hỗ trợ SyncKey)
+  getSecurityParams: async (customSyncKey?: string) => {
     const deviceId = storageService.getDeviceId();
     const fingerprint = await storageService.getFingerprint();
-    return { deviceId, fingerprint };
+    const syncId = customSyncKey || deviceId;
+    return { deviceId, fingerprint, syncId };
   },
 
   // Lấy toàn bộ câu hỏi trong kho
@@ -63,7 +64,7 @@ export const storageService = {
   },
 
   // Lưu một câu hỏi vào kho
-  saveQuestion: (question: Question): boolean => {
+  saveQuestion: (question: Question, syncId?: string): boolean => {
     try {
       const bank = storageService.getBank();
       // Kiểm tra trùng lặp (dựa trên nội dung)
@@ -80,9 +81,9 @@ export const storageService = {
       const updatedBank = [newSavedQuestion, ...bank];
       localStorage.setItem(BANK_KEY, JSON.stringify(updatedBank));
 
-      // Đồng bộ lên Cloud (Firebase)
-      const deviceId = storageService.getDeviceId();
-      firebaseService.saveQuestion(deviceId, newSavedQuestion).catch(console.error);
+      // Đồng bộ lên Cloud (Firebase) dùng syncId nếu có
+      const finalSyncId = syncId || storageService.getDeviceId();
+      firebaseService.saveQuestion(finalSyncId, newSavedQuestion).catch(console.error);
 
       return true;
     } catch (error) {
@@ -92,7 +93,7 @@ export const storageService = {
   },
 
   // Nhập dữ liệu từ file backup (Merge data)
-  importBank: (importedQuestions: any[]): { success: number, failed: number } => {
+  importBank: (importedQuestions: any[], syncId?: string): { success: number, failed: number } => {
     try {
       if (!Array.isArray(importedQuestions)) return { success: 0, failed: 0 };
 
@@ -103,19 +104,10 @@ export const storageService = {
       const newBank = [...currentBank];
 
       importedQuestions.forEach(q => {
-        // Kiểm tra cấu trúc cơ bản của câu hỏi
-        if (!q.content || !q.type || !q.difficulty) {
-          return;
-        }
-
-        // Kiểm tra trùng lặp nội dung
+        if (!q.content || !q.type || !q.difficulty) return;
         const exists = newBank.some(existing => existing.content === q.content);
         if (!exists) {
-          // Tạo ID mới để đảm bảo tính duy nhất
-          const newQ = {
-            ...q,
-            id: `bank_imported_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          };
+          const newQ = { ...q, id: `bank_imported_${Date.now()}_${Math.random().toString(36).substr(2, 9)}` };
           newBank.push(newQ);
           addedCount++;
         } else {
@@ -125,11 +117,13 @@ export const storageService = {
 
       localStorage.setItem(BANK_KEY, JSON.stringify(newBank));
 
-      // Đồng bộ hàng loạt lên Cloud
-      const deviceId = storageService.getDeviceId();
-      addedCount > 0 && newBank.forEach(q => {
-        firebaseService.saveQuestion(deviceId, q).catch(console.error);
-      });
+      // Đồng bộ Cloud
+      const finalSyncId = syncId || storageService.getDeviceId();
+      if (addedCount > 0) {
+        newBank.forEach(q => {
+          firebaseService.saveQuestion(finalSyncId, q).catch(console.error);
+        });
+      }
 
       return { success: addedCount, failed: duplicateCount };
     } catch (error) {
@@ -139,80 +133,55 @@ export const storageService = {
   },
 
   // Xóa câu hỏi khỏi kho
-  removeQuestion: (id: string) => {
+  removeQuestion: (id: string, syncId?: string) => {
     const bank = storageService.getBank();
     const updatedBank = bank.filter(q => q.id !== id);
     localStorage.setItem(BANK_KEY, JSON.stringify(updatedBank));
 
     // Xóa trên Cloud
-    const deviceId = storageService.getDeviceId();
-    firebaseService.deleteQuestion(deviceId, id).catch(console.error);
+    const finalSyncId = syncId || storageService.getDeviceId();
+    firebaseService.deleteQuestion(finalSyncId, id).catch(console.error);
 
     return updatedBank;
   },
 
-  // Lấy câu hỏi theo bộ lọc (Lớp, Mức độ, Tập, Bài)
-  filterBank: (
-    grade: number | 'All',
-    difficulty: string,
-    volume: string = 'All',
-    lesson: string = 'All'
-  ) => {
+  // Lấy câu hỏi theo bộ lọc...
+  filterBank: (grade: number | 'All', difficulty: string, volume: string = 'All', lesson: string = 'All') => {
     let bank = storageService.getBank();
-
-    // Filter by Grade
-    if (grade && grade !== 'All') {
-      bank = bank.filter(q => q.grade === Number(grade));
-    }
-
-    // Filter by Difficulty
-    if (difficulty && difficulty !== 'All') {
-      bank = bank.filter(q => q.difficulty === difficulty);
-    }
-
-    // Filter by Volume (Tập 1/2 in chapter name)
-    if (volume && volume !== 'All') {
-      bank = bank.filter(q => q.chapter && q.chapter.includes(volume));
-    }
-
-    // Filter by Lesson name
-    if (lesson && lesson !== 'All') {
-      bank = bank.filter(q => q.lesson === lesson);
-    }
-
+    if (grade && grade !== 'All') bank = bank.filter(q => q.grade === Number(grade));
+    if (difficulty && difficulty !== 'All') bank = bank.filter(q => q.difficulty === difficulty);
+    if (volume && volume !== 'All') bank = bank.filter(q => q.chapter && q.chapter.includes(volume));
+    if (lesson && lesson !== 'All') bank = bank.filter(q => q.lesson === lesson);
     return bank;
   },
 
   // Hàm đồng bộ toàn diện từ Local lên Cloud
-  syncCloud: async (): Promise<void> => {
+  syncCloud: async (syncId?: string): Promise<void> => {
     try {
-      const deviceId = storageService.getDeviceId();
+      const finalSyncId = syncId || storageService.getDeviceId();
       const localBank = storageService.getBank();
-
-      // Đẩy từng câu hỏi lên
       for (const q of localBank) {
-        await firebaseService.saveQuestion(deviceId, q);
+        await firebaseService.saveQuestion(finalSyncId, q);
       }
-
-      console.log("Alla Sync - Cloud Pushed Successfully");
+      console.log("Alla Sync - Cloud Pushed Successfully for ID:", finalSyncId);
     } catch (error) {
-      console.error("Alla Sync - Error during pushing to cloud:", error);
+      console.error("Alla Sync - Error pushing to cloud:", error);
       throw error;
     }
   },
 
   // Hàm tải dữ liệu từ Cloud về Local
-  pullCloud: async (): Promise<void> => {
+  pullCloud: async (syncId?: string): Promise<void> => {
     try {
-      const deviceId = storageService.getDeviceId();
-      const cloudBank = await firebaseService.getBank(deviceId);
+      const finalSyncId = syncId || storageService.getDeviceId();
+      const cloudBank = await firebaseService.getBank(finalSyncId);
 
       if (cloudBank.length > 0) {
         localStorage.setItem(BANK_KEY, JSON.stringify(cloudBank));
-        console.log("Alla Sync - Cloud Pulled Successfully", cloudBank.length, "questions");
+        console.log("Alla Sync - Cloud Pulled Successfully", cloudBank.length, "questions for ID:", finalSyncId);
       }
     } catch (error) {
-      console.error("Alla Sync - Error during pulling from cloud:", error);
+      console.error("Alla Sync - Error pulling from cloud:", error);
       throw error;
     }
   }
