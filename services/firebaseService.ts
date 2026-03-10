@@ -120,13 +120,34 @@ export const firebaseService = {
      */
     async saveSharedExam(questions: Question[], config: any): Promise<string> {
         try {
+            // Tối ưu hóa dung lượng: Loại bỏ khoảng trắng thừa trong SVG nếu có
+            const optimizedQuestions = questions.map(q => {
+                if (q.hasImage && q.imageDescription && q.imageDescription.includes('<svg')) {
+                    return {
+                        ...q,
+                        imageDescription: q.imageDescription.replace(/>\s+</g, '><').trim()
+                    };
+                }
+                return q;
+            });
+
+            const data = {
+                questions: optimizedQuestions,
+                config,
+                createdAt: new Date().toISOString()
+            };
+
+            // Kiểm tra dung lượng ước tính (Firestore giới hạn 1MB)
+            const stringSize = JSON.stringify(data).length;
+            if (stringSize > 1000000) {
+                throw new Error("Bộ đề này quá lớn (nhiều hình vẽ). Anh vui lòng giảm số câu hỏi hoặc giảm tỷ lệ hình vẽ xuống nhé.");
+            }
+
             const shareId = "share_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
             const sRef = doc(db, "shared_exams", shareId);
             await setDoc(sRef, {
                 shareId,
-                questions,
-                config,
-                createdAt: new Date().toISOString()
+                ...data
             });
             return shareId;
         } catch (error) {

@@ -633,7 +633,7 @@ export default function App() {
     }
 
   }, []);
-  useLayoutEffect(() => { const timer = setTimeout(triggerMath, 200); return () => clearTimeout(timer); }, [questions, gameQuestions, config.gameStatus, isLoading]);
+  useLayoutEffect(() => { const timer = setTimeout(triggerMath, 200); return () => clearTimeout(timer); }, [questions, gameQuestions, config.gameStatus, config.answerMode, isLoading, isViewerMode]);
 
   const handleGenerate = async () => {
     if (config.examType === ExamType.None && config.lessons.length === 0 && !config.customLesson) return alert("Vui lòng chọn chủ đề!");
@@ -718,20 +718,29 @@ export default function App() {
   const handleShareLink = async () => {
     if (questions.length === 0) return alert("Chưa có đề để chia sẻ!");
     setIsSharing(true);
+
+    // Tạo một timeout để báo lỗi nếu Firebase treo quá lâu
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Mạng yếu hoặc bộ đề quá nặng. Anh thử lại sau nhé!")), 15000)
+    );
+
     try {
-      const id = await firebaseService.saveSharedExam(questions, config);
+      const id = await Promise.race([
+        firebaseService.saveSharedExam(questions, config),
+        timeoutPromise
+      ]) as string;
+
       const shareUrl = `${window.location.origin}${window.location.pathname}?share=${id}`;
 
       try {
         await navigator.clipboard.writeText(shareUrl);
-        alert("Thành công! Link đã được copy vào bộ nhớ tạm:\n" + shareUrl);
+        alert("Thành công! Link đã được copy vào bộ bộ nhớ tạm:\n" + shareUrl);
       } catch (copyErr) {
-        // Fallback nếu clipboard API bị chặn
         window.prompt("Vui lòng copy link bên dưới để gửi cho học sinh:", shareUrl);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Share error:", err);
-      alert("Lỗi khi tạo link chia sẻ. Anh kiểm tra lại kết nối mạng nhé.");
+      alert(err.message || "Lỗi khi tạo link chia sẻ.");
     } finally {
       setIsSharing(false);
     }
