@@ -48,7 +48,7 @@ async function retryWithFallback(
   maxRetries: number = 3
 ): Promise<string> {
   // Sử dụng các model cao cấp nhất hiện nay
-  const models = ['gemini-2.0-flash', 'gemini-1.5-pro'];
+  const models = ['gemini-3.1-flash', 'gemini-3.1-pro'];
   let lastError = "";
 
   for (const modelName of models) {
