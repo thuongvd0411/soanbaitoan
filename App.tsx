@@ -669,13 +669,24 @@ export default function App() {
         rem -= CHUNK_SIZE;
       }
 
+      let progressInterval: any = null;
+      setProgress(5);
+
       let completedChunks = 0;
       const updateProgress = () => {
         completedChunks++;
-        setProgress((completedChunks / chunks.length) * 100);
+        const targetProgress = (completedChunks / chunks.length) * 100;
+        setProgress(Math.max(progress, targetProgress));
       };
 
-      // Chạy song song tất cả các lô
+      progressInterval = setInterval(() => {
+        setProgress(prev => {
+          const nextTarget = ((completedChunks + 1) / chunks.length) * 100 - 2;
+          if (prev < nextTarget) return prev + 0.3;
+          return prev;
+        });
+      }, 500);
+
       const chunkPromises = chunks.map((size, index) => {
         return (async () => {
           try {
@@ -691,9 +702,9 @@ export default function App() {
       });
 
       const results = await Promise.all(chunkPromises);
+      if (progressInterval) clearInterval(progressInterval);
       const allQuestions = results.flat();
 
-      // Đánh số lại và cân bằng đáp án cuối cùng
       const finalQuestions = distributeAnswersEvenly(allQuestions).map((q, idx) => ({
         ...q,
         id: `q_${Date.now()}_${idx}`,
@@ -703,7 +714,6 @@ export default function App() {
       setQuestions(finalQuestions);
       setProgress(100);
 
-      // --- TỰ ĐỘNG SINH LINK CHIA SẺ NGAY KHI XONG ---
       firebaseService.saveSharedExam(finalQuestions, config)
         .then(id => {
           setShareId(id);
@@ -730,6 +740,7 @@ export default function App() {
     } catch (e: any) {
       console.error("Generate Error:", e);
       if (e.message === "LICENSE_REQUIRED") alert("Vui lòng kích hoạt bản quyền!");
+      else if (e.message.includes("API Key đã hết lượt")) alert(e.message);
       else alert("Lỗi soạn thảo: " + (e.message || "Vui lòng thử lại sau ít phút."));
       setProgress(0);
     } finally {
