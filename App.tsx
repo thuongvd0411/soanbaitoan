@@ -697,8 +697,11 @@ export default function App() {
           allBalancedQuestions = [...allBalancedQuestions, ...offsetQuestions];
           // Cập nhật lại list trên UI liên tục để user có cảm giác đang tải dần dần
           setQuestions([...allBalancedQuestions]);
-        } catch (err) {
-          throw err; // văng lỗi ra ngoài loop
+        } catch (err: any) {
+          console.error(`Lỗi ở chunk thứ ${i + 1}:`, err);
+          // NẾU CÓ THREOW THÌ BỊ DỪNG HẲN. TA BÁO LỖI LÊN MÀN HÌNH VÀ BREAK LOOP ĐỂ LƯU NHỮNG CÂU ĐÃ LÀM ĐƯỢC
+          alert(`Hệ thống AI đang quá tải, Alla chỉ có thể làm được ${allBalancedQuestions.length} câu. Anh tạm dừng xíu chờ mạng ổn định nhé!`);
+          break;
         } finally {
           clearInterval(progressTimer);
         }
