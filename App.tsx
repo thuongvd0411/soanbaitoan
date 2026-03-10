@@ -633,7 +633,21 @@ export default function App() {
     }
 
   }, []);
-  useLayoutEffect(() => { const timer = setTimeout(triggerMath, 200); return () => clearTimeout(timer); }, [questions, gameQuestions, config.gameStatus, config.answerMode, isLoading, isViewerMode]);
+  useLayoutEffect(() => {
+    const timer = setTimeout(triggerMath, 200);
+    return () => clearTimeout(timer);
+  }, [questions, gameQuestions, config.gameStatus, config.answerMode, isLoading, isViewerMode]);
+
+  // MutationObserver to catch any DOM changes and trigger MathJax
+  useEffect(() => {
+    const observer = new MutationObserver((mutations) => {
+      if (mutations.some(m => m.type === 'childList' || m.type === 'characterData')) {
+        triggerMath();
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    return () => observer.disconnect();
+  }, []);
 
   const handleGenerate = async () => {
     if (config.examType === ExamType.None && config.lessons.length === 0 && !config.customLesson) return alert("Vui lòng chọn chủ đề!");
@@ -689,6 +703,14 @@ export default function App() {
       setQuestions(finalQuestions);
       setProgress(100);
 
+      // --- TỰ ĐỘNG SINH LINK CHIA SẺ NGAY KHI XONG ---
+      firebaseService.saveSharedExam(finalQuestions, config)
+        .then(id => {
+          setShareId(id);
+          console.log("Auto-shared exam ID:", id);
+        })
+        .catch(err => console.error("Auto-share failed:", err));
+
       const newHistoryItem: HistoryItem = {
         id: Date.now().toString(),
         timestamp: Date.now(),
@@ -717,32 +739,29 @@ export default function App() {
 
   const handleShareLink = async () => {
     if (questions.length === 0) return alert("Chưa có đề để chia sẻ!");
-    setIsSharing(true);
 
-    // Tạo một timeout để báo lỗi nếu Firebase treo quá lâu
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("Mạng yếu hoặc bộ đề quá nặng. Anh thử lại sau nhé!")), 15000)
-    );
+    // Nếu đã có shareId từ Auto-share thì dùng luôn
+    let currentShareId = shareId;
+
+    if (!currentShareId) {
+      setIsSharing(true);
+      try {
+        currentShareId = await firebaseService.saveSharedExam(questions, config);
+        setShareId(currentShareId);
+      } catch (err: any) {
+        setIsSharing(false);
+        return alert(err.message || "Lỗi khi tạo link chia sẻ.");
+      }
+      setIsSharing(false);
+    }
+
+    const shareUrl = `${window.location.origin}${window.location.pathname}?share=${currentShareId}`;
 
     try {
-      const id = await Promise.race([
-        firebaseService.saveSharedExam(questions, config),
-        timeoutPromise
-      ]) as string;
-
-      const shareUrl = `${window.location.origin}${window.location.pathname}?share=${id}`;
-
-      try {
-        await navigator.clipboard.writeText(shareUrl);
-        alert("Thành công! Link đã được copy vào bộ bộ nhớ tạm:\n" + shareUrl);
-      } catch (copyErr) {
-        window.prompt("Vui lòng copy link bên dưới để gửi cho học sinh:", shareUrl);
-      }
-    } catch (err: any) {
-      console.error("Share error:", err);
-      alert(err.message || "Lỗi khi tạo link chia sẻ.");
-    } finally {
-      setIsSharing(false);
+      await navigator.clipboard.writeText(shareUrl);
+      alert("Thành công! Link đã được copy vào bộ nhớ tạm:\n" + shareUrl);
+    } catch (copyErr) {
+      window.prompt("Vui lòng copy link bên dưới để gửi cho học sinh:", shareUrl);
     }
   };
 
