@@ -632,22 +632,27 @@ export default function App() {
       });
     }
 
+    // === FIREBASE SYNC: Tải lịch sử từ Cloud ===
+    (async () => {
+      try {
+        const { deviceId } = await storageService.getSecurityParams();
+        if (deviceId) {
+          const cloudHistory = await firebaseService.getHistory(deviceId);
+          if (cloudHistory.length > 0) {
+            setHistory(cloudHistory);
+            localStorage.setItem('math_app_history', JSON.stringify(cloudHistory));
+          }
+        }
+      } catch (err) {
+        console.error("Firebase sync failed, using local:", err);
+      }
+    })();
+
   }, []);
   useLayoutEffect(() => {
     const timer = setTimeout(triggerMath, 200);
     return () => clearTimeout(timer);
   }, [questions, gameQuestions, config.gameStatus, config.answerMode, isLoading, isViewerMode]);
-
-  // MutationObserver to catch any DOM changes and trigger MathJax
-  useEffect(() => {
-    const observer = new MutationObserver((mutations) => {
-      if (mutations.some(m => m.type === 'childList' || m.type === 'characterData')) {
-        triggerMath();
-      }
-    });
-    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
-    return () => observer.disconnect();
-  }, []);
 
   const handleGenerate = async () => {
     if (config.examType === ExamType.None && config.lessons.length === 0 && !config.customLesson) return alert("Vui lòng chọn chủ đề!");
@@ -738,28 +743,24 @@ export default function App() {
     }
   };
 
-  const handleShareLink = async () => {
+  const handleShareLink = () => {
     if (questions.length === 0) return alert("Chưa có đề để chia sẻ!");
 
-    // Nếu đã có shareId từ Auto-share thì dùng luôn
+    // Tạo shareId local ngay lập tức
     let currentShareId = shareId;
-
     if (!currentShareId) {
-      setIsSharing(true);
-      try {
-        currentShareId = await firebaseService.saveSharedExam(questions, config);
-        setShareId(currentShareId);
-      } catch (err: any) {
-        setIsSharing(false);
-        return alert(err.message || "Lỗi khi tạo link chia sẻ.");
-      }
-      setIsSharing(false);
+      currentShareId = "share_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+      setShareId(currentShareId);
+      // Upload lên Firebase ở background, không chờ
+      firebaseService.saveSharedExam(questions, config)
+        .then(() => console.log("Shared exam saved:", currentShareId))
+        .catch(err => console.error("Share save failed:", err));
     }
 
     const shareUrl = `${window.location.origin}${window.location.pathname}?share=${currentShareId}`;
 
     try {
-      await navigator.clipboard.writeText(shareUrl);
+      navigator.clipboard.writeText(shareUrl);
       alert("Thành công! Link đã được copy vào bộ nhớ tạm:\n" + shareUrl);
     } catch (copyErr) {
       window.prompt("Vui lòng copy link bên dưới để gửi cho học sinh:", shareUrl);
