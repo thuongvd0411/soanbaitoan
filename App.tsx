@@ -781,37 +781,52 @@ export default function App() {
   // Hàm helper: parse đáp án Đúng/Sai linh hoạt — xử lý mọi format AI trả về
   const parseTFCorrectAnswer = (correctAnswer: string): Record<number, 'Đ' | 'S'> => {
     try {
+      const str = correctAnswer;
+      const lowerStr = str.toLowerCase();
       const result: Record<number, 'Đ' | 'S'> = {};
-      const str = correctAnswer.toLowerCase();
+      const letters = ['a', 'b', 'c', 'd'];
 
-      // Phương án 1: format ngắn gọn "a)Đ, b)S, c)Đ, d)S"
+      // Tìm vị trí của a), b), c), d) trong chuỗi
+      const positions: { idx: number; pos: number }[] = [];
       for (let i = 0; i < 4; i++) {
-        const letter = String.fromCharCode(97 + i);
-        const shortReg = new RegExp(`${letter}\\)\\s*[:.-]?\\s*(đ|đúng|s|sai)(?=[,;.\\s]|$)`, 'i');
-        const match = str.match(shortReg);
-        if (match) {
-          result[i] = match[1].startsWith('đ') ? 'Đ' : 'S';
+        const pattern = letters[i] + ')';
+        let searchFrom = 0;
+        while (true) {
+          const found = lowerStr.indexOf(pattern, searchFrom);
+          if (found === -1) break;
+          // Chỉ chấp nhận nếu ở đầu hoặc sau dấu cách/dấu phẩy
+          if (found === 0 || /[\s,.;]/.test(lowerStr[found - 1])) {
+            positions.push({ idx: i, pos: found });
+            break;
+          }
+          searchFrom = found + 1;
         }
       }
 
-      if (Object.keys(result).length === 4) return result;
+      positions.sort((a, b) => a.pos - b.pos);
 
-      // Phương án 2: Tách theo a), b), c), d) và tìm từ "đúng"/"sai" trong mỗi đoạn
-      const parts = str.split(/(?=[abcd]\))/i).filter(p => p.trim());
-      for (let i = 0; i < Math.min(parts.length, 4); i++) {
-        if (result[i] !== undefined) continue;
-        const part = parts[i];
-        if (part.includes('đúng') && !part.includes('sai')) {
-          result[i] = 'Đ';
-        } else if (part.includes('sai') && !part.includes('đúng')) {
-          result[i] = 'S';
-        } else if (part.includes('sai')) {
-          const lastDung = part.lastIndexOf('đúng');
-          const lastSai = part.lastIndexOf('sai');
-          result[i] = lastSai > lastDung ? 'S' : 'Đ';
+      // Tách từng đoạn và tìm "đúng"/"sai"
+      for (let p = 0; p < positions.length; p++) {
+        const start = positions[p].pos;
+        const end = p + 1 < positions.length ? positions[p + 1].pos : str.length;
+        const segment = str.substring(start, end).toLowerCase();
+
+        // Kiểm tra 30 ký tự đầu của segment (ví dụ: "a) đúng theo quy...")
+        const head = segment.substring(0, Math.min(30, segment.length));
+        if (head.includes('đúng') || head.includes('đ)') || head.match(/[):]\s*đ(?!\w)/)) {
+          result[positions[p].idx] = 'Đ';
+        } else if (head.includes('sai') || head.includes('s)') || head.match(/[):]\s*s(?!\w)/)) {
+          result[positions[p].idx] = 'S';
+        } else {
+          // Fallback: tìm từ cuối cùng "đúng" hoặc "sai" trong toàn đoạn
+          const lastD = segment.lastIndexOf('đúng');
+          const lastS = segment.lastIndexOf('sai');
+          if (lastD > lastS && lastD !== -1) result[positions[p].idx] = 'Đ';
+          else if (lastS !== -1) result[positions[p].idx] = 'S';
         }
       }
 
+      console.log('Alla T/F Parser:', { input: correctAnswer.substring(0, 80), result });
       return result;
     } catch (e) {
       console.error("parseTFCorrectAnswer error:", e);
@@ -1607,7 +1622,7 @@ export default function App() {
                           )}
 
                           {(!isViewerMode ? config.answerMode === AnswerMode.Detailed : true) && (
-                            <div className="text-base text-gray-700 leading-relaxed font-serif bg-white p-5 rounded-2xl border border-gray-100 shadow-inner" dangerouslySetInnerHTML={{ __html: q.explanation }}></div>
+                            <MathContent html={q.explanation || ''} className="text-base text-gray-700 leading-relaxed font-serif bg-white p-5 rounded-2xl border border-gray-100 shadow-inner" />
                           )}
                         </div>
                       );
