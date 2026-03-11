@@ -598,10 +598,23 @@ const Sidebar = ({ config, setConfig, onGenerate, onStartGame, onVoiceCompose, i
   );
 };
 
+// Component bảo vệ nội dung MathJax khỏi React re-render
+const MathContent = React.memo(({ html, className }: { html: string; className?: string }) => {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (ref.current) {
+      ref.current.innerHTML = html;
+      triggerMath();
+    }
+  }, [html]);
+
+  return <div ref={ref} className={className} />;
+}, (prev, next) => prev.html === next.html);
+
 const QuestionItem = ({ question, onSave, readOnly = false, studentAnswer, onAnswerChange, showResult = false }: any) => {
   const isSvg = question.imageDescription && question.imageDescription.trim().startsWith('<svg');
   const [isSaved, setIsSaved] = useState(false);
-  useEffect(() => { const t = setTimeout(triggerMath, 100); return () => clearTimeout(t); }, [question, showResult]);
 
   const isTrueFalse = question.type?.includes('Đúng/Sai') || question.type === 'DUNGSAI';
   const isShortAnswer = question.type?.includes('ngắn') || question.type === 'NGANGON';
@@ -610,17 +623,17 @@ const QuestionItem = ({ question, onSave, readOnly = false, studentAnswer, onAns
     <div className={`mb-12 break-inside-avoid relative group ${readOnly ? 'p-6 border rounded-2xl bg-white mb-6 shadow-sm ' + (showResult ? 'border-gray-200' : 'border-indigo-100 hover:border-indigo-300 transition-colors') : ''}`}>
       {!readOnly && (<div className="absolute -right-3 top-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10 no-print"> <button onClick={() => { onSave?.(question); setIsSaved(true); setTimeout(() => setIsSaved(false), 2000); }} className={`p-2.5 rounded-full shadow-lg text-white transition-all transform hover:scale-110 active:scale-90 ${isSaved ? 'bg-green-500' : 'bg-gray-400 hover:bg-primary'}`}> {isSaved ? <CheckSquare size={18} /> : <Save size={18} />} </button> </div>)}
       <div className="flex gap-2 items-baseline mb-4"> <span className="font-black text-primary text-xl">Câu {question.number}.</span> {!readOnly && <span className="text-[10px] font-black bg-gray-100 text-gray-500 px-2 py-0.5 rounded-md border border-gray-200 uppercase tracking-wider">{question.difficulty}</span>} {readOnly && showResult && <span className="ml-auto text-xs font-bold uppercase px-3 py-1 rounded-full border bg-gray-100 text-gray-500">Đã nộp</span>} </div>
-      <div className="text-justify text-gray-900 leading-relaxed text-lg font-serif overflow-x-auto no-scrollbar mb-4" dangerouslySetInnerHTML={{ __html: question.content }}></div>
+      <MathContent html={question.content} className="text-justify text-gray-900 leading-relaxed text-lg font-serif overflow-x-auto no-scrollbar mb-4" />
       {question.hasImage && (<div className="my-8 mx-auto max-w-full md:max-w-md bg-white p-4 rounded-3xl shadow-sm border border-gray-100 svg-container"> {isSvg ? <div className="w-full flex justify-center" dangerouslySetInnerHTML={{ __html: question.imageDescription! }} /> : <div className="p-8 border-2 border-dashed border-gray-300 rounded-2xl w-full text-center text-xs text-gray-400 font-medium italic">Hình minh họa đề bài</div>} </div>)}
 
       {/* RENDER DUNG/SAI */}
       {isTrueFalse && question.choices && (
         <div className="flex flex-col gap-3 mt-6 ml-4">
           {question.choices.map((choice: string, idx: number) => {
-            const currentAns = studentAnswer ? studentAnswer[idx] : null; // 'Đ' hoặc 'S'
+            const currentAns = studentAnswer ? studentAnswer[idx] : null;
             return (
               <div key={idx} className="flex gap-4 items-start p-3 rounded-xl hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-100">
-                <div className="flex-1 mt-1 text-lg font-serif overflow-x-auto no-scrollbar" dangerouslySetInnerHTML={{ __html: choice }}></div>
+                <MathContent html={choice} className="flex-1 mt-1 text-lg font-serif overflow-x-auto no-scrollbar" />
                 {readOnly && (
                   <div className="flex gap-2 shrink-0">
                     <button disabled={showResult} onClick={() => { const newAns = { ...(studentAnswer || {}) }; newAns[idx] = 'Đ'; onAnswerChange?.(newAns); }} className={`w-10 h-10 rounded-lg flex items-center justify-center font-black text-sm transition-all shadow-sm ${currentAns === 'Đ' ? 'bg-green-500 text-white border-green-600' : 'bg-white text-gray-400 border-gray-200 border hover:bg-green-50 hover:text-green-600 hover:border-green-300'} ${showResult ? 'opacity-70 cursor-not-allowed' : ''}`}>Đ</button>
@@ -657,7 +670,7 @@ const QuestionItem = ({ question, onSave, readOnly = false, studentAnswer, onAns
                 <span className={`font-black px-2.5 py-1 rounded-lg text-sm border transition-all shadow-sm ${isSelected && readOnly ? 'bg-indigo-600 text-white border-indigo-700' : (!readOnly ? 'text-gray-900 bg-gray-100 border-gray-200 group-hover/choice:bg-primary group-hover/choice:text-white' : 'text-gray-500 bg-white border-gray-200 group-hover:bg-indigo-100 group-hover:text-indigo-600')}`}>
                   {letter}.
                 </span>
-                <span className={`text-lg font-serif overflow-x-auto no-scrollbar mt-0.5 transition-colors ${isSelected && readOnly ? 'text-indigo-900' : (!readOnly ? 'group-hover/choice:text-primary' : 'text-gray-700')}`} dangerouslySetInnerHTML={{ __html: choice }}></span>
+                <MathContent html={choice} className={`text-lg font-serif overflow-x-auto no-scrollbar mt-0.5 transition-colors ${isSelected && readOnly ? 'text-indigo-900' : (!readOnly ? 'group-hover/choice:text-primary' : 'text-gray-700')}`} />
               </div>
             );
           })}
