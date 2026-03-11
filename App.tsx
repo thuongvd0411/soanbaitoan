@@ -120,12 +120,17 @@ const playSound = (type: 'correct' | 'wrong' | 'applause' | 'celebration' | 'tic
   }
 };
 
+let _mathTimer: any = null;
 const triggerMath = () => {
-  if (window.MathJax && window.MathJax.typesetPromise) {
-    try {
-      window.MathJax.typesetPromise().catch((err: any) => console.debug("MathJax error:", err));
-    } catch (e) { console.debug("MathJax call failed:", e); }
-  }
+  if (_mathTimer) clearTimeout(_mathTimer);
+  _mathTimer = setTimeout(() => {
+    if (window.MathJax && window.MathJax.typesetPromise) {
+      try {
+        window.MathJax.typesetClear();
+        window.MathJax.typesetPromise().catch((err: any) => console.debug("MathJax error:", err));
+      } catch (e) { console.debug("MathJax call failed:", e); }
+    }
+  }, 300); // Debounce 300ms
 };
 
 const Confetti = ({ density = 150 }: { density?: number }) => (
@@ -596,7 +601,7 @@ const Sidebar = ({ config, setConfig, onGenerate, onStartGame, onVoiceCompose, i
 const QuestionItem = ({ question, onSave, readOnly = false, studentAnswer, onAnswerChange, showResult = false }: any) => {
   const isSvg = question.imageDescription && question.imageDescription.trim().startsWith('<svg');
   const [isSaved, setIsSaved] = useState(false);
-  useLayoutEffect(() => { triggerMath(); }, [isSaved, question, studentAnswer, showResult]);
+  useEffect(() => { const t = setTimeout(triggerMath, 100); return () => clearTimeout(t); }, [isSaved, question, studentAnswer, showResult]);
 
   const isTrueFalse = question.type?.includes('Đúng/Sai') || question.type === 'DUNGSAI';
   const isShortAnswer = question.type?.includes('ngắn') || question.type === 'NGANGON';
@@ -1498,9 +1503,9 @@ export default function App() {
                       }
                       setIsSubmitted(true);
                       window.scrollTo({ top: 0, behavior: 'smooth' });
-                    } catch (err) {
+                    } catch (err: any) {
                       console.error("Submit error:", err);
-                      alert("Có lỗi lúc nộp bài, em hãy thử lại nhé.");
+                      alert("Lỗi nộp bài: " + (err?.message || err?.code || "Firebase không phản hồi. Anh kiểm tra kết nối mạng."));
                     } finally {
                       setIsSubmittingResult(false);
                     }
