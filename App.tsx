@@ -726,11 +726,22 @@ export default function App() {
       }
 
       if (isTrueFalse) {
-        const correctStr = String(q.correctAnswer).replace(/\s/g, '').toLowerCase();
+        const correctStr = String(q.correctAnswer).toLowerCase();
         let correctParts = 0;
+
+        // Regex linh hoạt hơn: tìm a), b), c), d) và xem ngay sau đó là Đ/S/Đúng/Sai
+        // Ví dụ: a) Đ; b). Sai; c): đúng
+        const getTF = (letter: string) => {
+          const reg = new RegExp(`${letter}\\)\\s?[:.-]?\\s?([đs]|đúng|sai)`, 'i');
+          const match = correctStr.match(reg);
+          if (!match) return null;
+          const val = match[1].substring(0, 1).toUpperCase().replace('Đ', 'Đ').replace('D', 'Đ'); // Standarize to Đ or S
+          return val === 'Đ' || val === 'D' ? 'Đ' : 'S';
+        };
+
         for (let i = 0; i < 4; i++) {
           const letter = String.fromCharCode(97 + i);
-          const expected = correctStr.includes(`${letter})đ`) ? 'Đ' : (correctStr.includes(`${letter})s`) ? 'S' : null);
+          const expected = getTF(letter);
           if (expected && uAns[i] === expected) correctParts++;
         }
         const questionScore = (correctParts / 4) * pointsPerQuestion;
@@ -1286,7 +1297,14 @@ export default function App() {
           currentTranscript += event.results[i][0].transcript;
         }
       }
-      console.log("Alla Voice Interim:", fullTranscript + currentTranscript);
+      const combined = (fullTranscript + currentTranscript).toLowerCase();
+      console.log("Alla Dynamic Voice:", combined);
+
+      // Điều kiện kích hoạt đặc biệt: Nếu nghe thấy cụm từ "bắt đầu đi"
+      if (combined.includes("bắt đầu đi") || combined.includes("bắt đầu di")) {
+        console.log("Alla Voice: Trigger 'Bắt đầu đi' detected!");
+        stopRecognition();
+      }
     };
 
     recognition.onerror = (event: any) => {
@@ -1476,10 +1494,18 @@ export default function App() {
                       // Hàm parse kết quả Đ/S từ chuỗi "a)Đ, b)S, c)Đ, d)S" ra mảng 4 phân tử [Đ, S, Đ, S]
                       let tfAnswers: (string | null)[] = [null, null, null, null];
                       if (isTrueFalse) {
-                        const correctStr = String(q.correctAnswer).replace(/\s/g, '').toLowerCase();
+                        const correctStr = String(q.correctAnswer).toLowerCase();
+                        const getTFText = (letter: string) => {
+                          const reg = new RegExp(`${letter}\\)\\s?[:.-]?\\s?([đs]|đúng|sai)`, 'i');
+                          const match = correctStr.match(reg);
+                          if (!match) return '?';
+                          const val = match[1].substring(0, 1).toUpperCase().replace('D', 'Đ').replace('Đ', 'Đ');
+                          return val === 'Đ' ? 'Đúng' : 'Sai';
+                        };
+
                         for (let i = 0; i < 4; i++) {
                           const letter = String.fromCharCode(97 + i);
-                          tfAnswers[i] = correctStr.includes(`${letter})đ`) ? 'Đúng' : (correctStr.includes(`${letter})s`) ? 'Sai' : '?');
+                          tfAnswers[i] = getTFText(letter);
                         }
                       }
 
@@ -1603,6 +1629,9 @@ export default function App() {
                 <h2 className="font-black text-2xl uppercase text-indigo-900 flex items-center gap-3">
                   <Award className="text-indigo-600" size={32} />
                   Báo Cáo Thống Kê Điểm Số
+                  <button onClick={handleShowStats} className="ml-2 p-2 text-indigo-500 hover:bg-indigo-50 rounded-full transition-colors" title="Làm mới dữ liệu">
+                    <RefreshCw size={24} className={isLoading ? "animate-spin" : ""} />
+                  </button>
                 </h2>
                 <p className="text-gray-500 font-medium text-sm mt-1">Phân tích kết quả học tập của tất cả học sinh</p>
               </div>
