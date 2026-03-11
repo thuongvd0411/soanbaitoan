@@ -1223,11 +1223,8 @@ export default function App() {
               {isViewerMode && !isSubmitted && questions.length > 0 && (
                 <div className="mt-12 flex justify-center no-print">
                   <button onClick={() => {
-                    const confirm = window.confirm('Em đã chắc chắn muốn nộp bài chưa?');
-                    if (confirm) {
-                      setIsSubmitted(true);
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }
+                    setIsSubmitted(true);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
                   }} className="bg-gradient-to-r from-green-500 to-emerald-600 text-white font-black text-xl py-4 px-12 rounded-full shadow-[0_10px_20px_-10px_rgba(16,185,129,0.5)] border-b-4 border-emerald-800 hover:translate-y-1 hover:border-b-0 transition-all uppercase tracking-widest">
                     Nộp Bài Ngay
                   </button>
