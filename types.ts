@@ -63,6 +63,15 @@ export interface Question {
   hint: string;
 }
 
+export interface StudentResult {
+  id?: string;
+  studentName: string;
+  studentClass: string;
+  score: number;
+  answers: Record<string, any>;
+  submittedAt: string;
+}
+
 export interface AppState {
   grade: number;
   questionCount: number;
@@ -93,4 +102,5 @@ export interface HistoryItem {
   timestamp: number;
   config: AppState;
   questions: Question[];
+  shareId?: string;
 }

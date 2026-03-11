@@ -678,10 +678,15 @@ export default function App() {
   const [shareId, setShareId] = useState<string | null>(null);
   const [isSharing, setIsSharing] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("AI Đang soạn thảo...");
+  const [showResultsModal, setShowResultsModal] = useState(false);
+  const [resultsData, setResultsData] = useState<any[]>([]);
 
   // States cho Học sinh làm bài
   const [studentAnswers, setStudentAnswers] = useState<Record<string, any>>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [studentName, setStudentName] = useState("");
+  const [studentClass, setStudentClass] = useState("");
+  const [isSubmittingResult, setIsSubmittingResult] = useState(false);
 
   const calculateScore = () => {
     let correct = 0;
@@ -698,12 +703,12 @@ export default function App() {
       if (isTrueFalse) {
         // q.correctAnswer mẫu: "a)Đ, b)S, c)Đ, d)S"
         const correctStr = String(q.correctAnswer).replace(/\s/g, '').toLowerCase();
-        let scoreForThis = 1;
+        let scoreForThis = 0;
         for (let i = 0; i < 4; i++) {
           const letter = String.fromCharCode(97 + i); // a, b, c, d
           const expected = correctStr.includes(`${letter})đ`) ? 'Đ' : (correctStr.includes(`${letter})s`) ? 'S' : null);
-          if (expected && uAns[i] !== expected) {
-            scoreForThis = 0; // Sai 1 ý là sai cả câu (hoặc anh có thể chia 0.25đ/ý)
+          if (expected && uAns[i] === expected) {
+            scoreForThis += 0.25;
           }
         }
         correct += scoreForThis;
@@ -926,6 +931,18 @@ export default function App() {
       }
 
       const shareUrl = `${window.location.origin}${window.location.pathname}?share=${currentShareId}`;
+
+      // Cập nhật shareId vào history gần nhất để tiện xem Bảng Điểm
+      if (history.length > 0) {
+        const updatedHistory = [...history];
+        if (!updatedHistory[0].shareId) {
+          updatedHistory[0].shareId = currentShareId;
+          setHistory(updatedHistory);
+          localStorage.setItem('math_app_history', JSON.stringify(updatedHistory));
+          const ownerId = storageService.getOwnerId();
+          if (ownerId) firebaseService.saveHistory(ownerId, updatedHistory[0]).catch(console.error);
+        }
+      }
 
       // Copy link cho anh ngay lập tức — KHÔNG CHỜ Firebase
       try {
@@ -1204,6 +1221,20 @@ export default function App() {
               </p>
             </div>
 
+            {/* THÔNG TIN HỌC SINH LÀM BÀI */}
+            {isViewerMode && !isSubmitted && (
+              <div className="mb-10 bg-indigo-50/50 p-6 rounded-2xl border border-indigo-100 flex flex-col md:flex-row gap-4 max-w-2xl mx-auto shadow-sm no-print">
+                <div className="flex-1">
+                  <label className="block text-sm font-bold text-indigo-900 mb-1">Họ và Tên Học Sinh <span className="text-red-500">*</span></label>
+                  <input type="text" value={studentName} onChange={(e) => setStudentName(e.target.value)} placeholder="Nhập họ tên của em..." className="w-full border-2 border-indigo-200 outline-none focus:border-indigo-500 px-4 py-2.5 rounded-xl font-medium text-gray-800" />
+                </div>
+                <div className="w-full md:w-1/3">
+                  <label className="block text-sm font-bold text-indigo-900 mb-1">Lớp <span className="text-red-500">*</span></label>
+                  <input type="text" value={studentClass} onChange={(e) => setStudentClass(e.target.value)} placeholder="VD: 12A1" className="w-full border-2 border-indigo-200 outline-none focus:border-indigo-500 px-4 py-2.5 rounded-xl font-medium text-gray-800" />
+                </div>
+              </div>
+            )}
+
             {/* NÚT CHIA SẺ DÀNH CHO GIÁO VIÊN */}
             {!isViewerMode && (
               <div className="flex justify-end mb-8 no-print">
@@ -1222,11 +1253,32 @@ export default function App() {
               {/* PHU LUC LÀM BÀI CHO HỌC SINH */}
               {isViewerMode && !isSubmitted && questions.length > 0 && (
                 <div className="mt-12 flex justify-center no-print">
-                  <button onClick={() => {
-                    setIsSubmitted(true);
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }} className="bg-gradient-to-r from-green-500 to-emerald-600 text-white font-black text-xl py-4 px-12 rounded-full shadow-[0_10px_20px_-10px_rgba(16,185,129,0.5)] border-b-4 border-emerald-800 hover:translate-y-1 hover:border-b-0 transition-all uppercase tracking-widest">
-                    Nộp Bài Ngay
+                  <button disabled={isSubmittingResult} onClick={async () => {
+                    if (!studentName.trim() || !studentClass.trim()) {
+                      alert("Em vui lòng điền đầy đủ Họ Tên và Lớp trước khi nộp bài nhé!");
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                      return;
+                    }
+                    setIsSubmittingResult(true);
+                    try {
+                      const finalScore = calculateScore();
+                      if (shareId) {
+                        await firebaseService.saveStudentResult(shareId, {
+                          studentName: studentName.trim(),
+                          studentClass: studentClass.trim(),
+                          score: finalScore,
+                          answers: studentAnswers
+                        });
+                      }
+                      setIsSubmitted(true);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    } catch (err) {
+                      alert("Có lỗi lúc nộp bài, em hãy thử lại nhé.");
+                    } finally {
+                      setIsSubmittingResult(false);
+                    }
+                  }} className="bg-gradient-to-r from-green-500 to-emerald-600 text-white font-black text-xl py-4 px-12 rounded-full shadow-[0_10px_20px_-10px_rgba(16,185,129,0.5)] border-b-4 border-emerald-800 hover:translate-y-1 hover:border-b-0 transition-all uppercase tracking-widest disabled:opacity-50">
+                    {isSubmittingResult ? 'Đang Nộp Bài...' : 'Nộp Bài Ngay'}
                   </button>
                 </div>
               )}
@@ -1244,7 +1296,58 @@ export default function App() {
               {((!isViewerMode && config.answerMode !== AnswerMode.None) || (isViewerMode && isSubmitted)) && (
                 <div className="mt-20 pt-10 border-t-2 border-dashed border-gray-300 break-before-page">
                   <div className="flex items-center justify-center gap-4 mb-10"> <div className="h-0.5 flex-1 bg-gray-200"></div> <h2 className="text-2xl font-black uppercase tracking-widest text-gray-400">ĐÁP ÁN VÀ LỜI GIẢI</h2> <div className="h-0.5 flex-1 bg-gray-200"></div> </div>
-                  <div className="space-y-10"> {questions.map(q => (<div key={`ans_${q.id}`} className="p-6 bg-gray-50 rounded-3xl border border-gray-200"> <div className="flex items-center gap-3 mb-3"> <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-black">C{q.number}</div> <span className="font-black text-lg text-green-600 uppercase">Đáp án: {q.correctAnswer}</span> </div> {(!isViewerMode ? config.answerMode === AnswerMode.Detailed : true) && (<div className="text-base text-gray-700 leading-relaxed font-serif bg-white p-5 rounded-2xl border border-gray-100 shadow-inner" dangerouslySetInnerHTML={{ __html: q.explanation }}></div>)} </div>))} </div>
+                  <div className="space-y-10">
+                    {questions.map(q => {
+                      const isTrueFalse = q.type?.includes('Đúng/Sai') || q.type === 'DUNGSAI';
+
+                      // Hàm parse kết quả Đ/S từ chuỗi "a)Đ, b)S, c)Đ, d)S" ra mảng 4 phân tử [Đ, S, Đ, S]
+                      let tfAnswers: (string | null)[] = [null, null, null, null];
+                      if (isTrueFalse) {
+                        const correctStr = String(q.correctAnswer).replace(/\s/g, '').toLowerCase();
+                        for (let i = 0; i < 4; i++) {
+                          const letter = String.fromCharCode(97 + i);
+                          tfAnswers[i] = correctStr.includes(`${letter})đ`) ? 'Đúng' : (correctStr.includes(`${letter})s`) ? 'Sai' : '?');
+                        }
+                      }
+
+                      return (
+                        <div key={`ans_${q.id}`} className="p-6 bg-gray-50 rounded-3xl border border-gray-200">
+                          <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-black">C{q.number}</div>
+                            {!isTrueFalse && <span className="font-black text-lg text-green-600 uppercase">Đáp án: {q.correctAnswer}</span>}
+                            {isTrueFalse && <span className="font-black text-lg text-primary uppercase">Bảng Đáp Án:</span>}
+                          </div>
+
+                          {isTrueFalse && (
+                            <div className="mb-4 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+                              <table className="w-full text-center text-sm md:text-base">
+                                <thead>
+                                  <tr className="bg-gray-100/50 text-gray-600 font-bold border-b border-gray-200">
+                                    <th className="py-2 border-r border-gray-200 w-1/4">Phát biểu a)</th>
+                                    <th className="py-2 border-r border-gray-200 w-1/4">Phát biểu b)</th>
+                                    <th className="py-2 border-r border-gray-200 w-1/4">Phát biểu c)</th>
+                                    <th className="py-2 w-1/4">Phát biểu d)</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <tr className="font-black font-serif text-lg">
+                                    <td className={`py-3 border-r border-gray-200 ${tfAnswers[0] === 'Đúng' ? 'text-green-600' : 'text-red-500'}`}>{tfAnswers[0]}</td>
+                                    <td className={`py-3 border-r border-gray-200 ${tfAnswers[1] === 'Đúng' ? 'text-green-600' : 'text-red-500'}`}>{tfAnswers[1]}</td>
+                                    <td className={`py-3 border-r border-gray-200 ${tfAnswers[2] === 'Đúng' ? 'text-green-600' : 'text-red-500'}`}>{tfAnswers[2]}</td>
+                                    <td className={`py-3 ${tfAnswers[3] === 'Đúng' ? 'text-green-600' : 'text-red-500'}`}>{tfAnswers[3]}</td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+
+                          {(!isViewerMode ? config.answerMode === AnswerMode.Detailed : true) && (
+                            <div className="text-base text-gray-700 leading-relaxed font-serif bg-white p-5 rounded-2xl border border-gray-100 shadow-inner" dangerouslySetInnerHTML={{ __html: q.explanation }}></div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
@@ -1282,7 +1385,79 @@ export default function App() {
         <div className="fixed inset-0 bg-black/70 z-[70] flex items-center justify-center p-6 animate-in fade-in">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg h-full md:max-h-[85vh] flex flex-col overflow-hidden">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50"> <h2 className="font-black text-sm uppercase text-primary flex items-center gap-2"><History size={18} /> Nhật ký</h2> <button onClick={() => setShowHistoryModal(false)} className="p-2"><X size={24} /></button> </div>
-            <div className="flex-1 overflow-y-auto p-6 space-y-4"> {history.length === 0 ? <p className="text-center text-gray-400 py-12">Trống</p> : history.map(item => (<div key={item.id} className="border border-gray-200 rounded-2xl p-4 hover:border-primary hover:bg-blue-50 cursor-pointer" onClick={() => { setQuestions(item.questions); setConfig(item.config); setShowHistoryModal(false); }}> <div className="flex justify-between items-center"> <p className="font-black text-gray-800">Lớp {item.config.grade}</p> <ChevronRight size={16} /> </div> <p className="text-[10px] text-gray-400 mt-1">{new Date(item.timestamp).toLocaleString()}</p> </div>))} </div>
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {history.length === 0 ? <p className="text-center text-gray-400 py-12">Trống</p> : history.map(item => (
+                <div key={item.id} className="border border-gray-200 rounded-2xl p-4 hover:border-primary hover:bg-blue-50 cursor-pointer">
+                  <div className="flex justify-between items-center" onClick={() => { setQuestions(item.questions); setConfig(item.config); setShowHistoryModal(false); }}>
+                    <p className="font-black text-gray-800">Lớp {item.config.grade}</p>
+                    <ChevronRight size={16} />
+                  </div>
+                  <div className="flex justify-between items-center mt-2">
+                    <p className="text-[10px] text-gray-400">{new Date(item.timestamp).toLocaleString()}</p>
+                    {item.shareId && (
+                      <button onClick={async (e) => {
+                        e.stopPropagation();
+                        try {
+                          setLoadingMessage("Đang tải bảng điểm...");
+                          setIsLoading(true);
+                          const res = await firebaseService.getStudentResults(item.shareId!);
+                          setResultsData(res);
+                          setShowResultsModal(true);
+                        } catch (err) {
+                          alert("Lỗi tải bảng điểm!");
+                        } finally {
+                          setIsLoading(false);
+                        }
+                      }} className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold hover:bg-indigo-200 transition-colors">
+                        Bảng Điểm
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL BẢNG ĐIỂM HỌC SINH */}
+      {showResultsModal && (
+        <div className="fixed inset-0 bg-black/70 z-[80] flex items-center justify-center p-6 animate-in fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl h-full md:max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="p-6 border-b flex justify-between items-center bg-indigo-50">
+              <h2 className="font-black text-lg uppercase text-indigo-900 flex items-center gap-2">Bảng Điểm Tổng Hợp</h2>
+              <button onClick={() => setShowResultsModal(false)} className="p-2"><X size={24} /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              {resultsData.length === 0 ? (
+                <div className="text-center py-20 text-gray-500 font-medium tracking-wide">Chưa có học sinh nào nộp bài ở đề này.</div>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-gray-100 text-gray-700 text-sm font-bold uppercase tracking-wider">
+                        <th className="px-6 py-4 border-b">Học Sinh</th>
+                        <th className="px-6 py-4 border-b">Lớp</th>
+                        <th className="px-6 py-4 border-b text-center">Điểm</th>
+                        <th className="px-6 py-4 border-b">Thời gian nộp</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 bg-white">
+                      {resultsData.map((res: any, idx: number) => (
+                        <tr key={idx} className="hover:bg-indigo-50/30 transition-colors">
+                          <td className="px-6 py-4 font-bold text-gray-900">{res.studentName}</td>
+                          <td className="px-6 py-4 text-gray-600 font-medium">{res.studentClass}</td>
+                          <td className="px-6 py-4 text-center">
+                            <span className="inline-block px-3 py-1 rounded-full text-sm font-black bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-sm">{res.score}/10</span>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500">{new Date(res.submittedAt).toLocaleString('vi-VN')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

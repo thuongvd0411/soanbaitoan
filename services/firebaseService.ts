@@ -168,9 +168,6 @@ export const firebaseService = {
         }
     },
 
-    /**
-     * Tải phiếu bài tập chia sẻ theo shareId
-     */
     async getSharedExam(shareId: string): Promise<{ questions: Question[], config: any } | null> {
         if (!shareId) return null;
         try {
@@ -187,6 +184,42 @@ export const firebaseService = {
         } catch (error) {
             console.error("Firebase getSharedExam error:", error);
             return null;
+        }
+    },
+
+    /**
+     * Nộp bài của Học sinh
+     */
+    async saveStudentResult(shareId: string, result: { studentName: string, studentClass: string, score: number, answers: Record<string, any> }): Promise<void> {
+        if (!shareId) return;
+        try {
+            const resultRef = doc(collection(db, "shared_exams", shareId, "results"));
+            await setDoc(resultRef, {
+                id: resultRef.id,
+                ...result,
+                submittedAt: new Date().toISOString()
+            });
+        } catch (error) {
+            console.error("Firebase saveStudentResult error:", error);
+            throw error;
+        }
+    },
+
+    /**
+     * Lấy toàn bộ kết quả của 1 mã đề
+     */
+    async getStudentResults(shareId: string): Promise<any[]> {
+        if (!shareId) return [];
+        try {
+            const resultsRef = collection(db, "shared_exams", shareId, "results");
+            const q = query(resultsRef, orderBy("score", "desc"));
+            const snapshot = await getDocs(q);
+            const results: any[] = [];
+            snapshot.forEach(doc => results.push(doc.data()));
+            return results;
+        } catch (error) {
+            console.error("Firebase getStudentResults error:", error);
+            return [];
         }
     }
 };

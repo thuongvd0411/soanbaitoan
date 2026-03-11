@@ -1,23 +1,28 @@
 # Nhật ký công việc - Soạn Toán AI
-**Ngày cập nhật:** 09/03/2026 00:30 (Đêm muộn)
+**Ngày cập nhật:** 11/03/2026 12:58
 
 ## Trạng thái hiện tại
-- **Phiên bản app:** `v5.1b` (Đã gắn nhãn vào giao diện để nhận diện).
+- **Phiên bản app:** `v5.2 (Shared Data)` — Deploy thành công trên GitHub Pages
 - **Tính năng đã hoàn tất:**
     1. **Bảo mật v2**: DeviceId + Fingerprint (SHA-256) đã chạy ổn định.
-    2. **Cloud Database**: Tích hợp Firebase Firestore, đồng bộ 2 chiều (Local <-> Cloud).
-    3. **GitHub Workflow**: Cập nhật `main.yml` để nhận các biến môi trường `VITE_`.
-- **Vấn đề đang xử lý:**
-    - Lỗi `An API Key must be set when running in a browser` trên GitHub Pages.
-    - **Nguyên nhân nghi vấn:** Đang "lệch pha" giữa tên Secret cũ (`GEMINI_API_KEY`) và mới (`VITE_GEMINI_API_KEY`) hoặc do cache build cũ trên GitHub.
-    - **Giải pháp cuối cùng đã thực hiện:** 
-        - Chuẩn hóa toàn bộ tên Secret thành `VITE_GEMINI_API_KEY`.
-        - Dọn dẹp sạch sẽ file `vite.config.ts` để tránh ghi đè biến môi trường.
-        - Gắn nhãn `v5.1b` để anh Thưởng xác nhận khi app load bản mới nhất.
+    2. **Cloud Database**: Firebase Firestore đã tạo + Rules cho phép read/write.
+    3. **Chế độ "Chỉ Làm Bài Tập"**: Học sinh dán link → vào thẳng trang bài, bỏ qua kích hoạt.
+    4. **Share Link hoạt động**: Sinh bài xong → copy link ngay, Firebase upload ngầm.
+    5. **Dữ liệu chung**: Tất cả máy cùng token = cùng `ownerId` (hash SHA-256) = cùng kho dữ liệu.
+    6. **Bỏ Sync ID UI**: Không cần sync key thủ công nữa.
 
-## Việc cần làm tiếp theo (Sáng mai)
-1. **Xác nhận v5.1b**: Kiểm tra xem anh Thưởng đã thấy nhãn `v5.1b` chưa.
-2. **Kiểm tra soạn bài**: Nếu vẫn lỗi API Key dù đã ở `v5.1b`, cần kiểm tra lại chính xác giá trị Secret trên GitHub (có thể bị thừa dấu cách hoặc sai ký tự).
-3. **Đồng bộ thực tế**: Sau khi AI chạy, kiểm tra dữ liệu có thực sự "đổ" về Firestore không.
+## Kiến trúc dữ liệu hiện tại
+- **ownerId**: `owner_` + SHA256(token).substring(0,24) — tự tạo khi kích hoạt
+- **Firebase paths**: 
+  - `users/{ownerId}/questionBank/{questionId}` — kho câu hỏi
+  - `users/{ownerId}/history/{historyId}` — lịch sử soạn thảo
+  - `shared_exams/{shareId}` — bài tập chia sẻ (public read)
+- **Firestore Rules**: Test mode (allow read/write: if true) — Cần siết lại khi production
 
-**Ghi chú cho Alla:** Luôn ưu tiên kiểm tra nhãn phiên bản trên giao diện trước khi debug tiếp.
+## Việc cần làm tiếp theo
+1. **Siết Firestore Rules**: Hiện đang ở test mode, cần thêm authentication hoặc rules chặt hơn.
+2. **Bỏ debug log**: Xóa `console.log("Alla Firebase Config Status:...")` trong `firebaseService.ts`.
+3. **Nâng cấp UI**: Cân nhắc thêm tính năng xem kết quả học sinh, thống kê điểm.
+4. **Migration dữ liệu cũ**: Dữ liệu Firebase cũ ở `users/{deviceId_cũ}/...` chưa được migrate.
+
+**Ghi chú cho Alla:** Ưu tiên kiểm tra nhãn phiên bản (v5.2) trước khi debug. Firestore cần được tạo thủ công trên Firebase Console — code không tự tạo được.
