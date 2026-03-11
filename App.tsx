@@ -708,36 +708,59 @@ export default function App() {
   const [isListening, setIsListening] = useState(false);
 
   const calculateScore = () => {
-    let correct = 0;
-    const total = questions.length;
-    if (total === 0) return 0;
+    let totalCorrect = 0;
+    const totalQuestions = questions.length;
+    if (totalQuestions === 0) return { score: 0, details: {} };
+
+    const pointsPerQuestion = 10 / totalQuestions;
+    const details: Record<string, { isCorrect: boolean, score: number, label: string }> = {};
 
     questions.forEach(q => {
       const uAns = studentAnswers[q.id];
-      if (!uAns) return;
-
       const isTrueFalse = q.type?.includes('Đúng/Sai') || q.type === 'DUNGSAI';
       const isShortAnswer = q.type?.includes('ngắn') || q.type === 'NGANGON';
 
+      if (!uAns) {
+        details[q.id] = { isCorrect: false, score: 0, label: isTrueFalse ? "Đúng 0/4" : `đáp án ${q.correctAnswer} - Sai` };
+        return;
+      }
+
       if (isTrueFalse) {
-        // q.correctAnswer mẫu: "a)Đ, b)S, c)Đ, d)S"
         const correctStr = String(q.correctAnswer).replace(/\s/g, '').toLowerCase();
-        let scoreForThis = 0;
+        let correctParts = 0;
         for (let i = 0; i < 4; i++) {
-          const letter = String.fromCharCode(97 + i); // a, b, c, d
+          const letter = String.fromCharCode(97 + i);
           const expected = correctStr.includes(`${letter})đ`) ? 'Đ' : (correctStr.includes(`${letter})s`) ? 'S' : null);
-          if (expected && uAns[i] === expected) {
-            scoreForThis += 0.25;
-          }
+          if (expected && uAns[i] === expected) correctParts++;
         }
-        correct += scoreForThis;
+        const questionScore = (correctParts / 4) * pointsPerQuestion;
+        totalCorrect += (correctParts / 4);
+        details[q.id] = {
+          isCorrect: correctParts === 4,
+          score: Math.round(questionScore * 100) / 100,
+          label: `Bảng đáp án - Đúng ${correctParts}/4`
+        };
       } else if (isShortAnswer) {
-        if (String(uAns).trim().toLowerCase() === String(q.correctAnswer).trim().toLowerCase()) correct += 1;
+        const isCorr = String(uAns).trim().toLowerCase() === String(q.correctAnswer).trim().toLowerCase();
+        if (isCorr) totalCorrect += 1;
+        details[q.id] = {
+          isCorrect: isCorr,
+          score: isCorr ? Math.round(pointsPerQuestion * 100) / 100 : 0,
+          label: `đáp án ${q.correctAnswer} - ${isCorr ? 'Đúng' : 'Sai'}`
+        };
       } else {
-        if (uAns === q.correctAnswer) correct += 1;
+        const isCorr = uAns === q.correctAnswer;
+        if (isCorr) totalCorrect += 1;
+        details[q.id] = {
+          isCorrect: isCorr,
+          score: isCorr ? Math.round(pointsPerQuestion * 100) / 100 : 0,
+          label: `đáp án ${q.correctAnswer} - ${isCorr ? 'Đúng' : 'Sai'}`
+        };
       }
     });
-    return Math.round((correct / total) * 10) * 1; // Thang điểm 10
+
+    const finalScore = Math.round((totalCorrect / totalQuestions) * 10 * 10) / 10;
+    return { score: finalScore, details };
   };
 
   useEffect(() => {
@@ -1233,43 +1256,72 @@ export default function App() {
 
     const recognition = new SpeechRecognition();
     recognition.lang = 'vi-VN';
-    recognition.continuous = false;
-    recognition.interimResults = false;
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    let silenceTimer: any = null;
+    let fullTranscript = "";
+    const SILENCE_LIMIT = 2000; // 2 giây im lặng
+
+    const stopRecognition = () => {
+      if (silenceTimer) clearTimeout(silenceTimer);
+      recognition.stop();
+    };
 
     recognition.onstart = () => {
       setIsListening(true);
+      if (silenceTimer) clearTimeout(silenceTimer);
+      silenceTimer = setTimeout(stopRecognition, SILENCE_LIMIT + 1000);
     };
 
-    recognition.onresult = async (event: any) => {
-      const text = event.results[0][0].transcript;
-      setIsListening(false);
-      setLoadingMessage(`Đang phân tích lệnh: "${text}"...`);
-      setIsLoading(true);
+    recognition.onresult = (event: any) => {
+      if (silenceTimer) clearTimeout(silenceTimer);
+      silenceTimer = setTimeout(stopRecognition, SILENCE_LIMIT);
 
-      try {
-        const partialConfig = await parseVoiceCommand(text, config);
-        setConfig(prev => {
-          const newConfig = { ...prev, ...partialConfig };
-          // Tự động soạn đề ngay sau khi update config
-          setTimeout(() => {
-            handleGenerateWithConfig(newConfig);
-          }, 100);
-          return newConfig;
-        });
-      } catch (err) {
-        alert("Alla không hiểu lệnh này, anh thử nói lại nhé.");
-      } finally {
-        setIsLoading(false);
+      let currentTranscript = "";
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          fullTranscript += event.results[i][0].transcript;
+        } else {
+          currentTranscript += event.results[i][0].transcript;
+        }
+      }
+      console.log("Alla Voice Interim:", fullTranscript + currentTranscript);
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error("Speech Recognition Error:", event.error);
+      setIsListening(false);
+      if (silenceTimer) clearTimeout(silenceTimer);
+      if (event.error !== 'no-speech') {
+        alert("Lỗi Micro: " + event.error);
       }
     };
 
-    recognition.onerror = () => {
+    recognition.onend = async () => {
       setIsListening(false);
-      alert("Lỗi nhận diện giọng nói.");
-    };
+      if (silenceTimer) clearTimeout(silenceTimer);
 
-    recognition.onend = () => {
-      setIsListening(false);
+      const finalCommand = fullTranscript.trim();
+      if (finalCommand.length > 3) {
+        setLoadingMessage(`Đang phân tích lệnh: "${finalCommand}"...`);
+        setIsLoading(true);
+
+        try {
+          const partialConfig = await parseVoiceCommand(finalCommand, config);
+          setConfig(prev => {
+            const newConfig = { ...prev, ...partialConfig };
+            setTimeout(() => {
+              handleGenerateWithConfig(newConfig);
+            }, 100);
+            return newConfig;
+          });
+        } catch (err) {
+          alert("Alla không hiểu lệnh này hoặc lỗi kết nối AI.");
+        } finally {
+          setIsLoading(false);
+        }
+      }
     };
 
     recognition.start();
@@ -1374,7 +1426,9 @@ export default function App() {
                   <button disabled={isSubmittingResult} onClick={async () => {
                     setIsSubmittingResult(true);
                     try {
-                      const finalScore = calculateScore();
+                      const scoreResult = calculateScore();
+                      const finalScore = scoreResult.score;
+
                       if (shareId) {
                         // Lấy tên Học sinh/Khách và Lớp (từ config)
                         const finalName = studentName.trim() || 'Khách';
@@ -1391,6 +1445,7 @@ export default function App() {
                       setIsSubmitted(true);
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     } catch (err) {
+                      console.error("Submit error:", err);
                       alert("Có lỗi lúc nộp bài, em hãy thử lại nhé.");
                     } finally {
                       setIsSubmittingResult(false);
@@ -1404,9 +1459,8 @@ export default function App() {
               {isViewerMode && isSubmitted && (
                 <div className="mt-12 p-8 bg-gradient-to-br from-indigo-50 to-blue-50 border-2 border-indigo-200 rounded-3xl text-center shadow-inner no-print animate-in zoom-in-95 duration-500">
                   <h2 className="text-3xl font-black text-indigo-900 mb-2 uppercase">Kết Quả Làm Bài</h2>
-                  <div className="text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 my-6 drop-shadow-sm">{calculateScore()}<span className="text-3xl text-indigo-400">/10</span></div>
+                  <div className="text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 my-6 drop-shadow-sm">{calculateScore().score}<span className="text-3xl text-indigo-400">/10</span></div>
                   <p className="text-lg text-indigo-700 font-medium">Bên dưới là đáp án chi tiết. Em hãy đối chiếu với bài làm của mình nhé!</p>
-                  <button onClick={() => window.location.reload()} className="mt-6 font-bold text-indigo-600 underline">Làm bài lại</button>
                 </div>
               )}
 
@@ -1417,6 +1471,7 @@ export default function App() {
                   <div className="space-y-10">
                     {questions.map(q => {
                       const isTrueFalse = q.type?.includes('Đúng/Sai') || q.type === 'DUNGSAI';
+                      const resDetails = calculateScore().details[q.id];
 
                       // Hàm parse kết quả Đ/S từ chuỗi "a)Đ, b)S, c)Đ, d)S" ra mảng 4 phân tử [Đ, S, Đ, S]
                       let tfAnswers: (string | null)[] = [null, null, null, null];
@@ -1430,10 +1485,11 @@ export default function App() {
 
                       return (
                         <div key={`ans_${q.id}`} className="p-6 bg-gray-50 rounded-3xl border border-gray-200">
-                          <div className="flex items-center gap-3 mb-4">
-                            <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-black">C{q.number}</div>
-                            {!isTrueFalse && <span className="font-black text-lg text-green-600 uppercase">Đáp án: {q.correctAnswer}</span>}
-                            {isTrueFalse && <span className="font-black text-lg text-primary uppercase">Bảng Đáp Án:</span>}
+                          <div className="flex flex-col md:flex-row md:items-center gap-3 mb-4">
+                            <div className="w-10 h-10 shrink-0 rounded-full bg-primary text-white flex items-center justify-center font-black">C{q.number}</div>
+                            <span className={`font-black text-lg uppercase ${resDetails?.isCorrect ? 'text-green-600' : 'text-red-500'}`}>
+                              Câu {q.number}: {resDetails?.label} - {resDetails?.score} điểm
+                            </span>
                           </div>
 
                           {isTrueFalse && (
