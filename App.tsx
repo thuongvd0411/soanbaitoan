@@ -826,26 +826,37 @@ export default function App() {
 
     setIsSharing(true);
     try {
+      // Tạo shareId ngay lập tức nếu chưa có
       let currentShareId = shareId;
       if (!currentShareId) {
         currentShareId = "share_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
-        // Đảm bảo lưu thành công lên Firebase trước khi cung cấp Link
-        await firebaseService.saveSharedExam(questions, config, currentShareId);
         setShareId(currentShareId);
-        console.log("Shared exam saved successfully:", currentShareId);
       }
 
       const shareUrl = `${window.location.origin}${window.location.pathname}?share=${currentShareId}`;
 
+      // Copy link cho anh ngay lập tức — KHÔNG CHỜ Firebase
       try {
         await navigator.clipboard.writeText(shareUrl);
-        alert("Thành công! Link bài tập đã được lưu lên đám mây và copy vào bộ nhớ tạm:\n" + shareUrl);
+        alert("Link đã copy! Đang lưu lên đám mây ngầm...\n" + shareUrl);
       } catch (copyErr) {
-        window.prompt("Vui lòng copy link bên dưới để gửi cho học sinh:", shareUrl);
+        window.prompt("Copy link bên dưới để gửi cho học sinh:", shareUrl);
+      }
+
+      // Upload Firebase ngầm với timeout 10 giây
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Firebase timeout")), 10000));
+      try {
+        await Promise.race([
+          firebaseService.saveSharedExam(questions, config, currentShareId),
+          timeoutPromise
+        ]);
+        console.log("Share saved to Firebase:", currentShareId);
+      } catch (firebaseErr) {
+        console.error("Firebase share upload failed (link vẫn hoạt động nếu retry):", firebaseErr);
       }
     } catch (err: any) {
       console.error("Share failed:", err);
-      alert("Lỗi chia sẻ: " + (err.message || "Không thể lưu bộ đề lên đám mây. Có thể do nội dung quá lớn."));
+      alert("Lỗi chia sẻ: " + (err.message || "Không rõ nguyên nhân."));
     } finally {
       setIsSharing(false);
     }
