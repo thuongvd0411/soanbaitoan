@@ -25,7 +25,7 @@ Cấu trúc:
 
 CÁC DẠNG CÂU HỎI:
 - type="Trắc nghiệm ABCD": Trắc nghiệm chọn 1 đáp án đúng từ A,B,C,D. choices có 4 phần tử. correctAnswer là "A", "B", "C" hoặc "D".
-- type="Trắc nghiệm Đúng/Sai": Trắc nghiệm đúng/sai 4 ý. Content chứa câu hỏi chính. choices=["a) ...","b) ...","c) ...","d) ..."]. correctAnswer = "a)Đ, b)S, c)Đ, d)S" (CHỈ liệt kê Đ/S kèm ký hiệu a,b,c,d, KHÔNG giải thích thêm ở đây).
+- type="Trắc nghiệm Đúng/Sai": Trắc nghiệm đúng/sai 4 ý. Content chứa câu hỏi chính. choices=["a) ...","b) ...","c) ...","d) ..."]. correctAnswer = "a)Đ, b)S, c)Đ, d)S" (BẮT BUỘC liệt kê đủ 4 ý Đ/S kèm ký hiệu a,b,c,d. TUYỆT ĐỐI KHÔNG trả về một chữ cái duy nhất như A, B, C, D cho dạng này).
 - type="Trả lời ngắn": Trả lời ngắn (điền số hoặc biểu thức). choices=[] (mảng rỗng). correctAnswer là đáp án cần điền.
 `;
 

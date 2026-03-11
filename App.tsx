@@ -743,7 +743,16 @@ export default function App() {
       }
 
       if (isTrueFalse) {
-        const tfResult = parseTFCorrectAnswer(String(q.correctAnswer));
+        // Fallback logic: thử parse từ correctAnswer, nếu không ra gì thì thử explanation
+        let tfResult = parseTFCorrectAnswer(String(q.correctAnswer));
+        if (Object.keys(tfResult).length < 4 && q.explanation) {
+          console.log(`Alla T/F Fallback for C${q.number} (trying explanation)`);
+          const fallbackResult = parseTFCorrectAnswer(q.explanation);
+          if (Object.keys(fallbackResult).length >= Object.keys(tfResult).length) {
+            tfResult = fallbackResult;
+          }
+        }
+
         let correctParts = 0;
         for (let i = 0; i < 4; i++) {
           if (tfResult[i] && uAns[i] === tfResult[i]) correctParts++;
@@ -1583,7 +1592,14 @@ export default function App() {
                       // Hàm parse kết quả Đ/S từ chuỗi "a)Đ, b)S, c)Đ, d)S" ra mảng 4 phân tử [Đ, S, Đ, S]
                       let tfAnswers: (string | null)[] = [null, null, null, null];
                       if (isTrueFalse) {
-                        const tfParsed = parseTFCorrectAnswer(String(q.correctAnswer));
+                        let tfParsed = parseTFCorrectAnswer(String(q.correctAnswer));
+                        // Fallback render logic
+                        if (Object.keys(tfParsed).length < 4 && q.explanation) {
+                          const fallbackParsed = parseTFCorrectAnswer(q.explanation);
+                          if (Object.keys(fallbackParsed).length >= Object.keys(tfParsed).length) {
+                            tfParsed = fallbackParsed;
+                          }
+                        }
                         for (let i = 0; i < 4; i++) {
                           tfAnswers[i] = tfParsed[i] === 'Đ' ? 'Đúng' : (tfParsed[i] === 'S' ? 'Sai' : '?');
                         }
