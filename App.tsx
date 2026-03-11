@@ -726,23 +726,10 @@ export default function App() {
       }
 
       if (isTrueFalse) {
-        const correctStr = String(q.correctAnswer).toLowerCase();
+        const tfResult = parseTFCorrectAnswer(String(q.correctAnswer));
         let correctParts = 0;
-
-        // Regex linh hoạt hơn: tìm a), b), c), d) và xem ngay sau đó là Đ/S/Đúng/Sai
-        // Ví dụ: a) Đ; b). Sai; c): đúng
-        const getTF = (letter: string) => {
-          const reg = new RegExp(`${letter}\\)\\s?[:.-]?\\s?([đs]|đúng|sai)`, 'i');
-          const match = correctStr.match(reg);
-          if (!match) return null;
-          const val = match[1].substring(0, 1).toUpperCase().replace('Đ', 'Đ').replace('D', 'Đ'); // Standarize to Đ or S
-          return val === 'Đ' || val === 'D' ? 'Đ' : 'S';
-        };
-
         for (let i = 0; i < 4; i++) {
-          const letter = String.fromCharCode(97 + i);
-          const expected = getTF(letter);
-          if (expected && uAns[i] === expected) correctParts++;
+          if (tfResult[i] && uAns[i] === tfResult[i]) correctParts++;
         }
         const questionScore = (correctParts / 4) * pointsPerQuestion;
         totalCorrect += (correctParts / 4);
@@ -774,6 +761,44 @@ export default function App() {
     return { score: finalScore, details };
   };
 
+  // Hàm helper: parse đáp án Đúng/Sai linh hoạt — xử lý mọi format AI trả về
+  const parseTFCorrectAnswer = (correctAnswer: string): Record<number, 'Đ' | 'S'> => {
+    const result: Record<number, 'Đ' | 'S'> = {};
+    const str = correctAnswer.toLowerCase();
+
+    // Phương án 1: format ngắn gọn "a)Đ, b)S, c)Đ, d)S"
+    for (let i = 0; i < 4; i++) {
+      const letter = String.fromCharCode(97 + i);
+      const shortReg = new RegExp(`${letter}\\)\\s*[:.-]?\\s*(đ|đúng|s|sai)(?=[,;.\\s]|$)`, 'i');
+      const match = str.match(shortReg);
+      if (match) {
+        result[i] = match[1].startsWith('đ') ? 'Đ' : 'S';
+      }
+    }
+
+    if (Object.keys(result).length === 4) return result;
+
+    // Phương án 2: Tách theo a), b), c), d) và tìm từ "đúng"/"sai" trong mỗi đoạn
+    const parts = str.split(/(?=[abcd]\))/i).filter(p => p.trim());
+    for (let i = 0; i < Math.min(parts.length, 4); i++) {
+      if (result[i] !== undefined) continue;
+      const part = parts[i];
+      // Tìm từ "đúng" hoặc "sai" ở cuối đoạn
+      if (part.includes('đúng') && !part.includes('sai')) {
+        result[i] = 'Đ';
+      } else if (part.includes('sai') && !part.includes('đúng')) {
+        result[i] = 'S';
+      } else if (part.includes('sai')) {
+        // Nếu có cả 2 từ, lấy từ xuất hiện cuối cùng
+        const lastDung = part.lastIndexOf('đúng');
+        const lastSai = part.lastIndexOf('sai');
+        result[i] = lastSai > lastDung ? 'S' : 'Đ';
+      }
+    }
+
+    return result;
+  };
+
   useEffect(() => {
     const saved = localStorage.getItem('math_app_history');
     if (saved) setHistory(JSON.parse(saved));
@@ -799,6 +824,7 @@ export default function App() {
         if (data && data.questions && data.questions.length > 0) {
           setQuestions(data.questions);
           setShareConfig(data.config);
+          setShareId(sharedId); // CRITICAL: Lưu shareId để đảm bảo nộp bài được lưu lên Firebase
         } else {
           alert("Link bài tập không hợp lệ hoặc đã bị xóa!");
           window.location.href = window.location.pathname;
@@ -1494,18 +1520,9 @@ export default function App() {
                       // Hàm parse kết quả Đ/S từ chuỗi "a)Đ, b)S, c)Đ, d)S" ra mảng 4 phân tử [Đ, S, Đ, S]
                       let tfAnswers: (string | null)[] = [null, null, null, null];
                       if (isTrueFalse) {
-                        const correctStr = String(q.correctAnswer).toLowerCase();
-                        const getTFText = (letter: string) => {
-                          const reg = new RegExp(`${letter}\\)\\s?[:.-]?\\s?([đs]|đúng|sai)`, 'i');
-                          const match = correctStr.match(reg);
-                          if (!match) return '?';
-                          const val = match[1].substring(0, 1).toUpperCase().replace('D', 'Đ').replace('Đ', 'Đ');
-                          return val === 'Đ' ? 'Đúng' : 'Sai';
-                        };
-
+                        const tfParsed = parseTFCorrectAnswer(String(q.correctAnswer));
                         for (let i = 0; i < 4; i++) {
-                          const letter = String.fromCharCode(97 + i);
-                          tfAnswers[i] = getTFText(letter);
+                          tfAnswers[i] = tfParsed[i] === 'Đ' ? 'Đúng' : (tfParsed[i] === 'S' ? 'Sai' : '?');
                         }
                       }
 
