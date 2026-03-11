@@ -794,8 +794,8 @@ export default function App() {
         while (true) {
           const found = lowerStr.indexOf(pattern, searchFrom);
           if (found === -1) break;
-          // Chỉ chấp nhận nếu ở đầu hoặc sau dấu cách/dấu phẩy
-          if (found === 0 || /[\s,.;]/.test(lowerStr[found - 1])) {
+          // Chấp nhận nếu ở đầu, sau dấu cách/phẩy/chấm HOẶC sau dấu ) của LaTeX
+          if (found === 0 || /[\s,.;\)]/.test(lowerStr[found - 1])) {
             positions.push({ idx: i, pos: found });
             break;
           }
@@ -1621,8 +1621,8 @@ export default function App() {
                             </div>
                           )}
 
-                          {(!isViewerMode ? config.answerMode === AnswerMode.Detailed : true) && (
-                            <MathContent html={q.explanation || ''} className="text-base text-gray-700 leading-relaxed font-serif bg-white p-5 rounded-2xl border border-gray-100 shadow-inner" />
+                          {(!isViewerMode ? config.answerMode === AnswerMode.Detailed : true) && q.explanation && (
+                            <MathContent html={q.explanation} className="text-base text-gray-700 leading-relaxed font-serif bg-white p-5 rounded-2xl border border-gray-100 shadow-inner" />
                           )}
                         </div>
                       );
