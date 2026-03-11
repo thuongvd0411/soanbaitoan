@@ -24,6 +24,18 @@ const firebaseConfig = {
     appId: env.VITE_FIREBASE_APP_ID
 };
 
+// Debug log chi tiết từng biến Firebase
+console.log("Alla Firebase Config Status:", {
+    apiKey: !!firebaseConfig.apiKey,
+    authDomain: !!firebaseConfig.authDomain,
+    projectId: !!firebaseConfig.projectId,
+    storageBucket: !!firebaseConfig.storageBucket,
+    messagingSenderId: !!firebaseConfig.messagingSenderId,
+    appId: !!firebaseConfig.appId,
+    // Log giá trị projectId (không nhạy cảm) để kiểm tra
+    projectIdValue: firebaseConfig.projectId || "MISSING!"
+});
+
 // Khởi tạo Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
