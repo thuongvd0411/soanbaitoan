@@ -697,6 +697,8 @@ export default function App() {
     setIsLoading(true);
     setProgress(0);
 
+    let generatedData: { questions: Question[], historyItem: HistoryItem } | null = null;
+
     try {
       const session = localStorage.getItem('math_app_license_session');
       if (!session || JSON.parse(session).status !== 'ACTIVE') {
@@ -744,15 +746,6 @@ export default function App() {
       setQuestions(finalQuestions);
       setProgress(100);
 
-      // Lưu lên Firebase ngay và lấy shareId
-      try {
-        const newShareId = await firebaseService.saveSharedExam(finalQuestions, config);
-        setShareId(newShareId);
-        console.log("Auto-shared exam ID:", newShareId);
-      } catch (err) {
-        console.error("Auto-share failed:", err);
-      }
-
       const newHistoryItem: HistoryItem = {
         id: Date.now().toString(),
         timestamp: Date.now(),
@@ -764,10 +757,8 @@ export default function App() {
       setHistory(updated);
       localStorage.setItem('math_app_history', JSON.stringify(updated));
 
-      const ownerId = storageService.getOwnerId();
-      if (ownerId) {
-        firebaseService.saveHistory(ownerId, newHistoryItem).catch(console.error);
-      }
+      // Lưu biến local để upload ngầm sau khi tắt loading
+      generatedData = { questions: finalQuestions, historyItem: newHistoryItem };
 
     } catch (e: any) {
       console.error("Generate Error:", e);
@@ -776,6 +767,18 @@ export default function App() {
       setProgress(0);
     } finally {
       setIsLoading(false);
+    }
+
+    // Upload Firebase chạy ngầm — KHÔNG block UI
+    if (generatedData) {
+      firebaseService.saveSharedExam(generatedData.questions, config)
+        .then(id => { setShareId(id); console.log("Auto-shared exam ID:", id); })
+        .catch(err => console.error("Auto-share failed:", err));
+
+      const ownerId = storageService.getOwnerId();
+      if (ownerId) {
+        firebaseService.saveHistory(ownerId, generatedData.historyItem).catch(console.error);
+      }
     }
   };
 
