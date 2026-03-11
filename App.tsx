@@ -123,7 +123,6 @@ const playSound = (type: 'correct' | 'wrong' | 'applause' | 'celebration' | 'tic
 const triggerMath = () => {
   if (window.MathJax && window.MathJax.typesetPromise) {
     try {
-      window.MathJax.typesetClear();
       window.MathJax.typesetPromise().catch((err: any) => console.debug("MathJax error:", err));
     } catch (e) { console.debug("MathJax call failed:", e); }
   }
@@ -763,40 +762,43 @@ export default function App() {
 
   // Hàm helper: parse đáp án Đúng/Sai linh hoạt — xử lý mọi format AI trả về
   const parseTFCorrectAnswer = (correctAnswer: string): Record<number, 'Đ' | 'S'> => {
-    const result: Record<number, 'Đ' | 'S'> = {};
-    const str = correctAnswer.toLowerCase();
+    try {
+      const result: Record<number, 'Đ' | 'S'> = {};
+      const str = correctAnswer.toLowerCase();
 
-    // Phương án 1: format ngắn gọn "a)Đ, b)S, c)Đ, d)S"
-    for (let i = 0; i < 4; i++) {
-      const letter = String.fromCharCode(97 + i);
-      const shortReg = new RegExp(`${letter}\\)\\s*[:.-]?\\s*(đ|đúng|s|sai)(?=[,;.\\s]|$)`, 'i');
-      const match = str.match(shortReg);
-      if (match) {
-        result[i] = match[1].startsWith('đ') ? 'Đ' : 'S';
+      // Phương án 1: format ngắn gọn "a)Đ, b)S, c)Đ, d)S"
+      for (let i = 0; i < 4; i++) {
+        const letter = String.fromCharCode(97 + i);
+        const shortReg = new RegExp(`${letter}\\)\\s*[:.-]?\\s*(đ|đúng|s|sai)(?=[,;.\\s]|$)`, 'i');
+        const match = str.match(shortReg);
+        if (match) {
+          result[i] = match[1].startsWith('đ') ? 'Đ' : 'S';
+        }
       }
-    }
 
-    if (Object.keys(result).length === 4) return result;
+      if (Object.keys(result).length === 4) return result;
 
-    // Phương án 2: Tách theo a), b), c), d) và tìm từ "đúng"/"sai" trong mỗi đoạn
-    const parts = str.split(/(?=[abcd]\))/i).filter(p => p.trim());
-    for (let i = 0; i < Math.min(parts.length, 4); i++) {
-      if (result[i] !== undefined) continue;
-      const part = parts[i];
-      // Tìm từ "đúng" hoặc "sai" ở cuối đoạn
-      if (part.includes('đúng') && !part.includes('sai')) {
-        result[i] = 'Đ';
-      } else if (part.includes('sai') && !part.includes('đúng')) {
-        result[i] = 'S';
-      } else if (part.includes('sai')) {
-        // Nếu có cả 2 từ, lấy từ xuất hiện cuối cùng
-        const lastDung = part.lastIndexOf('đúng');
-        const lastSai = part.lastIndexOf('sai');
-        result[i] = lastSai > lastDung ? 'S' : 'Đ';
+      // Phương án 2: Tách theo a), b), c), d) và tìm từ "đúng"/"sai" trong mỗi đoạn
+      const parts = str.split(/(?=[abcd]\))/i).filter(p => p.trim());
+      for (let i = 0; i < Math.min(parts.length, 4); i++) {
+        if (result[i] !== undefined) continue;
+        const part = parts[i];
+        if (part.includes('đúng') && !part.includes('sai')) {
+          result[i] = 'Đ';
+        } else if (part.includes('sai') && !part.includes('đúng')) {
+          result[i] = 'S';
+        } else if (part.includes('sai')) {
+          const lastDung = part.lastIndexOf('đúng');
+          const lastSai = part.lastIndexOf('sai');
+          result[i] = lastSai > lastDung ? 'S' : 'Đ';
+        }
       }
-    }
 
-    return result;
+      return result;
+    } catch (e) {
+      console.error("parseTFCorrectAnswer error:", e);
+      return {};
+    }
   };
 
   useEffect(() => {
@@ -1470,14 +1472,20 @@ export default function App() {
                   <button disabled={isSubmittingResult} onClick={async () => {
                     setIsSubmittingResult(true);
                     try {
-                      const scoreResult = calculateScore();
-                      const finalScore = scoreResult.score;
+                      let finalScore = 0;
+                      try {
+                        const scoreResult = calculateScore();
+                        finalScore = scoreResult.score || 0;
+                      } catch (scoreErr) {
+                        console.error("Score calculation error:", scoreErr);
+                      }
+
+                      console.log("Alla Submit Debug:", { shareId, finalScore, hasConfig: !!shareConfig, ownerId: shareConfig?.ownerId });
 
                       if (shareId) {
-                        // Lấy tên Học sinh/Khách và Lớp (từ config)
                         const finalName = studentName.trim() || 'Khách';
                         const finalClass = shareConfig?.grade ? `Lớp ${shareConfig.grade}` : 'Không rõ';
-                        const ownerId = shareConfig?.ownerId; // Lấy ownerId từ config của đề được chia sẻ
+                        const ownerId = shareConfig?.ownerId;
 
                         await firebaseService.saveStudentResult(shareId, {
                           studentName: finalName,
@@ -1485,6 +1493,8 @@ export default function App() {
                           score: finalScore,
                           answers: studentAnswers
                         }, ownerId);
+                      } else {
+                        console.warn("Alla: shareId is null, cannot save result!");
                       }
                       setIsSubmitted(true);
                       window.scrollTo({ top: 0, behavior: 'smooth' });
