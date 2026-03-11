@@ -171,14 +171,38 @@ export const storageService = {
     return bank;
   },
 
+  // HISTORY LOCAL MANAGEMENT
+  getHistoryLocal: (): HistoryItem[] => {
+    try {
+      const data = localStorage.getItem('math_app_history_v1');
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error("Error reading local history:", error);
+      return [];
+    }
+  },
+
+  saveHistoryLocal: (history: HistoryItem[]): void => {
+    localStorage.setItem('math_app_history_v1', JSON.stringify(history));
+  },
+
   // Hàm đồng bộ toàn diện từ Local lên Cloud — dùng ownerId
   syncCloud: async (): Promise<void> => {
     try {
       const ownerId = storageService.getOwnerId();
+
+      // 1. Sync Question Bank
       const localBank = storageService.getBank();
       for (const q of localBank) {
         await firebaseService.saveQuestion(ownerId, q);
       }
+
+      // 2. Sync History
+      const localHistory = storageService.getHistoryLocal();
+      for (const h of localHistory) {
+        await firebaseService.saveHistory(ownerId, h);
+      }
+
       console.log("Alla Sync - Cloud Pushed Successfully for OwnerId:", ownerId);
     } catch (error) {
       console.error("Alla Sync - Error pushing to cloud:", error);
@@ -190,12 +214,27 @@ export const storageService = {
   pullCloud: async (): Promise<void> => {
     try {
       const ownerId = storageService.getOwnerId();
-      const cloudBank = await firebaseService.getBank(ownerId);
 
+      // 1. Pull Question Bank
+      const cloudBank = await firebaseService.getBank(ownerId);
       if (cloudBank.length > 0) {
         localStorage.setItem(BANK_KEY, JSON.stringify(cloudBank));
-        console.log("Alla Sync - Cloud Pulled Successfully", cloudBank.length, "questions for OwnerId:", ownerId);
       }
+
+      // 2. Pull History
+      const cloudHistory = await firebaseService.getHistory(ownerId);
+      if (cloudHistory.length > 0) {
+        const localHistory = storageService.getHistoryLocal();
+        // Merge cloud and local, prevent duplicates based on ID
+        const combined = [...cloudHistory, ...localHistory];
+        const unique = Array.from(new Map(combined.map(item => [item.id, item])).values());
+        // Sort descending by timestamp
+        unique.sort((a, b) => b.timestamp - a.timestamp);
+
+        storageService.saveHistoryLocal(unique);
+      }
+
+      console.log("Alla Sync - Cloud Pulled Successfully for OwnerId:", ownerId);
     } catch (error) {
       console.error("Alla Sync - Error pulling from cloud:", error);
       throw error;

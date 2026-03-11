@@ -641,7 +641,9 @@ export default function App() {
   });
   const [questions, setQuestions] = useState<Question[]>([]);
   const [gameQuestions, setGameQuestions] = useState<Question[]>([]);
-  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [history, setHistory] = useState<HistoryItem[]>(() => {
+    return storageService.getHistoryLocal() || [];
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
@@ -994,9 +996,10 @@ export default function App() {
         setHistory(prev => {
           const combined = [...cloudHistory, ...prev];
           const unique = Array.from(new Map(combined.map(item => [item.id, item])).values());
-          return unique.sort((a, b) => b.timestamp - a.timestamp).slice(0, 50);
+          const finalSorted = unique.sort((a, b) => b.timestamp - a.timestamp).slice(0, 50);
+          storageService.saveHistoryLocal(finalSorted);
+          return finalSorted;
         });
-        localStorage.setItem('math_app_history', JSON.stringify(cloudHistory));
       }
 
       if (cloudBank.length > 0) {
@@ -1179,14 +1182,20 @@ export default function App() {
       try {
         await storageService.pullCloud();
         const ownerId = storageService.getOwnerId();
-        const cloudHistory = await firebaseService.getHistory(ownerId);
-        if (cloudHistory.length > 0) {
-          setHistory(prev => {
-            const combined = [...cloudHistory, ...prev];
-            const unique = Array.from(new Map(combined.map(item => [item.id, item])).values());
-            return unique.sort((a, b) => b.timestamp - a.timestamp).slice(0, 20);
-          });
-        }
+        // Load nhẹ nhàng dưới background
+        firebaseService.getHistory(ownerId).then((cloudHistory) => {
+          if (cloudHistory.length > 0) {
+            setHistory(prev => {
+              const combined = [...cloudHistory, ...prev];
+              const unique = Array.from(new Map(combined.map(item => [item.id, item])).values());
+              const finalSorted = unique.sort((a, b) => b.timestamp - a.timestamp).slice(0, 20);
+
+              // Backup lại xuống local
+              storageService.saveHistoryLocal(finalSorted);
+              return finalSorted;
+            });
+          }
+        }).catch(err => console.error("Initial history fetch failed:", err));
       } catch (err) {
         console.error("Initial cloud pull failed:", err);
       } finally {
@@ -1211,15 +1220,23 @@ export default function App() {
       setGameQuestions(balancedRes);
       setConfig(prev => ({ ...prev, gameStatus: GameStatus.Playing }));
 
-      // Tự động lưu Cloud dùng ownerId
+      // Tự động lưu Cloud dùng ownerId -> Giờ đổi thành lưu Local rồi syncCloud lo
+      const historyRecord = {
+        id: 'game_' + Date.now(),
+        timestamp: Date.now(),
+        config: { ...config },
+        questions: balancedRes
+      };
+
+      setHistory(prev => {
+        const newHist = [historyRecord, ...prev].slice(0, 20);
+        storageService.saveHistoryLocal(newHist);
+        return newHist;
+      });
+
       const ownerId = storageService.getOwnerId();
       if (ownerId) {
-        firebaseService.saveHistory(ownerId, {
-          id: 'game_' + Date.now(),
-          timestamp: Date.now(),
-          config: { ...config },
-          questions: balancedRes
-        }).catch(console.error);
+        firebaseService.saveHistory(ownerId, historyRecord).catch(console.error);
       }
     } catch (e) { alert("Lỗi trò chơi: " + (e as Error).message); } finally { clearInterval(progressTimer); setIsLoading(false); }
   };
@@ -1396,14 +1413,22 @@ export default function App() {
       const res = await generateQuestions(newConfig);
       setQuestions(res);
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      const historyRecord = {
+        id: 'hist_' + Date.now(),
+        timestamp: Date.now(),
+        config: { ...newConfig },
+        questions: res
+      };
+
+      setHistory(prev => {
+        const newHist = [historyRecord, ...prev].slice(0, 20);
+        storageService.saveHistoryLocal(newHist);
+        return newHist;
+      });
+
       const ownerId = storageService.getOwnerId();
       if (ownerId) {
-        firebaseService.saveHistory(ownerId, {
-          id: 'hist_' + Date.now(),
-          timestamp: Date.now(),
-          config: { ...newConfig },
-          questions: res
-        }).catch(console.error);
+        firebaseService.saveHistory(ownerId, historyRecord).catch(console.error);
       }
     } catch (e) {
       alert("Lỗi AI: " + (e as Error).message);
