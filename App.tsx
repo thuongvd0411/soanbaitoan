@@ -11,7 +11,7 @@ import {
   Database,
   Cloud,
   CheckSquare,
-  Save, ChevronRight, ListChecks, BrainCircuit, Star, Award, FileCode, Printer, RefreshCw, LogOut, PenLine, PenTool, ChevronDown, ChevronUp, Play, Gift, ImageIcon, CloudLightning
+  Save, ChevronRight, ListChecks, BrainCircuit, Star, Award, FileCode, Printer, RefreshCw, LogOut, PenLine, PenTool, ChevronDown, ChevronUp, Play, Gift, ImageIcon, CloudLightning, Trash2
 } from 'lucide-react';
 
 declare global {
@@ -32,65 +32,10 @@ const shuffleArray = <T,>(array: T[]): T[] => {
 
 /**
  * THUẬT TOÁN CÂN BẰNG ĐÁP ÁN TUYỆT ĐỐI (BULLETPROOF SHUFFLE)
- * Đảm bảo phân bổ A, B, C, D đều 25% cho mọi số lượng câu hỏi.
+ * Đã tắt theo yêu cầu: Giữ nguyên thứ tự câu/đáp án như AI trả về.
  */
 const distributeAnswersEvenly = (questions: Question[]): Question[] => {
-  if (!questions || questions.length === 0) return [];
-
-  const labels = ['A', 'B', 'C', 'D'];
-  const count = questions.length;
-
-  // 1. Tạo một "Danh sách nhãn mục tiêu" cân bằng hoàn hảo
-  // Ví dụ: 40 câu -> 10A, 10B, 10C, 10D
-  let targetLabels: string[] = [];
-  for (let i = 0; i < count; i++) {
-    targetLabels.push(labels[i % 4]);
-  }
-
-  // Tráo đổi ngẫu nhiên danh sách nhãn mục tiêu này
-  targetLabels = shuffleArray(targetLabels);
-
-  return questions.map((q, index) => {
-    // Chỉ xử lý câu hỏi trắc nghiệm có đủ 4 lựa chọn
-    if (!q.choices || q.choices.length !== 4) return q;
-
-    // A. Tìm nội dung của đáp án ĐÚNG mà AI đã trả về Ban đầu
-    const originalCorrectLabel = q.correctAnswer.trim().toUpperCase().charAt(0);
-    let originalCorrectIndex = labels.indexOf(originalCorrectLabel);
-
-    // Fallback nếu AI trả về sai định dạng label
-    if (originalCorrectIndex === -1) {
-      const asNum = parseInt(originalCorrectLabel);
-      if (!isNaN(asNum) && asNum >= 1 && asNum <= 4) originalCorrectIndex = asNum - 1;
-      else originalCorrectIndex = 0;
-    }
-
-    // Lấy nội dung text đúng và mảng các text sai
-    const correctText = q.choices[originalCorrectIndex];
-    const allWrongTexts = q.choices.filter((_, idx) => idx !== originalCorrectIndex);
-    const shuffledWrongTexts = shuffleArray(allWrongTexts);
-
-    // B. Lấy nhãn mục tiêu ĐÃ ĐƯỢC CÂN BẰNG cho câu hỏi này từ Pool
-    const finalLabel = targetLabels[index];
-    const finalIndex = labels.indexOf(finalLabel);
-
-    // C. Tái cấu trúc mảng choices mới
-    const newChoices = new Array(4);
-    newChoices[finalIndex] = correctText; // Đặt đáp án đúng vào vị trí "cân bằng"
-
-    let wIdx = 0;
-    for (let i = 0; i < 4; i++) {
-      if (i !== finalIndex) {
-        newChoices[i] = shuffledWrongTexts[wIdx++];
-      }
-    }
-
-    return {
-      ...q,
-      choices: newChoices,
-      correctAnswer: finalLabel
-    };
-  });
+  return questions;
 };
 
 // --- Web Audio Engine ---
@@ -1868,28 +1813,47 @@ export default function App() {
                                 <p className="text-[10px] text-gray-400 uppercase font-medium">{new Date(res.submittedAt).toLocaleTimeString('vi-VN')}</p>
                               </td>
                               <td className="px-8 py-5">
-                                <button
-                                  onClick={async () => {
-                                    setLoadingMessage("Đang tải đề gốc...");
-                                    setIsLoading(true);
-                                    try {
-                                      const data = await firebaseService.getSharedExam(res.shareId);
-                                      if (data) {
-                                        setQuestions(data.questions);
-                                        setShareConfig(data.config);
-                                        setStudentAnswers(res.answers || {});
-                                        setIsSubmitted(true);
-                                        setIsViewerMode(true);
-                                        setShowStatsModal(false);
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={async () => {
+                                      setLoadingMessage("Đang tải đề gốc...");
+                                      setIsLoading(true);
+                                      try {
+                                        const data = await firebaseService.getSharedExam(res.shareId);
+                                        if (data) {
+                                          setQuestions(data.questions);
+                                          setShareConfig(data.config);
+                                          setStudentAnswers(res.answers || {});
+                                          setIsSubmitted(true);
+                                          setIsViewerMode(true);
+                                          setShowStatsModal(false);
+                                        }
+                                      } catch (e) { alert("Lỗi tải đề!"); }
+                                      finally { setIsLoading(false); }
+                                    }}
+                                    className="p-3 bg-white border-2 border-gray-200 text-gray-400 rounded-2xl hover:border-indigo-500 hover:text-indigo-600 transition-all group-hover:shadow-md"
+                                    title="Xem chi tiết bài làm của em này"
+                                  >
+                                    <Search size={20} />
+                                  </button>
+                                  <button
+                                    onClick={async () => {
+                                      if (window.confirm(`Bạn có chắc muốn xóa bài làm của học sinh ${res.studentName} không?`)) {
+                                        try {
+                                          await firebaseService.deleteGlobalResult(res.id);
+                                          // Update state local
+                                          setGlobalResults(prev => prev.filter(item => item.id !== res.id));
+                                        } catch (e) {
+                                          alert("Lỗi khi xóa bảng điểm.");
+                                        }
                                       }
-                                    } catch (e) { alert("Lỗi tải đề!"); }
-                                    finally { setIsLoading(false); }
-                                  }}
-                                  className="p-3 bg-white border-2 border-gray-200 text-gray-400 rounded-2xl hover:border-indigo-500 hover:text-indigo-600 transition-all group-hover:shadow-md"
-                                  title="Xem chi tiết bài làm của em này"
-                                >
-                                  <Search size={20} />
-                                </button>
+                                    }}
+                                    className="p-3 bg-white border-2 border-gray-200 text-gray-400 rounded-2xl hover:border-red-500 hover:text-red-600 transition-all group-hover:shadow-md"
+                                    title="Xóa bài làm này"
+                                  >
+                                    <Trash2 size={20} />
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           ))}

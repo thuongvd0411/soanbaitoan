@@ -1,11 +1,18 @@
 
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { AppState, Difficulty, Question, QuestionType, HistoryItem, AnswerMode, ExamType, ImageMode, GameStatus } from './types';
-import { generateQuestions, generateMillionaireQuestions } from './services/geminiService';
+import { generateQuestions, generateMillionaireQuestions, parseVoiceCommand } from './services/geminiService';
 import { getLessonOptions } from './services/syllabusData';
 import { storageService } from './services/storageService';
 import { firebaseService } from './services/firebaseService';
-import { Download, PlusCircle, BookOpen, Loader2, X, FileSignature, Menu, Trophy, Sparkles, RotateCcw, Home, HelpCircle, FastForward, HeartPulse, HandMetal, PartyPopper, Volume2, VolumeX, ArrowRight, Wallet, Info, Flame, ShieldAlert, Crown, History, Search, Upload, CheckSquare, Save, Database, ChevronRight, ListChecks, BrainCircuit, Star, Award, FileCode, Printer, RefreshCw, LogOut, PenLine, PenTool, ChevronDown, ChevronUp, Play, Gift, ImageIcon, CloudLightning } from 'lucide-react';
+import {
+  Download, PlusCircle, BookOpen, Loader2, X, FileSignature, Menu, Trophy, Sparkles, RotateCcw, Home, HelpCircle, FastForward, HeartPulse, HandMetal, PartyPopper, Volume2, VolumeX, ArrowRight, Wallet, Info, Flame, ShieldAlert, Crown, History, Search,
+  Mic, MicOff,
+  Database,
+  Cloud,
+  CheckSquare,
+  Save, ChevronRight, ListChecks, BrainCircuit, Star, Award, FileCode, Printer, RefreshCw, LogOut, PenLine, PenTool, ChevronDown, ChevronUp, Play, Gift, ImageIcon, CloudLightning
+} from 'lucide-react';
 
 declare global {
   interface Window {
@@ -113,13 +120,17 @@ const playSound = (type: 'correct' | 'wrong' | 'applause' | 'celebration' | 'tic
   }
 };
 
+let _mathTimer: any = null;
 const triggerMath = () => {
-  if (window.MathJax && window.MathJax.typesetPromise) {
-    try {
-      window.MathJax.typesetClear();
-      window.MathJax.typesetPromise().catch((err: any) => console.debug("MathJax error:", err));
-    } catch (e) { console.debug("MathJax call failed:", e); }
-  }
+  if (_mathTimer) clearTimeout(_mathTimer);
+  _mathTimer = setTimeout(() => {
+    if (window.MathJax && window.MathJax.typesetPromise) {
+      try {
+        window.MathJax.typesetClear();
+        window.MathJax.typesetPromise().catch((err: any) => console.debug("MathJax error:", err));
+      } catch (e) { console.debug("MathJax call failed:", e); }
+    }
+  }, 300); // Debounce 300ms
 };
 
 const Confetti = ({ density = 150 }: { density?: number }) => (
@@ -502,7 +513,7 @@ const LessonPicker = ({ grade, selectedLessons, onChange }: { grade: number, sel
   );
 };
 
-const Sidebar = ({ config, setConfig, onGenerate, onStartGame, isLoading, onShowHistory, onShowBank, isOpen, onClose }: any) => {
+const Sidebar = ({ config, setConfig, onGenerate, onStartGame, onVoiceCompose, isListening, isLoading, onShowHistory, onShowBank, onShowStats, onSync, isSyncing, isOpen, onClose }: any) => {
   const handleDifficultyChange = (diff: Difficulty) => { setConfig((prev: AppState) => { const exists = prev.selectedDifficulties.includes(diff); if (exists) return { ...prev, selectedDifficulties: prev.selectedDifficulties.filter(d => d !== diff) }; return { ...prev, selectedDifficulties: [...prev.selectedDifficulties, diff] }; }); };
   const handleTypeChange = (type: QuestionType) => { setConfig((prev: AppState) => { const exists = prev.questionTypes.includes(type); if (exists) { if (prev.questionTypes.length === 1) return prev; return { ...prev, questionTypes: prev.questionTypes.filter(t => t !== type) }; } return { ...prev, questionTypes: [...prev.questionTypes, type] }; }); };
   return (
@@ -511,76 +522,178 @@ const Sidebar = ({ config, setConfig, onGenerate, onStartGame, isLoading, onShow
       <div className={`fixed md:relative inset-y-0 left-0 w-80 bg-white border-r border-gray-200 h-screen overflow-y-auto p-4 flex flex-col no-print z-50 transition-transform duration-300 ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className="flex items-center justify-between mb-6 text-primary"> <div className="flex items-center gap-2"><BookOpen size={28} /><h1 className="text-xl font-black uppercase tracking-tighter text-blue-900">Soạn Toán AI</h1></div> <button onClick={onClose} className="md:hidden p-2"><X size={24} /></button> </div>
         <div className="space-y-6 flex-1">
-          <div className="space-y-4">
-            <div className="p-4 bg-orange-50 rounded-2xl border border-orange-100 shadow-sm mb-4">
-              <label className="block text-[10px] font-black text-orange-600 mb-2 uppercase tracking-widest flex items-center gap-2">
-                <ShieldAlert size={14} /> Cấu hình Gemini API Key
-              </label>
-              <div className="relative">
-                <input
-                  type="password"
-                  placeholder="Dán API Key của anh vào đây..."
-                  className="w-full border border-orange-200 rounded-xl p-3 pr-10 text-xs focus:ring-2 ring-orange-500/20 outline-none bg-white shadow-inner"
-                  value={config.customApiKey || ''}
-                  onChange={(e) => {
-                    const newKey = e.target.value;
-                    setConfig((prev: AppState) => ({ ...prev, customApiKey: newKey }));
-                    localStorage.setItem('math_app_custom_api_key', newKey);
+          <div className="p-4 bg-orange-50 rounded-2xl border border-orange-100 shadow-sm mb-4">
+            <label className="block text-[10px] font-black text-orange-600 mb-2 uppercase tracking-widest flex items-center gap-2">
+              <ShieldAlert size={14} /> Cấu hình Gemini API Key
+            </label>
+            <div className="relative">
+              <input
+                type="password"
+                placeholder="Dán API Key của anh vào đây..."
+                className="w-full border border-orange-200 rounded-xl p-3 pr-10 text-xs focus:ring-2 ring-orange-500/20 outline-none bg-white shadow-inner"
+                value={config.customApiKey || ''}
+                onChange={(e) => {
+                  const newKey = e.target.value;
+                  setConfig((prev: AppState) => ({ ...prev, customApiKey: newKey }));
+                  localStorage.setItem('math_app_custom_api_key', newKey);
+                }}
+              />
+              {config.customApiKey && (
+                <button
+                  onClick={() => {
+                    setConfig((prev: AppState) => ({ ...prev, customApiKey: '' }));
+                    localStorage.removeItem('math_app_custom_api_key');
                   }}
-                />
-                {config.customApiKey && (
-                  <button
-                    onClick={() => {
-                      setConfig((prev: AppState) => ({ ...prev, customApiKey: '' }));
-                      localStorage.removeItem('math_app_custom_api_key');
-                    }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-orange-400 hover:text-orange-600 transition-colors"
-                    title="Xóa Key để dùng mặc định"
-                  >
-                    <X size={16} />
-                  </button>
-                )}
-              </div>
-              <p className="text-[9px] text-orange-400 mt-2 leading-relaxed">
-                Nhập Key cá nhân để không bị phụ thuộc vào hệ thống. Alla sẽ ưu tiên dùng Key này của anh.
-              </p>
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-orange-400 hover:text-orange-600 transition-colors"
+                  title="Xóa Key để dùng mặc định"
+                >
+                  <X size={16} />
+                </button>
+              )}
             </div>
-
-            <div> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest">Khối Lớp</label> <select className="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50 font-bold focus:ring-2 ring-primary/20 outline-none" value={config.grade} onChange={(e) => setConfig({ ...config, grade: Number(e.target.value), lessons: [] })}> {Array.from({ length: 12 }, (_, i) => i + 1).map(g => <option key={g} value={g}>Toán Lớp {g}</option>)} </select> </div>
-            {config.examType === ExamType.None && (<div> <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-widest">Nội dung bài học (Chọn nhiều)</label> <LessonPicker grade={config.grade} selectedLessons={config.lessons} onChange={(lessons) => setConfig({ ...config, lessons })} /> <div className="mt-3"> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest">Hoặc nhập yêu cầu riêng</label> <input type="text" placeholder="Nhập chủ đề tùy chỉnh..." className="w-full border border-gray-300 rounded-lg p-2.5 text-xs focus:ring-2 ring-primary/20 outline-none" value={config.customLesson} onChange={(e) => setConfig({ ...config, customLesson: e.target.value })} /> </div> </div>)}
-            <div className="grid grid-cols-2 gap-4"> <div> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest">Số câu hỏi</label> <input type="number" min={1} max={50} className="w-full border border-gray-300 rounded-lg p-2 font-bold focus:ring-2 ring-primary/20 outline-none" value={config.questionCount} onChange={(e) => setConfig({ ...config, questionCount: Number(e.target.value) })} /> </div> <div> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest">Lời giải</label> <select className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 ring-primary/20 outline-none" value={config.answerMode} onChange={(e) => setConfig({ ...config, answerMode: e.target.value as AnswerMode })}> <option value={AnswerMode.None}>Không hiển thị</option> <option value={AnswerMode.Basic}>Đáp án ngắn gọn</option> <option value={AnswerMode.Detailed}>Lời giải chi tiết</option> </select> </div> </div>
-            <div> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest flex items-center justify-between"> <span>Tỷ lệ hình vẽ (SVG)</span> <span className="bg-gray-200 text-gray-700 px-1.5 rounded">{config.imageRatio}%</span> </label> <div className="flex items-center gap-2"> <ImageIcon size={14} className="text-gray-400" /> <input type="range" min="0" max="100" step="10" className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary" value={config.imageRatio} onChange={(e) => setConfig({ ...config, imageRatio: Number(e.target.value) })} /> </div> </div>
-            <div> <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-widest">Mức độ nhận thức</label> <div className="flex flex-wrap gap-1.5"> {Object.values(Difficulty).map(diff => (<button key={diff} onClick={() => handleDifficultyChange(diff)} className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase border transition-all ${config.selectedDifficulties.includes(diff) ? 'bg-primary text-white border-primary shadow-md' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>{diff}</button>))} </div> </div>
-
-            <div className="bg-purple-50 p-4 rounded-2xl border border-purple-100 shadow-sm text-center relative overflow-hidden group"> <Trophy size={28} className="mx-auto text-purple-600 mb-1" /> <p className="text-[10px] font-black text-purple-700 uppercase mb-3 tracking-tighter italic">Ai Là Triệu Phú Toán Học</p> <button onClick={() => { onStartGame(); onClose(); }} disabled={isLoading} className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-black py-3 rounded-xl shadow-lg active:scale-95 transition-all text-[10px] uppercase border-b-4 border-indigo-800">BẮT ĐẦU CHƠI</button> </div>
+            <p className="text-[9px] text-orange-400 mt-2 leading-relaxed">
+              Nhập Key cá nhân để không bị phụ thuộc vào hệ thống. Alla sẽ ưu tiên dùng Key này của anh.
+            </p>
           </div>
+
+
+          <div> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest">Khối Lớp</label> <select className="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50 font-bold focus:ring-2 ring-primary/20 outline-none" value={config.grade} onChange={(e) => setConfig({ ...config, grade: Number(e.target.value), lessons: [] })}> {Array.from({ length: 12 }, (_, i) => i + 1).map(g => <option key={g} value={g}>Toán Lớp {g}</option>)} </select> </div>
+          {config.examType === ExamType.None && (<div> <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-widest">Nội dung bài học (Chọn nhiều)</label> <LessonPicker grade={config.grade} selectedLessons={config.lessons} onChange={(lessons) => setConfig({ ...config, lessons })} /> <div className="mt-3"> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest">Hoặc nhập yêu cầu riêng</label> <input type="text" placeholder="Nhập chủ đề tùy chỉnh..." className="w-full border border-gray-300 rounded-lg p-2.5 text-xs focus:ring-2 ring-primary/20 outline-none" value={config.customLesson} onChange={(e) => setConfig({ ...config, customLesson: e.target.value })} /> </div> </div>)}
+          <div className="grid grid-cols-2 gap-4"> <div> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest">Số câu hỏi</label> <input type="number" min={1} max={50} className="w-full border border-gray-300 rounded-lg p-2 font-bold focus:ring-2 ring-primary/20 outline-none" value={config.questionCount} onChange={(e) => setConfig({ ...config, questionCount: Number(e.target.value) })} /> </div> <div> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest">Lời giải</label> <select className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 ring-primary/20 outline-none" value={config.answerMode} onChange={(e) => setConfig({ ...config, answerMode: e.target.value as AnswerMode })}> <option value={AnswerMode.None}>Không hiển thị</option> <option value={AnswerMode.Basic}>Đáp án ngắn gọn</option> <option value={AnswerMode.Detailed}>Lời giải chi tiết</option> </select> </div> </div>
+          <div> <label className="block text-[10px] font-black text-gray-500 mb-1 uppercase tracking-widest flex items-center justify-between"> <span>Tỷ lệ hình vẽ (SVG)</span> <span className="bg-gray-200 text-gray-700 px-1.5 rounded">{config.imageRatio}%</span> </label> <div className="flex items-center gap-2"> <ImageIcon size={14} className="text-gray-400" /> <input type="range" min="0" max="100" step="10" className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary" value={config.imageRatio} onChange={(e) => setConfig({ ...config, imageRatio: Number(e.target.value) })} /> </div> </div>
+          <div> <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-widest">Mức độ nhận thức</label> <div className="flex flex-wrap gap-1.5"> {Object.values(Difficulty).map(diff => (<button key={diff} onClick={() => handleDifficultyChange(diff)} className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase border transition-all ${config.selectedDifficulties.includes(diff) ? 'bg-primary text-white border-primary shadow-md' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>{diff}</button>))} </div> </div>
+          <div> <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-widest">Dạng câu hỏi</label> <div className="flex flex-wrap gap-1.5"> {[QuestionType.MultipleChoice, QuestionType.TrueFalse, QuestionType.ShortAnswer].map(qt => (<button key={qt} onClick={() => handleTypeChange(qt)} className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase border transition-all ${config.questionTypes.includes(qt) ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-gray-50 text-gray-400 border-gray-200'}`}>{qt}</button>))} </div> </div>
+
+          <div className="bg-purple-50 p-4 rounded-2xl border border-purple-100 shadow-sm text-center relative overflow-hidden group"> <Trophy size={28} className="mx-auto text-purple-600 mb-1" /> <p className="text-[10px] font-black text-purple-700 uppercase mb-3 tracking-tighter italic">Ai Là Triệu Phú Toán Học</p> <button onClick={() => { onStartGame(); onClose(); }} disabled={isLoading} className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-black py-3 rounded-xl shadow-lg active:scale-95 transition-all text-[10px] uppercase border-b-4 border-indigo-800">BẮT ĐẦU CHƠI</button> </div>
         </div>
         <div className="mt-8 space-y-3">
+          <button
+            onClick={() => { onVoiceCompose(); onClose(); }}
+            disabled={isLoading || isListening}
+            className={`w-full py-4 rounded-xl flex items-center justify-center gap-3 font-black uppercase text-sm transition-all shadow-lg mb-3 ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:scale-105 active:scale-95'}`}
+          >
+            {isListening ? <MicOff size={22} /> : <Mic size={22} />}
+            {isListening ? 'Alla Đang Nghe...' : 'Soạn bằng Giọng nói'}
+          </button>
+
           <button onClick={() => { onGenerate(); onClose(); }} disabled={isLoading} className="w-full bg-primary hover:bg-blue-800 text-white font-black py-4 rounded-xl shadow-xl flex items-center justify-center gap-2 uppercase tracking-tight transition-all border-b-4 border-blue-900"> {isLoading ? <Loader2 className="animate-spin" /> : <PlusCircle size={22} />} Soạn bộ câu hỏi AI </button>
+
+          <button
+            onClick={() => { onSync(); }}
+            disabled={isSyncing}
+            className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 font-black py-3 rounded-xl flex items-center justify-center gap-2 uppercase text-[10px] transition-all border border-blue-100"
+          >
+            <Cloud className={isSyncing ? "animate-pulse" : ""} size={18} />
+            {isSyncing ? "Đang đồng bộ..." : "Đồng bộ đám mây"}
+          </button>
+
           <div className="flex gap-2"> <button onClick={onShowHistory} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2.5 rounded-xl text-[10px] uppercase flex items-center justify-center gap-1 transition-colors"><History size={14} /> Lịch sử</button> <button onClick={onShowBank} className="flex-1 bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold py-2.5 rounded-xl text-[10px] border border-amber-200 uppercase flex items-center justify-center gap-1 transition-colors"><Database size={14} /> Kho lưu</button> </div>
+          <button onClick={onShowStats} className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-black py-3 rounded-xl flex items-center justify-center gap-2 uppercase text-[10px] transition-all border border-indigo-100">
+            <Trophy size={18} />
+            Thống kê điểm số
+          </button>
         </div>
-      </div>
+      </div >
     </>
   );
 };
 
-const QuestionItem = ({ question, onSave, readOnly = false }: any) => {
+// Component bảo vệ nội dung MathJax khỏi React re-render
+const MathContent = React.memo(({ html, className }: { html: string; className?: string }) => {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (ref.current) {
+      ref.current.innerHTML = html;
+      triggerMath();
+    }
+  }, [html]);
+
+  return <div ref={ref} className={className} />;
+}, (prev, next) => prev.html === next.html);
+
+const QuestionItem = ({ question, onSave, readOnly = false, studentAnswer, onAnswerChange, showResult = false }: any) => {
   const isSvg = question.imageDescription && question.imageDescription.trim().startsWith('<svg');
   const [isSaved, setIsSaved] = useState(false);
-  useLayoutEffect(() => { triggerMath(); }, [isSaved, question]);
+
+  const isTrueFalse = question.type?.includes('Đúng/Sai') || question.type === 'DUNGSAI';
+  const isShortAnswer = question.type?.includes('ngắn') || question.type === 'NGANGON';
+
   return (
-    <div className={`mb-12 break-inside-avoid relative group ${readOnly ? 'p-6 border rounded-2xl bg-white mb-6 shadow-sm border-gray-100' : ''}`}>
+    <div className={`mb-12 break-inside-avoid relative group ${readOnly ? 'p-6 border rounded-2xl bg-white mb-6 shadow-sm ' + (showResult ? 'border-gray-200' : 'border-indigo-100 hover:border-indigo-300 transition-colors') : ''}`}>
       {!readOnly && (<div className="absolute -right-3 top-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10 no-print"> <button onClick={() => { onSave?.(question); setIsSaved(true); setTimeout(() => setIsSaved(false), 2000); }} className={`p-2.5 rounded-full shadow-lg text-white transition-all transform hover:scale-110 active:scale-90 ${isSaved ? 'bg-green-500' : 'bg-gray-400 hover:bg-primary'}`}> {isSaved ? <CheckSquare size={18} /> : <Save size={18} />} </button> </div>)}
-      <div className="flex gap-2 items-baseline mb-4"> <span className="font-black text-primary text-xl">Câu {question.number}.</span> {!readOnly && <span className="text-[10px] font-black bg-gray-100 text-gray-500 px-2 py-0.5 rounded-md border border-gray-200 uppercase tracking-wider">{question.difficulty}</span>} </div>
-      <div className="text-justify text-gray-900 leading-relaxed text-lg font-serif overflow-x-auto no-scrollbar mb-4" dangerouslySetInnerHTML={{ __html: question.content }}></div>
+      <div className="flex gap-2 items-baseline mb-4"> <span className="font-black text-primary text-xl">Câu {question.number}.</span> {!readOnly && <span className="text-[10px] font-black bg-gray-100 text-gray-500 px-2 py-0.5 rounded-md border border-gray-200 uppercase tracking-wider">{question.difficulty}</span>} {readOnly && showResult && <span className="ml-auto text-xs font-bold uppercase px-3 py-1 rounded-full border bg-gray-100 text-gray-500">Đã nộp</span>} </div>
+      <MathContent html={question.content} className="text-justify text-gray-900 leading-relaxed text-lg font-serif overflow-x-auto no-scrollbar mb-4" />
       {question.hasImage && (<div className="my-8 mx-auto max-w-full md:max-w-md bg-white p-4 rounded-3xl shadow-sm border border-gray-100 svg-container"> {isSvg ? <div className="w-full flex justify-center" dangerouslySetInnerHTML={{ __html: question.imageDescription! }} /> : <div className="p-8 border-2 border-dashed border-gray-300 rounded-2xl w-full text-center text-xs text-gray-400 font-medium italic">Hình minh họa đề bài</div>} </div>)}
-      {question.choices && (<div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-12 mt-6 ml-4"> {question.choices.map((choice: string, idx: number) => (<div key={idx} className="flex gap-3 items-start group/choice"> <span className="font-black text-gray-900 bg-gray-100 px-2.5 py-1 rounded-lg text-sm border border-gray-200 group-hover/choice:bg-primary group-hover/choice:text-white transition-all shadow-sm">{String.fromCharCode(65 + idx)}.</span> <span className="text-lg font-serif overflow-x-auto no-scrollbar group-hover/choice:text-primary transition-colors" dangerouslySetInnerHTML={{ __html: choice }}></span> </div>))} </div>)}
+
+      {/* RENDER DUNG/SAI */}
+      {isTrueFalse && question.choices && (
+        <div className="flex flex-col gap-3 mt-6 ml-4">
+          {question.choices.map((choice: string, idx: number) => {
+            const currentAns = studentAnswer ? studentAnswer[idx] : null;
+            return (
+              <div key={idx} className="flex gap-4 items-start p-3 rounded-xl hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-100">
+                <MathContent html={choice} className="flex-1 mt-1 text-lg font-serif overflow-x-auto no-scrollbar" />
+                {readOnly && (
+                  <div className="flex gap-2 shrink-0">
+                    <button disabled={showResult} onClick={() => { const newAns = { ...(studentAnswer || {}) }; newAns[idx] = 'Đ'; onAnswerChange?.(newAns); }} className={`w-10 h-10 rounded-lg flex items-center justify-center font-black text-sm transition-all shadow-sm ${currentAns === 'Đ' ? 'bg-green-500 text-white border-green-600' : 'bg-white text-gray-400 border-gray-200 border hover:bg-green-50 hover:text-green-600 hover:border-green-300'} ${showResult ? 'opacity-70 cursor-not-allowed' : ''}`}>Đ</button>
+                    <button disabled={showResult} onClick={() => { const newAns = { ...(studentAnswer || {}) }; newAns[idx] = 'S'; onAnswerChange?.(newAns); }} className={`w-10 h-10 rounded-lg flex items-center justify-center font-black text-sm transition-all shadow-sm ${currentAns === 'S' ? 'bg-red-500 text-white border-red-600' : 'bg-white text-gray-400 border-gray-200 border hover:bg-red-50 hover:text-red-600 hover:border-red-300'} ${showResult ? 'opacity-70 cursor-not-allowed' : ''}`}>S</button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* RENDER TRA LOI NGAN */}
+      {isShortAnswer && (
+        <div className="mt-6 ml-4">
+          {readOnly ? (
+            <input disabled={showResult} type="text" placeholder="Nhập đáp án của em..." value={studentAnswer || ''} onChange={(e) => onAnswerChange?.(e.target.value)} className={`w-full md:w-1/2 border-2 p-3 text-lg font-bold rounded-xl outline-none focus:border-indigo-500 shadow-sm transition-all ${showResult ? 'bg-gray-100 border-gray-300 text-gray-600' : 'bg-white border-indigo-200 text-indigo-900 focus:ring-4 ring-indigo-500/10'}`} />
+          ) : (
+            <div className="p-4 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 text-gray-400 text-sm font-medium italic w-full md:w-1/2">
+              (Học sinh sẽ điền đáp án ngắn vào ô trống này)
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* RENDER ABCD */}
+      {!isTrueFalse && !isShortAnswer && question.choices && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-12 mt-6 ml-4">
+          {question.choices.map((choice: string, idx: number) => {
+            const letter = String.fromCharCode(65 + idx);
+            const isSelected = studentAnswer === letter;
+            return (
+              <div key={idx} onClick={() => { if (readOnly && !showResult) onAnswerChange?.(letter); }} className={`flex gap-3 items-start p-2 rounded-xl transition-all ${readOnly && !showResult ? 'cursor-pointer hover:bg-indigo-50 border border-transparent hover:border-indigo-100' : 'group/choice'} ${isSelected && readOnly ? 'bg-indigo-50 border border-indigo-200 shadow-sm' : ''}`}>
+                <span className={`font-black px-2.5 py-1 rounded-lg text-sm border transition-all shadow-sm ${isSelected && readOnly ? 'bg-indigo-600 text-white border-indigo-700' : (!readOnly ? 'text-gray-900 bg-gray-100 border-gray-200 group-hover/choice:bg-primary group-hover/choice:text-white' : 'text-gray-500 bg-white border-gray-200 group-hover:bg-indigo-100 group-hover:text-indigo-600')}`}>
+                  {letter}.
+                </span>
+                <MathContent html={choice} className={`text-lg font-serif overflow-x-auto no-scrollbar mt-0.5 transition-colors ${isSelected && readOnly ? 'text-indigo-900' : (!readOnly ? 'group-hover/choice:text-primary' : 'text-gray-700')}`} />
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };
 
 export default function App() {
-  const [config, setConfig] = useState<AppState>({ grade: 12, questionCount: 10, selectedDifficulties: [Difficulty.NB, Difficulty.TH], lessons: [], customLesson: '', questionTypes: [QuestionType.MultipleChoice], answerMode: AnswerMode.Basic, imageRatio: 30, examType: ExamType.None, imageMode: ImageMode.None, gameStatus: GameStatus.Idle });
+  const [config, setConfig] = useState<AppState>({
+    grade: 12,
+    questionCount: 10,
+    selectedDifficulties: [Difficulty.NB, Difficulty.TH],
+    lessons: [],
+    customLesson: '',
+    questionTypes: [QuestionType.MultipleChoice],
+    answerMode: AnswerMode.Basic,
+    imageRatio: 0,
+    examType: ExamType.None,
+    imageMode: ImageMode.None,
+    gameStatus: GameStatus.Idle
+  });
   const [questions, setQuestions] = useState<Question[]>([]);
   const [gameQuestions, setGameQuestions] = useState<Question[]>([]);
   const [history, setHistory] = useState<HistoryItem[]>([]);
@@ -590,6 +703,174 @@ export default function App() {
   const [showBankModal, setShowBankModal] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  // States cho tính năng Chia sẻ bài tập qua Link
+  const [isViewerMode, setIsViewerMode] = useState(false);
+  const [shareConfig, setShareConfig] = useState<any>(null);
+  const [shareId, setShareId] = useState<string | null>(null);
+  const [isSharing, setIsSharing] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("AI Đang soạn thảo...");
+  const [showResultsModal, setShowResultsModal] = useState(false);
+  const [resultsData, setResultsData] = useState<any[]>([]);
+  const [showStatsModal, setShowStatsModal] = useState(false);
+  const [globalResults, setGlobalResults] = useState<any[]>([]);
+  const [statsMonth, setStatsMonth] = useState<string>(new Date().toISOString().substring(0, 7)); // YYYY-MM
+  const [statsClass, setStatsClass] = useState<string>("All");
+
+  // States cho Học sinh làm bài
+  const [studentAnswers, setStudentAnswers] = useState<Record<string, any>>({});
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [studentName, setStudentName] = useState("");
+  const [studentClass, setStudentClass] = useState("");
+  const [isSubmittingResult, setIsSubmittingResult] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+
+  const calculateScore = () => {
+    let totalCorrect = 0;
+    const totalQuestions = questions.length;
+    if (totalQuestions === 0) return { score: 0, details: {} };
+
+    const pointsPerQuestion = 10 / totalQuestions;
+    const details: Record<string, { isCorrect: boolean, score: number, label: string }> = {};
+
+    questions.forEach(q => {
+      const uAns = studentAnswers[q.id];
+      const isTrueFalse = q.type?.includes('Đúng/Sai') || q.type === 'DUNGSAI';
+      const isShortAnswer = q.type?.includes('ngắn') || q.type === 'NGANGON';
+
+      if (!uAns) {
+        details[q.id] = { isCorrect: false, score: 0, label: isTrueFalse ? "Đúng 0/4" : `đáp án ${q.correctAnswer} - Sai` };
+        return;
+      }
+
+      if (isTrueFalse) {
+        // Fallback logic: thử parse từ correctAnswer, nếu không ra gì thì thử explanation
+        let tfMap = parseTFCorrectAnswer(String(q.correctAnswer));
+        if (Object.keys(tfMap).length < 4 && q.explanation) {
+          const fallbackMap = parseTFCorrectAnswer(q.explanation);
+          // Lấy map nào có nhiều key hơn
+          if (Object.keys(fallbackMap).length > Object.keys(tfMap).length) {
+            tfMap = fallbackMap;
+          }
+        }
+
+        let correctParts = 0;
+        const choices = q.choices || [];
+
+        // So sánh bằng cách tìm chữ cái a, b, c, d trong nội dung choice
+        choices.forEach((choiceText: string, idx: number) => {
+          const studentAns = uAns[idx];
+          if (!studentAns) return;
+
+          // Tìm xem choice này là câu a, b, c hay d
+          const lowerLevel = choiceText.toLowerCase();
+          let letterFound = '';
+          ['a', 'b', 'c', 'd'].forEach(l => {
+            if (lowerLevel.startsWith(l + ')') || lowerLevel.includes(' ' + l + ')') || lowerLevel.includes('>' + l + ')')) {
+              letterFound = l;
+            }
+          });
+
+          // Nếu không thấy ở đầu, thử regex
+          if (!letterFound) {
+            const match = lowerLevel.match(/([abcd])\)/);
+            if (match) letterFound = match[1];
+          }
+
+          if (letterFound && tfMap[letterFound] === studentAns) {
+            correctParts++;
+          } else if (!letterFound) {
+            // Fallback: nếu không tìm thấy chữ cái trong choice, dùng index dự phòng
+            const fallbackLetter = ['a', 'b', 'c', 'd'][idx];
+            if (tfMap[fallbackLetter] === studentAns) correctParts++;
+          }
+        });
+
+        const questionScore = (correctParts / 4) * pointsPerQuestion;
+        totalCorrect += (correctParts / 4);
+        details[q.id] = {
+          isCorrect: correctParts === 4,
+          score: Math.round(questionScore * 100) / 100,
+          label: `Bảng đáp án - Đúng ${correctParts}/4`
+        };
+      } else if (isShortAnswer) {
+        const isCorr = String(uAns).trim().toLowerCase() === String(q.correctAnswer).trim().toLowerCase();
+        if (isCorr) totalCorrect += 1;
+        details[q.id] = {
+          isCorrect: isCorr,
+          score: isCorr ? Math.round(pointsPerQuestion * 100) / 100 : 0,
+          label: `đáp án ${q.correctAnswer} - ${isCorr ? 'Đúng' : 'Sai'}`
+        };
+      } else {
+        const isCorr = uAns === q.correctAnswer;
+        if (isCorr) totalCorrect += 1;
+        details[q.id] = {
+          isCorrect: isCorr,
+          score: isCorr ? Math.round(pointsPerQuestion * 100) / 100 : 0,
+          label: `đáp án ${q.correctAnswer} - ${isCorr ? 'Đúng' : 'Sai'}`
+        };
+      }
+    });
+
+    const finalScore = Math.round((totalCorrect / totalQuestions) * 10 * 10) / 10;
+    return { score: finalScore, details };
+  };
+
+  // Hàm helper: parse đáp án Đúng/Sai linh hoạt — trả về Map theo chữ cái a, b, c, d
+  const parseTFCorrectAnswer = (correctAnswer: string): Record<string, 'Đ' | 'S'> => {
+    try {
+      const str = correctAnswer;
+      const lowerStr = str.toLowerCase();
+      const result: Record<string, 'Đ' | 'S'> = {};
+      const letters = ['a', 'b', 'c', 'd'];
+
+      // Tìm vị trí của a), b), c), d) trong chuỗi
+      const positions: { letter: string; pos: number }[] = [];
+      for (const l of letters) {
+        const pattern = l + ')';
+        let searchFrom = 0;
+        while (true) {
+          const found = lowerStr.indexOf(pattern, searchFrom);
+          if (found === -1) break;
+          // Chấp nhận nếu ở đầu, sau dấu cách/phẩy/chấm HOẶC sau dấu ) của LaTeX
+          if (found === 0 || /[\s,.;\)]/.test(lowerStr[found - 1])) {
+            positions.push({ letter: l, pos: found });
+            break;
+          }
+          searchFrom = found + 1;
+        }
+      }
+
+      positions.sort((a, b) => a.pos - b.pos);
+
+      // Tách từng đoạn và tìm "đúng"/"sai"
+      for (let p = 0; p < positions.length; p++) {
+        const start = positions[p].pos;
+        const end = p + 1 < positions.length ? positions[p + 1].pos : str.length;
+        const segment = str.substring(start, end).toLowerCase();
+
+        // Kiểm tra 40 ký tự đầu của segment
+        const head = segment.substring(0, Math.min(40, segment.length));
+        if (head.includes('đúng') || head.includes('đ)') || head.match(/[):]\s*đ(?!\w)/)) {
+          result[positions[p].letter] = 'Đ';
+        } else if (head.includes('sai') || head.includes('s)') || head.match(/[):]\s*s(?!\w)/)) {
+          result[positions[p].letter] = 'S';
+        } else {
+          // Fallback: tìm từ cuối cùng "đúng" hoặc "sai" trong toàn đoạn
+          const lastD = segment.lastIndexOf('đúng');
+          const lastS = segment.lastIndexOf('sai');
+          if (lastD > lastS && lastD !== -1) result[positions[p].letter] = 'Đ';
+          else if (lastS !== -1) result[positions[p].letter] = 'S';
+        }
+      }
+
+      console.log('Alla T/F Parser Result:', result);
+      return result;
+    } catch (e) {
+      console.error("parseTFCorrectAnswer error:", e);
+      return {};
+    }
+  };
+
   useEffect(() => {
     const saved = localStorage.getItem('math_app_history');
     if (saved) setHistory(JSON.parse(saved));
@@ -597,55 +878,251 @@ export default function App() {
     // Load Custom API Key
     const savedKey = localStorage.getItem('math_app_custom_api_key');
     if (savedKey) {
-      setConfig(prev => ({ ...prev, customApiKey: savedKey }));
+      setConfig(prev => ({
+        ...prev,
+        customApiKey: savedKey
+      }));
     }
+
+    // Xử lý Share Link — nếu có param ?share=xxx, vào thẳng viewer mode
+    const params = new URLSearchParams(window.location.search);
+    const sharedId = params.get('share');
+    if (sharedId) {
+      setIsViewerMode(true);
+      setShowActivateModal(false); // BỎ QUA kích hoạt bản quyền cho học sinh
+      setLoadingMessage("Đang mở link bài tập...");
+      setIsLoading(true);
+      firebaseService.getSharedExam(sharedId).then(data => {
+        if (data && data.questions && data.questions.length > 0) {
+          setQuestions(data.questions);
+          setShareConfig(data.config);
+          setShareId(sharedId); // CRITICAL: Lưu shareId để đảm bảo nộp bài được lưu lên Firebase
+        } else {
+          alert("Link bài tập không hợp lệ hoặc đã bị xóa!");
+          window.location.href = window.location.pathname;
+        }
+      }).catch(err => {
+        console.error("Lỗi khi tải bài tập chia sẻ", err);
+        alert("Lỗi khi tải bài tập. Vui lòng thử lại sau.");
+      }).finally(() => {
+        setIsLoading(false);
+      });
+    }
+
+    // === FIREBASE SYNC: Tải lịch sử từ Cloud ===
+    (async () => {
+      try {
+        const ownerId = storageService.getOwnerId();
+        if (ownerId) {
+          const cloudHistory = await firebaseService.getHistory(ownerId);
+          if (cloudHistory.length > 0) {
+            setHistory(cloudHistory);
+            localStorage.setItem('math_app_history', JSON.stringify(cloudHistory));
+          }
+        }
+      } catch (err) {
+        console.error("Firebase sync failed, using local:", err);
+      }
+    })();
+
   }, []);
-  useLayoutEffect(() => { const timer = setTimeout(triggerMath, 200); return () => clearTimeout(timer); }, [questions, gameQuestions, config.gameStatus, isLoading]);
+
+  // Tự động lưu cấu hình
+  useEffect(() => {
+    if (config.customApiKey !== undefined) {
+      if (config.customApiKey) localStorage.setItem('math_app_custom_api_key', config.customApiKey);
+      else localStorage.removeItem('math_app_custom_api_key');
+    }
+  }, [config.customApiKey]);
+  useLayoutEffect(() => {
+    const timer = setTimeout(triggerMath, 200);
+    return () => clearTimeout(timer);
+  }, [questions, gameQuestions, config.gameStatus, config.answerMode, isLoading, isViewerMode]);
 
   const handleGenerate = async () => {
     if (config.examType === ExamType.None && config.lessons.length === 0 && !config.customLesson) return alert("Vui lòng chọn chủ đề!");
-    setIsLoading(true); setProgress(0);
-    const progressTimer = setInterval(() => setProgress(prev => prev >= 98 ? 98 : prev + (prev < 30 ? 3 : 0.5)), 600);
+    setLoadingMessage("AI Đang soạn thảo...");
+    setIsLoading(true);
+    setProgress(0);
+
+    let generatedData: { questions: Question[], historyItem: HistoryItem } | null = null;
+
     try {
-      // Kiểm tra bảo mật trước khi gọi AI
       const session = localStorage.getItem('math_app_license_session');
       if (!session || JSON.parse(session).status !== 'ACTIVE') {
         throw new Error("LICENSE_REQUIRED");
       }
 
-      console.log("Alla Debug - handleGenerate triggering with config:", {
-        hasCustomKey: !!config.customApiKey,
-        grade: config.grade,
-        lessons: config.lessons
-      });
-      const res = await generateQuestions(config, questions);
-      // ÁP DỤNG CÂN BẰNG ĐÁP ÁN TUYỆT ĐỐI
-      const balancedRes = distributeAnswersEvenly(res);
-      setQuestions(balancedRes);
+      const CHUNK_SIZE = 10;
+      const totalRequested = config.questionCount;
+      const chunks = [];
+      let rem = totalRequested;
+      while (rem > 0) {
+        chunks.push(Math.min(rem, CHUNK_SIZE));
+        rem -= CHUNK_SIZE;
+      }
+
+      let allQuestions: Question[] = [];
+
+      for (let i = 0; i < chunks.length; i++) {
+        const chunkSize = chunks[i];
+        try {
+          const chunkConfig = { ...config, questionCount: chunkSize };
+          const res = await generateQuestions(chunkConfig, allQuestions, i + 1);
+          allQuestions = [...allQuestions, ...res];
+          setProgress(((i + 1) / chunks.length) * 100);
+        } catch (err: any) {
+          console.error(`Lỗi chunk ${i + 1}:`, err);
+          if (allQuestions.length > 0) {
+            alert(`AI chỉ tạo được ${allQuestions.length} câu. Phần còn lại bị lỗi: ${err.message}`);
+            break;
+          }
+          throw err;
+        }
+      }
+
+      const finalQuestions = distributeAnswersEvenly(allQuestions).map((q, idx) => ({
+        ...q,
+        id: `q_${Date.now()}_${idx}`,
+        number: idx + 1
+      }));
+
+      if (finalQuestions.length === 0) {
+        throw new Error("Không tạo được câu hỏi nào. Anh vui lòng thử lại.");
+      }
+
+      setQuestions(finalQuestions);
+      setProgress(100);
 
       const newHistoryItem: HistoryItem = {
         id: Date.now().toString(),
         timestamp: Date.now(),
         config: { ...config },
-        questions: balancedRes
+        questions: finalQuestions
       };
 
       const updated = [newHistoryItem, ...history].slice(0, 15);
       setHistory(updated);
       localStorage.setItem('math_app_history', JSON.stringify(updated));
 
-      // TỰ ĐỘNG LƯU CLOUD (Save Quota)
-      const { deviceId } = await storageService.getSecurityParams();
-      if (deviceId) {
-        firebaseService.saveHistory(deviceId, newHistoryItem).catch(err => console.error("Cloud Auto-save failed:", err));
-        // Đồng thời lưu từng câu vào kho tư liệu nếu anh muốn - Ở đây em lưu cả bộ vào History trước
-      }
+      // Lưu biến local để upload ngầm sau khi tắt loading
+      generatedData = { questions: finalQuestions, historyItem: newHistoryItem };
 
     } catch (e: any) {
-      console.error("Alla Debug - Generate Error:", e);
+      console.error("Generate Error:", e);
       if (e.message === "LICENSE_REQUIRED") alert("Vui lòng kích hoạt bản quyền!");
-      else alert("Lỗi AI: " + (e.message || "Vui lòng kiểm tra console"));
-    } finally { clearInterval(progressTimer); setIsLoading(false); }
+      else alert("Lỗi soạn thảo: " + (e.message || "Vui lòng thử lại sau ít phút."));
+      setProgress(0);
+    } finally {
+      setIsLoading(false);
+    }
+
+    // Upload Firebase chạy ngầm — KHÔNG block UI
+    if (generatedData) {
+      firebaseService.saveSharedExam(generatedData.questions, config)
+        .then(id => { setShareId(id); console.log("Auto-shared exam ID:", id); })
+        .catch(err => console.error("Auto-share failed:", err));
+
+      const ownerId = storageService.getOwnerId();
+      if (ownerId) {
+        firebaseService.saveHistory(ownerId, generatedData.historyItem).catch(console.error);
+      }
+    }
+  };
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    try {
+      const ownerId = storageService.getOwnerId();
+      if (!ownerId) throw new Error("Không xác định được Owner ID.");
+
+      // Đẩy dữ liệu local lên Cloud trước
+      await storageService.syncCloud();
+
+      // Rồi kéo dữ liệu từ Cloud về
+      const [cloudHistory, cloudBank] = await Promise.all([
+        firebaseService.getHistory(ownerId),
+        firebaseService.getBank(ownerId)
+      ]);
+
+      if (cloudHistory.length > 0) {
+        setHistory(prev => {
+          const combined = [...cloudHistory, ...prev];
+          const unique = Array.from(new Map(combined.map(item => [item.id, item])).values());
+          return unique.sort((a, b) => b.timestamp - a.timestamp).slice(0, 50);
+        });
+        localStorage.setItem('math_app_history', JSON.stringify(cloudHistory));
+      }
+
+      if (cloudBank.length > 0) {
+        const currentLocalBank = storageService.getBank();
+        const combinedBank = [...cloudBank, ...currentLocalBank];
+        const uniqueBank = Array.from(new Map(combinedBank.map(q => [q.content, q])).values());
+        localStorage.setItem('math_app_question_bank_v1', JSON.stringify(uniqueBank));
+      }
+
+      alert("Đồng bộ thành công! Dữ liệu đã được cập nhật từ đám mây.");
+    } catch (err: any) {
+      alert("Lỗi đồng bộ: " + err.message);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleShareLink = async () => {
+    if (questions.length === 0) return alert("Chưa có đề để chia sẻ!");
+
+    setIsSharing(true);
+    try {
+      // Tạo shareId ngay lập tức nếu chưa có
+      let currentShareId = shareId;
+      if (!currentShareId) {
+        currentShareId = "share_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+        setShareId(currentShareId);
+      }
+
+      const shareUrl = `${window.location.origin}${window.location.pathname}?share=${currentShareId}`;
+
+      // Cập nhật shareId vào history gần nhất để tiện xem Bảng Điểm
+      if (history.length > 0) {
+        const updatedHistory = [...history];
+        if (!updatedHistory[0].shareId) {
+          updatedHistory[0].shareId = currentShareId;
+          setHistory(updatedHistory);
+          localStorage.setItem('math_app_history', JSON.stringify(updatedHistory));
+          const ownerId = storageService.getOwnerId();
+          if (ownerId) firebaseService.saveHistory(ownerId, updatedHistory[0]).catch(console.error);
+        }
+      }
+
+      // Copy link cho anh ngay lập tức — KHÔNG CHỜ Firebase
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        alert("Link đã copy! Đang lưu lên đám mây ngầm...\n" + shareUrl);
+      } catch (copyErr) {
+        window.prompt("Copy link bên dưới để gửi cho học sinh:", shareUrl);
+      }
+
+      // Upload Firebase ngầm với timeout 10 giây
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Firebase timeout")), 10000));
+      try {
+        const ownerId = storageService.getOwnerId();
+        const shareDataConfig = { ...config, ownerId }; // Đính kèm ownerId vào metadata của đề
+
+        await Promise.race([
+          firebaseService.saveSharedExam(questions, shareDataConfig, currentShareId),
+          timeoutPromise
+        ]);
+        console.log("Share saved to Firebase:", currentShareId);
+      } catch (firebaseErr) {
+        console.error("Firebase share upload failed (link vẫn hoạt động nếu retry):", firebaseErr);
+      }
+    } catch (err: any) {
+      console.error("Share failed:", err);
+      alert("Lỗi chia sẻ: " + (err.message || "Không rõ nguyên nhân."));
+    } finally {
+      setIsSharing(false);
+    }
   };
 
   const [showActivateModal, setShowActivateModal] = useState(false);
@@ -661,13 +1138,19 @@ export default function App() {
     try {
       const { deviceId, fingerprint } = await storageService.getSecurityParams();
 
-      // Tuyệt đối không gọi server nếu thiếu thông số bảo mật
       if (!deviceId || !fingerprint) {
         throw new Error("MISSING_SECURITY_INFO");
       }
 
+      // Tạo ownerId từ hash token — tất cả máy cùng token sẽ có cùng ownerId
+      const tokenTrimmed = activationToken.trim();
+      const tokenBytes = new TextEncoder().encode(tokenTrimmed);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', tokenBytes);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const ownerId = 'owner_' + hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 24);
+
       const params = new URLSearchParams({
-        token: activationToken.trim(),
+        token: tokenTrimmed,
         deviceId: deviceId,
         fingerprint: fingerprint,
         action: 'activate'
@@ -682,9 +1165,10 @@ export default function App() {
       if (result.status === 'ACTIVE' || result.status === 'SUCCESS' || result.ok === true) {
         localStorage.setItem('math_app_license_session', JSON.stringify({
           status: 'ACTIVE',
-          token: activationToken.trim(),
+          token: tokenTrimmed,
           deviceId,
           fingerprint,
+          ownerId, // ID chung cho tất cả các máy cùng token
           expiry: result.expiry || 'Vĩnh viễn'
         }));
         alert("Kích hoạt thành công! Chào mừng anh Thưởng.");
@@ -695,6 +1179,7 @@ export default function App() {
         storageService.syncCloud().finally(() => setIsSyncing(false));
       } else if (result.error === 'TOKEN_CLONED' || result.message === 'TOKEN_CLONED' || result.status === 'TOKEN_CLONED') {
         localStorage.removeItem('math_app_license_session');
+        setShowActivateModal(true);
         alert("LỖI: Token này đã được sử dụng cho thiết bị khác (TOKEN_CLONED). Ứng dụng sẽ bị khóa.");
       } else {
         alert("Lỗi: " + (result.message || result.error || "Token không hợp lệ"));
@@ -714,12 +1199,18 @@ export default function App() {
 
       // Alla Debug - Kiểm tra biến môi trường (không log giá trị)
       const env = (import.meta as any).env;
-      console.log("Alla Debug - [v5.1b] Environment Check:", {
+      console.log("Alla Debug - [v5.2] Environment Check:", {
         VITE_GEMINI_API_KEY: !!env?.VITE_GEMINI_API_KEY,
         VITE_FIREBASE_API_KEY: !!env?.VITE_FIREBASE_API_KEY,
         BASE_URL: env?.BASE_URL,
         MODE: env?.MODE
       });
+
+      // Nếu đang ở viewer mode (học sinh xem bài), KHÔNG cần kiểm tra bản quyền
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('share')) {
+        return; // Học sinh không cần kích hoạt
+      }
 
       const sessionStr = localStorage.getItem('math_app_license_session');
       if (!sessionStr) {
@@ -738,15 +1229,14 @@ export default function App() {
         return;
       }
 
-      // Nếu đã có license, thực hiện đồng bộ từ Cloud về máy
+      // Nếu đã có license, thực hiện đồng bộ từ Cloud về máy dùng ownerId
       setIsSyncing(true);
       try {
         await storageService.pullCloud();
-        // Tải thêm lịch sử soạn thảo từ Cloud
-        const cloudHistory = await firebaseService.getHistory(deviceId);
+        const ownerId = storageService.getOwnerId();
+        const cloudHistory = await firebaseService.getHistory(ownerId);
         if (cloudHistory.length > 0) {
           setHistory(prev => {
-            // Hợp nhất và loại bỏ trùng lặp (ví dụ theo timestamp)
             const combined = [...cloudHistory, ...prev];
             const unique = Array.from(new Map(combined.map(item => [item.id, item])).values());
             return unique.sort((a, b) => b.timestamp - a.timestamp).slice(0, 20);
@@ -776,10 +1266,10 @@ export default function App() {
       setGameQuestions(balancedRes);
       setConfig(prev => ({ ...prev, gameStatus: GameStatus.Playing }));
 
-      // Tự động lưu Cloud
-      const { deviceId } = await storageService.getSecurityParams();
-      if (deviceId) {
-        firebaseService.saveHistory(deviceId, {
+      // Tự động lưu Cloud dùng ownerId
+      const ownerId = storageService.getOwnerId();
+      if (ownerId) {
+        firebaseService.saveHistory(ownerId, {
           id: 'game_' + Date.now(),
           timestamp: Date.now(),
           config: { ...config },
@@ -831,7 +1321,14 @@ export default function App() {
         <script type="text/javascript" id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
     </head>
     <body>
-        <div class="header"> <h1>Phiếu Bài Tập Toán Lớp ${config.grade}</h1> <p>${config.customLesson || (config.lessons.length > 0 ? config.lessons.join(", ") : "Tổng hợp")}</p> </div>
+        <div class="header"> 
+            <h1>Phiếu Bài Tập Toán Lớp ${config.grade}</h1> 
+            <p>${config.customLesson || (config.lessons.length > 0 ? config.lessons.join(", ") : "Tổng hợp")}</p> 
+            <div style="margin-top: 15px; font-weight: bold; font-size: 14pt; display: flex; justify-content: space-between; padding: 0 40px; text-align: left;">
+                <span>Họ và tên: ....................................................................</span>
+                <span>Lớp: ${config.grade}............</span>
+            </div>
+        </div>
         ${questionsHtml}
         <div class="answer-section"> <div class="header" style="border:none; margin-bottom:10px;"><h3>BẢNG ĐÁP ÁN</h3></div> ${answersTableHtml} ${detailedSolutionsHtml} </div>
     </body>
@@ -845,10 +1342,159 @@ export default function App() {
     link.click();
   };
 
+  const handleShowStats = async () => {
+    const ownerId = storageService.getOwnerId();
+    if (!ownerId) return alert("Anh cần kích hoạt bản quyền để sử dụng tính năng này nhé.");
+
+    setIsLoading(true);
+    setLoadingMessage("Đang tải dữ liệu thống kê...");
+    try {
+      const results = await firebaseService.getGlobalResults(ownerId);
+      setGlobalResults(results);
+      setShowStatsModal(true);
+    } catch (err) {
+      alert("Lỗi khi tải dữ liệu thống kê!");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVoiceCompose = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return alert("Trình duyệt của anh không hỗ trợ giọng nói. Anh dùng Chrome hoặc Edge nhé!");
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'vi-VN';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    let silenceTimer: any = null;
+    let fullTranscript = "";
+    const SILENCE_LIMIT = 2000; // 2 giây im lặng
+
+    const stopRecognition = () => {
+      if (silenceTimer) clearTimeout(silenceTimer);
+      recognition.stop();
+    };
+
+    recognition.onstart = () => {
+      setIsListening(true);
+      if (silenceTimer) clearTimeout(silenceTimer);
+      silenceTimer = setTimeout(stopRecognition, SILENCE_LIMIT + 1000);
+    };
+
+    recognition.onresult = (event: any) => {
+      if (silenceTimer) clearTimeout(silenceTimer);
+      silenceTimer = setTimeout(stopRecognition, SILENCE_LIMIT);
+
+      let currentTranscript = "";
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          fullTranscript += event.results[i][0].transcript;
+        } else {
+          currentTranscript += event.results[i][0].transcript;
+        }
+      }
+      const combined = (fullTranscript + currentTranscript).toLowerCase();
+      console.log("Alla Dynamic Voice:", combined);
+
+      // Điều kiện kích hoạt đặc biệt: Nếu nghe thấy cụm từ "bắt đầu đi"
+      if (combined.includes("bắt đầu đi") || combined.includes("bắt đầu di")) {
+        console.log("Alla Voice: Trigger 'Bắt đầu đi' detected!");
+        stopRecognition();
+      }
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error("Speech Recognition Error:", event.error);
+      setIsListening(false);
+      if (silenceTimer) clearTimeout(silenceTimer);
+      if (event.error !== 'no-speech') {
+        alert("Lỗi Micro: " + event.error);
+      }
+    };
+
+    recognition.onend = async () => {
+      setIsListening(false);
+      if (silenceTimer) clearTimeout(silenceTimer);
+
+      const finalCommand = fullTranscript.trim();
+      if (finalCommand.length > 3) {
+        setLoadingMessage(`Đang phân tích lệnh: "${finalCommand}"...`);
+        setIsLoading(true);
+
+        try {
+          const partialConfig = await parseVoiceCommand(finalCommand, config);
+          setConfig(prev => {
+            const newConfig = { ...prev, ...partialConfig };
+            setTimeout(() => {
+              handleGenerateWithConfig(newConfig);
+            }, 100);
+            return newConfig;
+          });
+        } catch (err) {
+          alert("Alla không hiểu lệnh này hoặc lỗi kết nối AI.");
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    recognition.start();
+  };
+
+  // Hàm bổ trợ để generate trực tiếp với config mới
+  const handleGenerateWithConfig = async (newConfig: AppState) => {
+    setIsLoading(true); setProgress(0);
+    const progressTimer = setInterval(() => setProgress(prev => prev >= 98 ? 98 : prev + 4), 500);
+    try {
+      const res = await generateQuestions(newConfig);
+      setQuestions(res);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      const ownerId = storageService.getOwnerId();
+      if (ownerId) {
+        firebaseService.saveHistory(ownerId, {
+          id: 'hist_' + Date.now(),
+          timestamp: Date.now(),
+          config: { ...newConfig },
+          questions: res
+        }).catch(console.error);
+      }
+    } catch (e) {
+      alert("Lỗi AI: " + (e as Error).message);
+    } finally {
+      clearInterval(progressTimer);
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-gray-100 font-sans overflow-hidden">
-      <header className="md:hidden bg-primary text-white p-4 flex justify-between items-center sticky top-0 z-30 shadow-lg"> <div className="flex items-center gap-2 font-black uppercase"><BookOpen size={24} /> Soạn Toán AI</div> <div className="flex items-center gap-2"> <button onClick={triggerMath} className="p-2 bg-white/20 rounded-full"><RefreshCw size={20} /></button> <button onClick={() => setIsSidebarOpen(true)} className="p-2"><Menu size={28} /></button> </div> </header>
-      <Sidebar config={config} setConfig={setConfig} onGenerate={handleGenerate} onStartGame={handleStartGame} isLoading={isLoading} onShowHistory={() => setShowHistoryModal(true)} onShowBank={() => setShowBankModal(true)} isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+      <header className="md:hidden bg-primary text-white p-4 flex justify-between items-center sticky top-0 z-30 shadow-lg">
+        <div className="flex items-center gap-2 font-black uppercase"><BookOpen size={24} /> {isViewerMode ? 'BÀI TẬP VỀ NHÀ' : 'Soạn Toán AI'}</div>
+        <div className="flex items-center gap-2">
+          <button onClick={triggerMath} className="p-2 bg-white/20 rounded-full"><RefreshCw size={20} /></button>
+          {!isViewerMode && <button onClick={() => setIsSidebarOpen(true)} className="p-2"><Menu size={28} /></button>}
+        </div>
+      </header>
+      {!isViewerMode ? (
+        <Sidebar
+          config={config}
+          setConfig={setConfig}
+          onGenerate={handleGenerate}
+          onStartGame={handleStartGame}
+          onVoiceCompose={handleVoiceCompose}
+          isListening={isListening}
+          isLoading={isLoading}
+          onShowHistory={() => setShowHistoryModal(true)}
+          onShowBank={() => setShowBankModal(true)}
+          onShowStats={handleShowStats}
+          onSync={handleSync}
+          isSyncing={isSyncing}
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+        />
+      ) : null}
       <main className="flex-1 p-3 md:p-10 overflow-y-auto h-screen relative bg-gray-200/40 no-print">
         {config.gameStatus === GameStatus.Playing && gameQuestions.length > 0 ? (
           <MillionaireGame questions={gameQuestions} grade={config.grade} lessonName={config.customLesson || (config.lessons.length > 0 ? config.lessons.join(", ") : "")} onClose={() => setConfig(prev => ({ ...prev, gameStatus: GameStatus.Idle }))} onRestart={handleStartGame} />
@@ -856,19 +1502,203 @@ export default function App() {
           <div className="h-full flex flex-col items-center justify-center text-gray-400 p-8 text-center max-w-lg mx-auto animate-in fade-in duration-700"> <div className="bg-white p-12 rounded-full shadow-2xl mb-8"><PartyPopper size={100} className="text-primary/15" /></div> <h2 className="text-2xl font-black text-gray-700 mb-3 uppercase tracking-tighter">AI Assistant Sẵn sàng!</h2> <p className="text-base text-gray-500 font-medium italic">Chọn bài học để bắt đầu.</p> </div>
         ) : (
           <div className="max-w-4xl mx-auto bg-white shadow-2xl p-6 md:p-16 min-h-[29.7cm] rounded-none md:rounded-lg animate-in slide-in-from-bottom-6 duration-500 relative">
-            <div className="text-center mb-16 border-b-2 border-black pb-8"> <h1 className="text-2xl md:text-4xl font-black uppercase font-serif text-gray-900 leading-tight">Phiếu Bài Tập Toán Lớp {config.grade}</h1> <p className="text-xl text-gray-500 italic font-serif mt-2">{config.customLesson || (config.lessons.length > 0 ? config.lessons.join(", ") : "Kiểm tra kiến thức")}</p> </div>
-            <div className="content-area"> {questions.map(q => <QuestionItem key={q.id} question={q} onSave={storageService.saveQuestion} />)}
-              {config.answerMode !== AnswerMode.None && (
+            <div className="text-center mb-16 border-b-2 border-black pb-8 relative">
+              <h1 className="text-2xl md:text-4xl font-black uppercase font-serif text-gray-900 leading-tight">
+                {isViewerMode ? 'PHIẾU BÀI TẬP VỀ NHÀ' : `Phiếu Bài Tập Toán Lớp ${config.grade}`}
+              </h1>
+              <p className="text-xl text-gray-500 italic font-serif mt-2">
+                {isViewerMode ? (shareConfig?.customLesson || 'Bài tập được giao') : (config.customLesson || (config.lessons.length > 0 ? config.lessons.join(", ") : "Kiểm tra kiến thức"))}
+              </p>
+            </div>
+
+            {/* THÔNG TIN HỌC SINH LÀM BÀI */}
+            {isViewerMode && !isSubmitted && (
+              <div className="mb-10 bg-indigo-50/50 p-6 rounded-2xl border border-indigo-100 flex flex-col md:flex-row gap-4 max-w-xl mx-auto shadow-sm no-print">
+                <div className="flex-1">
+                  <label className="block text-sm font-bold text-indigo-900 mb-2">Họ và Tên Học Sinh <span className="text-gray-400 font-normal ml-2">(không bắt buộc)</span></label>
+                  <input type="text" value={studentName} onChange={(e) => setStudentName(e.target.value)} placeholder="Nhập họ tên của em..." className="w-full border-2 border-indigo-200 outline-none focus:border-indigo-500 px-4 py-3 rounded-xl font-medium text-gray-800 shadow-sm transition-all" />
+                </div>
+              </div>
+            )}
+
+            {/* NÚT CHIA SẺ DÀNH CHO GIÁO VIÊN */}
+            {!isViewerMode && (
+              <div className="flex justify-end mb-8 no-print">
+                <button
+                  onClick={handleShareLink}
+                  disabled={isSharing}
+                  className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-2.5 px-6 rounded-full shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all text-sm uppercase tracking-wider disabled:opacity-50"
+                >
+                  {isSharing ? <Loader2 size={16} className="animate-spin" /> : <div className="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg> <span>Chia sẻ Link Học Sinh</span></div>}
+                </button>
+              </div>
+            )}
+
+            <div className="content-area"> {questions.map(q => <QuestionItem key={q.id} question={q} onSave={!isViewerMode ? (quest: any) => storageService.saveQuestion(quest) : undefined} readOnly={isViewerMode} studentAnswer={studentAnswers[q.id]} onAnswerChange={(val: any) => setStudentAnswers(prev => ({ ...prev, [q.id]: val }))} showResult={isSubmitted} />)}
+
+              {/* PHU LUC LÀM BÀI CHO HỌC SINH */}
+              {isViewerMode && !isSubmitted && questions.length > 0 && (
+                <div className="mt-12 flex justify-center no-print">
+                  <button disabled={isSubmittingResult} onClick={async () => {
+                    setIsSubmittingResult(true);
+                    try {
+                      let finalScore = 0;
+                      try {
+                        const scoreResult = calculateScore();
+                        finalScore = scoreResult.score || 0;
+                      } catch (scoreErr) {
+                        console.error("Score calculation error:", scoreErr);
+                      }
+
+                      console.log("Alla Submit Debug:", { shareId, finalScore, hasConfig: !!shareConfig, ownerId: shareConfig?.ownerId });
+
+                      if (shareId) {
+                        const finalName = studentName.trim() || 'Khách';
+                        const finalClass = shareConfig?.grade ? `Lớp ${shareConfig.grade}` : 'Không rõ';
+                        const ownerId = shareConfig?.ownerId;
+
+                        // Bước 1: Lưu vào đề (bắt buộc)
+                        try {
+                          await firebaseService.saveStudentResult(shareId, {
+                            studentName: finalName,
+                            studentClass: finalClass,
+                            score: finalScore,
+                            answers: studentAnswers
+                          });
+                        } catch (saveErr: any) {
+                          console.warn("Lưu vào shared_exams failed:", saveErr?.message);
+                        }
+
+                        // Bước 2: Lưu vào thống kê global (không bắt buộc)
+                        if (ownerId) {
+                          try {
+                            await firebaseService.saveGlobalResult(ownerId, {
+                              shareId,
+                              studentName: finalName,
+                              studentClass: finalClass,
+                              score: finalScore,
+                              answers: studentAnswers
+                            });
+                          } catch (globalErr: any) {
+                            console.warn("Lưu vào globalResults failed (không ảnh hưởng):", globalErr?.message);
+                          }
+                        }
+                      } else {
+                        console.warn("Alla: shareId is null, cannot save result!");
+                      }
+                      setIsSubmitted(true);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    } catch (err: any) {
+                      console.error("Submit error:", err);
+                      alert("Lỗi nộp bài: " + (err?.message || err?.code || "Firebase không phản hồi. Anh kiểm tra kết nối mạng."));
+                    } finally {
+                      setIsSubmittingResult(false);
+                    }
+                  }} className="bg-gradient-to-r from-green-500 to-emerald-600 text-white font-black text-xl py-4 px-12 rounded-full shadow-[0_10px_20px_-10px_rgba(16,185,129,0.5)] border-b-4 border-emerald-800 hover:translate-y-1 hover:border-b-0 transition-all uppercase tracking-widest disabled:opacity-50">
+                    {isSubmittingResult ? 'Đang Nộp Bài...' : 'Nộp Bài Ngay'}
+                  </button>
+                </div>
+              )}
+
+              {isViewerMode && isSubmitted && (
+                <div className="mt-12 p-8 bg-gradient-to-br from-indigo-50 to-blue-50 border-2 border-indigo-200 rounded-3xl text-center shadow-inner no-print animate-in zoom-in-95 duration-500">
+                  <h2 className="text-3xl font-black text-indigo-900 mb-2 uppercase">Kết Quả Làm Bài</h2>
+                  <div className="text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 my-6 drop-shadow-sm">{calculateScore().score}<span className="text-3xl text-indigo-400">/10</span></div>
+                  <p className="text-lg text-indigo-700 font-medium">Bên dưới là đáp án chi tiết. Em hãy đối chiếu với bài làm của mình nhé!</p>
+                </div>
+              )}
+
+              {/* ĐÁP ÁN VÀ LỜI GIẢI */}
+              {((!isViewerMode && config.answerMode !== AnswerMode.None) || (isViewerMode && isSubmitted)) && (
                 <div className="mt-20 pt-10 border-t-2 border-dashed border-gray-300 break-before-page">
                   <div className="flex items-center justify-center gap-4 mb-10"> <div className="h-0.5 flex-1 bg-gray-200"></div> <h2 className="text-2xl font-black uppercase tracking-widest text-gray-400">ĐÁP ÁN VÀ LỜI GIẢI</h2> <div className="h-0.5 flex-1 bg-gray-200"></div> </div>
-                  <div className="space-y-10"> {questions.map(q => (<div key={`ans_${q.id}`} className="p-6 bg-gray-50 rounded-3xl border border-gray-200"> <div className="flex items-center gap-3 mb-3"> <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-black">C{q.number}</div> <span className="font-black text-lg text-green-600 uppercase">Đáp án: {q.correctAnswer}</span> </div> {config.answerMode === AnswerMode.Detailed && (<div className="text-base text-gray-700 leading-relaxed font-serif bg-white p-5 rounded-2xl border border-gray-100 shadow-inner" dangerouslySetInnerHTML={{ __html: q.explanation }}></div>)} </div>))} </div>
+                  <div className="space-y-10">
+                    {questions.map(q => {
+                      const isTrueFalse = q.type?.includes('Đúng/Sai') || q.type === 'DUNGSAI';
+                      const resDetails = calculateScore().details[q.id];
+
+                      let tfAnswers: (string | null)[] = [null, null, null, null];
+                      if (isTrueFalse) {
+                        let tfMap = parseTFCorrectAnswer(String(q.correctAnswer));
+                        if (Object.keys(tfMap).length < 4 && q.explanation) {
+                          const fallbackMap = parseTFCorrectAnswer(q.explanation);
+                          if (Object.keys(fallbackMap).length > Object.keys(tfMap).length) {
+                            tfMap = fallbackMap;
+                          }
+                        }
+
+                        // Map kết quả vào bảng dựa trên chữ cái trong choice
+                        (q.choices || []).forEach((choiceText: string, idx: number) => {
+                          const lowerLevel = choiceText.toLowerCase();
+                          let letterFound = '';
+                          ['a', 'b', 'c', 'd'].forEach(l => {
+                            if (lowerLevel.startsWith(l + ')') || lowerLevel.includes(' ' + l + ')') || lowerLevel.includes('>' + l + ')')) {
+                              letterFound = l;
+                            }
+                          });
+                          if (!letterFound) {
+                            const match = lowerLevel.match(/([abcd])\)/);
+                            if (match) letterFound = match[1];
+                          }
+
+                          const finalLetter = letterFound || ['a', 'b', 'c', 'd'][idx];
+                          const ans = tfMap[finalLetter];
+                          tfAnswers[idx] = ans === 'Đ' ? 'Đúng' : (ans === 'S' ? 'Sai' : '?');
+                        });
+                      }
+
+                      return (
+                        <div key={`ans_${q.id}`} className="p-6 bg-gray-50 rounded-3xl border border-gray-200">
+                          <div className="flex flex-col md:flex-row md:items-center gap-3 mb-4">
+                            <div className="w-10 h-10 shrink-0 rounded-full bg-primary text-white flex items-center justify-center font-black">C{q.number}</div>
+                            <span className={`font-black text-lg uppercase ${resDetails?.isCorrect ? 'text-green-600' : 'text-red-500'}`}>
+                              Câu {q.number}: {resDetails?.label} - {resDetails?.score} điểm
+                            </span>
+                          </div>
+
+                          {isTrueFalse && (
+                            <div className="mb-4 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+                              <table className="w-full text-center text-sm md:text-base">
+                                <thead>
+                                  <tr className="bg-gray-100/50 text-gray-600 font-bold border-b border-gray-200">
+                                    <th className="py-2 border-r border-gray-200 w-1/4">Phát biểu a)</th>
+                                    <th className="py-2 border-r border-gray-200 w-1/4">Phát biểu b)</th>
+                                    <th className="py-2 border-r border-gray-200 w-1/4">Phát biểu c)</th>
+                                    <th className="py-2 w-1/4">Phát biểu d)</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  <tr className="font-black font-serif text-lg">
+                                    <td className={`py-3 border-r border-gray-200 ${tfAnswers[0] === 'Đúng' ? 'text-green-600' : 'text-red-500'}`}>{tfAnswers[0]}</td>
+                                    <td className={`py-3 border-r border-gray-200 ${tfAnswers[1] === 'Đúng' ? 'text-green-600' : 'text-red-500'}`}>{tfAnswers[1]}</td>
+                                    <td className={`py-3 border-r border-gray-200 ${tfAnswers[2] === 'Đúng' ? 'text-green-600' : 'text-red-500'}`}>{tfAnswers[2]}</td>
+                                    <td className={`py-3 ${tfAnswers[3] === 'Đúng' ? 'text-green-600' : 'text-red-500'}`}>{tfAnswers[3]}</td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+
+                          {(!isViewerMode ? config.answerMode === AnswerMode.Detailed : true) && q.explanation && (
+                            <MathContent html={q.explanation} className="text-base text-gray-700 leading-relaxed font-serif bg-white p-5 rounded-2xl border border-gray-100 shadow-inner" />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
           </div>
         )}
-        {questions.length > 0 && config.gameStatus === GameStatus.Idle && (
-          <div className="fixed bottom-8 right-8 flex flex-col gap-4 no-print z-40"> <button onClick={triggerMath} title="Làm mới" className="bg-blue-600 text-white p-5 rounded-2xl shadow-2xl border-b-4 border-blue-800"><RefreshCw size={28} /></button> <button onClick={handleExportHTML} title="Xuất HTML" className="bg-amber-600 text-white p-5 rounded-2xl shadow-2xl border-b-4 border-amber-800"><FileCode size={28} /></button> <button onClick={() => window.print()} title="In" className="bg-green-600 text-white p-5 rounded-2xl shadow-2xl border-b-4 border-green-800"><Printer size={28} /></button> <button onClick={handleGenerate} title="Soạn lại" className="bg-primary text-white p-5 rounded-2xl shadow-2xl hover:scale-110 transition-all active:scale-90 border-b-4 border-blue-900"><PlusCircle size={28} /></button> </div>
+        {questions.length > 0 && config.gameStatus === GameStatus.Idle && !isViewerMode && (
+          <div className="fixed bottom-8 right-8 flex flex-col gap-4 no-print z-40">
+            <button onClick={handleShareLink} title="Chia sẻ Link cho Phụ huynh/Học sinh" className="bg-indigo-600 text-white p-5 rounded-2xl shadow-2xl border-b-4 border-indigo-800 flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg></button>
+            <button onClick={triggerMath} title="Làm mới" className="bg-blue-600 text-white p-5 rounded-2xl shadow-2xl border-b-4 border-blue-800"><RefreshCw size={28} /></button>
+            <button onClick={handleExportHTML} title="Xuất HTML" className="bg-amber-600 text-white p-5 rounded-2xl shadow-2xl border-b-4 border-amber-800"><FileCode size={28} /></button>
+            <button onClick={() => window.print()} title="In" className="bg-green-600 text-white p-5 rounded-2xl shadow-2xl border-b-4 border-green-800"><Printer size={28} /></button>
+            <button onClick={handleGenerate} title="Soạn lại" className="bg-primary text-white p-5 rounded-2xl shadow-2xl hover:scale-110 transition-all active:scale-90 border-b-4 border-blue-900"><PlusCircle size={28} /></button>
+          </div>
         )}
       </main>
       {isSyncing && (
@@ -884,7 +1714,7 @@ export default function App() {
         <div className="fixed inset-0 bg-black/50 z-[100] flex flex-col items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white p-8 rounded-3xl shadow-2xl max-w-md w-full text-center space-y-6 border-4 border-white animate-in zoom-in-95">
             <div className="relative w-24 h-24 mx-auto"> <div className="absolute inset-0 rounded-full border-8 border-gray-100"></div> <div className="absolute inset-0 rounded-full border-8 border-primary border-t-transparent animate-spin"></div> <div className="absolute inset-0 flex items-center justify-center font-black text-2xl text-primary">{Math.round(progress)}%</div> </div>
-            <h3 className="text-xl font-black text-gray-800 uppercase tracking-tighter">AI Đang soạn thảo...</h3>
+            <h3 className="text-xl font-black text-gray-800 uppercase tracking-tighter">{loadingMessage}</h3>
             <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden shadow-inner"><div className="bg-primary h-full transition-all duration-300" style={{ width: `${progress}%` }}></div></div>
           </div>
         </div>
@@ -893,7 +1723,224 @@ export default function App() {
         <div className="fixed inset-0 bg-black/70 z-[70] flex items-center justify-center p-6 animate-in fade-in">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg h-full md:max-h-[85vh] flex flex-col overflow-hidden">
             <div className="p-6 border-b flex justify-between items-center bg-gray-50"> <h2 className="font-black text-sm uppercase text-primary flex items-center gap-2"><History size={18} /> Nhật ký</h2> <button onClick={() => setShowHistoryModal(false)} className="p-2"><X size={24} /></button> </div>
-            <div className="flex-1 overflow-y-auto p-6 space-y-4"> {history.length === 0 ? <p className="text-center text-gray-400 py-12">Trống</p> : history.map(item => (<div key={item.id} className="border border-gray-200 rounded-2xl p-4 hover:border-primary hover:bg-blue-50 cursor-pointer" onClick={() => { setQuestions(item.questions); setConfig(item.config); setShowHistoryModal(false); }}> <div className="flex justify-between items-center"> <p className="font-black text-gray-800">Lớp {item.config.grade}</p> <ChevronRight size={16} /> </div> <p className="text-[10px] text-gray-400 mt-1">{new Date(item.timestamp).toLocaleString()}</p> </div>))} </div>
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {history.length === 0 ? <p className="text-center text-gray-400 py-12">Trống</p> : history.map(item => (
+                <div key={item.id} className="border border-gray-200 rounded-2xl p-4 hover:border-primary hover:bg-blue-50 cursor-pointer">
+                  <div className="flex justify-between items-center" onClick={() => { setQuestions(item.questions); setConfig(item.config); setShowHistoryModal(false); }}>
+                    <p className="font-black text-gray-800">Lớp {item.config.grade}</p>
+                    <ChevronRight size={16} />
+                  </div>
+                  <div className="flex justify-between items-center mt-2">
+                    <p className="text-[10px] text-gray-400">{new Date(item.timestamp).toLocaleString()}</p>
+                    {item.shareId && (
+                      <button onClick={async (e) => {
+                        e.stopPropagation();
+                        try {
+                          setLoadingMessage("Đang tải bảng điểm...");
+                          setIsLoading(true);
+                          const res = await firebaseService.getStudentResults(item.shareId!);
+                          setResultsData(res);
+                          setShowResultsModal(true);
+                        } catch (err) {
+                          alert("Lỗi tải bảng điểm!");
+                        } finally {
+                          setIsLoading(false);
+                        }
+                      }} className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold hover:bg-indigo-200 transition-colors">
+                        Bảng Điểm
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL THỐNG KÊ TOÀN DIỆN */}
+      {showStatsModal && (
+        <div className="fixed inset-0 bg-black/70 z-[80] flex items-center justify-center p-4 md:p-10 animate-in fade-in">
+          <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-6xl h-full md:max-h-[90vh] flex flex-col overflow-hidden border-4 border-indigo-100">
+            <div className="p-8 border-b flex justify-between items-center bg-gradient-to-r from-indigo-50 to-blue-50">
+              <div>
+                <h2 className="font-black text-2xl uppercase text-indigo-900 flex items-center gap-3">
+                  <Award className="text-indigo-600" size={32} />
+                  Báo Cáo Thống Kê Điểm Số
+                  <button onClick={handleShowStats} className="ml-2 p-2 text-indigo-500 hover:bg-indigo-50 rounded-full transition-colors" title="Làm mới dữ liệu">
+                    <RefreshCw size={24} className={isLoading ? "animate-spin" : ""} />
+                  </button>
+                </h2>
+                <p className="text-gray-500 font-medium text-sm mt-1">Phân tích kết quả học tập của tất cả học sinh</p>
+              </div>
+              <button onClick={() => setShowStatsModal(false)} className="p-3 hover:bg-white rounded-full transition-colors shadow-sm"><X size={32} /></button>
+            </div>
+
+            {/* BỘ LỌC */}
+            <div className="p-6 bg-gray-50/80 border-b flex flex-col md:flex-row gap-6 items-end">
+              <div className="flex-1 w-full">
+                <label className="block text-[10px] font-black text-gray-400 mb-2 uppercase tracking-widest">Lọc theo Tháng</label>
+                <input
+                  type="month"
+                  value={statsMonth}
+                  onChange={(e) => setStatsMonth(e.target.value)}
+                  className="w-full border-2 border-gray-200 rounded-2xl p-3 font-bold text-gray-700 outline-none focus:border-indigo-500 bg-white transition-all shadow-sm"
+                />
+              </div>
+              <div className="flex-1 w-full">
+                <label className="block text-[10px] font-black text-gray-400 mb-2 uppercase tracking-widest">Lọc theo Lớp</label>
+                <select
+                  value={statsClass}
+                  onChange={(e) => setStatsClass(e.target.value)}
+                  className="w-full border-2 border-gray-200 rounded-2xl p-3 font-bold text-gray-700 outline-none focus:border-indigo-500 bg-white transition-all shadow-sm"
+                >
+                  <option value="All">Tất cả các lớp</option>
+                  {Array.from(new Set(globalResults.map(r => r.studentClass))).filter(Boolean).map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex-1 w-full md:w-auto">
+                <div className="bg-indigo-600 text-white p-3 rounded-2xl flex items-center justify-between shadow-lg">
+                  <div className="px-2">
+                    <p className="text-[10px] font-black uppercase opacity-60">Tổng số bài làm</p>
+                    <p className="text-2xl font-black">
+                      {globalResults.filter(r => {
+                        const dateMatch = r.submittedAt?.startsWith(statsMonth);
+                        const classMatch = statsClass === "All" || r.studentClass === statsClass;
+                        return dateMatch && classMatch;
+                      }).length}
+                    </p>
+                  </div>
+                  <Sparkles size={24} className="mr-2 opacity-50" />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-8">
+              {globalResults.length === 0 ? (
+                <div className="text-center py-32">
+                  <div className="bg-gray-100 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <History size={48} className="text-gray-300" />
+                  </div>
+                  <p className="text-gray-400 font-bold uppercase tracking-widest text-sm">Chưa có dữ liệu thống kê tập trung.</p>
+                  <p className="text-gray-300 text-xs mt-2 italic">Dữ liệu sẽ bắt đầu cập nhật từ các bài nộp mới nhất.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="overflow-x-auto rounded-[30px] border border-gray-200 shadow-xl bg-white">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-indigo-900 text-white text-[10px] font-black uppercase tracking-[0.2em]">
+                          <th className="px-8 py-5">Học Sinh</th>
+                          <th className="px-8 py-5">Lớp / Nhãn</th>
+                          <th className="px-8 py-5 text-center">Điểm số</th>
+                          <th className="px-8 py-5">Thời gian nộp</th>
+                          <th className="px-8 py-5">Hành động</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {globalResults
+                          .filter(r => {
+                            const dateMatch = r.submittedAt?.startsWith(statsMonth);
+                            const classMatch = statsClass === "All" || r.studentClass === statsClass;
+                            return dateMatch && classMatch;
+                          })
+                          .map((res: any, idx: number) => (
+                            <tr key={idx} className="hover:bg-indigo-50/50 transition-colors group">
+                              <td className="px-8 py-5">
+                                <p className="font-black text-gray-900 text-lg">{res.studentName}</p>
+                                <p className="text-[10px] text-indigo-400 font-bold uppercase">ID: {res.id?.substring(0, 8)}</p>
+                              </td>
+                              <td className="px-8 py-5">
+                                <span className="px-4 py-1.5 bg-gray-100 text-gray-600 rounded-full text-[11px] font-black uppercase border border-gray-200">
+                                  {res.studentClass || 'Tự do'}
+                                </span>
+                              </td>
+                              <td className="px-8 py-5 text-center">
+                                <div className={`inline-flex items-center gap-2 px-5 py-2 rounded-2xl font-black text-xl shadow-sm ${res.score >= 8 ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : res.score >= 5 ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>
+                                  {res.score}
+                                  <span className="text-[10px] opacity-50 uppercase">/ 10</span>
+                                </div>
+                              </td>
+                              <td className="px-8 py-5">
+                                <p className="text-gray-500 font-bold text-sm">{new Date(res.submittedAt).toLocaleDateString('vi-VN')}</p>
+                                <p className="text-[10px] text-gray-400 uppercase font-medium">{new Date(res.submittedAt).toLocaleTimeString('vi-VN')}</p>
+                              </td>
+                              <td className="px-8 py-5">
+                                <button
+                                  onClick={async () => {
+                                    setLoadingMessage("Đang tải đề gốc...");
+                                    setIsLoading(true);
+                                    try {
+                                      const data = await firebaseService.getSharedExam(res.shareId);
+                                      if (data) {
+                                        setQuestions(data.questions);
+                                        setShareConfig(data.config);
+                                        setStudentAnswers(res.answers || {});
+                                        setIsSubmitted(true);
+                                        setIsViewerMode(true);
+                                        setShowStatsModal(false);
+                                      }
+                                    } catch (e) { alert("Lỗi tải đề!"); }
+                                    finally { setIsLoading(false); }
+                                  }}
+                                  className="p-3 bg-white border-2 border-gray-200 text-gray-400 rounded-2xl hover:border-indigo-500 hover:text-indigo-600 transition-all group-hover:shadow-md"
+                                  title="Xem chi tiết bài làm của em này"
+                                >
+                                  <Search size={20} />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL BẢNG ĐIỂM HỌC SINH */}
+      {showResultsModal && (
+        <div className="fixed inset-0 bg-black/70 z-[80] flex items-center justify-center p-6 animate-in fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl h-full md:max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="p-6 border-b flex justify-between items-center bg-indigo-50">
+              <h2 className="font-black text-lg uppercase text-indigo-900 flex items-center gap-2">Bảng Điểm Tổng Hợp</h2>
+              <button onClick={() => setShowResultsModal(false)} className="p-2"><X size={24} /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              {resultsData.length === 0 ? (
+                <div className="text-center py-20 text-gray-500 font-medium tracking-wide">Chưa có học sinh nào nộp bài ở đề này.</div>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-gray-100 text-gray-700 text-sm font-bold uppercase tracking-wider">
+                        <th className="px-6 py-4 border-b">Học Sinh</th>
+                        <th className="px-6 py-4 border-b">Lớp</th>
+                        <th className="px-6 py-4 border-b text-center">Điểm</th>
+                        <th className="px-6 py-4 border-b">Thời gian nộp</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 bg-white">
+                      {resultsData.map((res: any, idx: number) => (
+                        <tr key={idx} className="hover:bg-indigo-50/30 transition-colors">
+                          <td className="px-6 py-4 font-bold text-gray-900">{res.studentName}</td>
+                          <td className="px-6 py-4 text-gray-600 font-medium">{res.studentClass}</td>
+                          <td className="px-6 py-4 text-center">
+                            <span className="inline-block px-3 py-1 rounded-full text-sm font-black bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-sm">{res.score}/10</span>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500">{new Date(res.submittedAt).toLocaleString('vi-VN')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -906,37 +1953,77 @@ export default function App() {
         </div>
       )}
       {showActivateModal && (
-        <div className="fixed inset-0 bg-[#000830]/95 z-[200] flex items-center justify-center p-6 backdrop-blur-md animate-in fade-in duration-500">
-          <div className="bg-white rounded-[40px] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.5)] w-full max-w-md p-10 text-center border-4 border-blue-600/20 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600"></div>
-            <div className="bg-blue-600 w-24 h-24 rounded-3xl rotate-12 flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-blue-500/20">
-              <ShieldAlert size={48} className="text-white -rotate-12" />
-            </div>
-            <h2 className="text-3xl font-black text-gray-900 uppercase tracking-tighter mb-2">Kích hoạt Bản quyền</h2>
-            <p className="text-gray-500 text-sm font-medium mb-8 leading-relaxed px-4">Vui lòng nhập mã kích hoạt được cung cấp để bắt đầu trải nghiệm hệ thống Soạn Toán AI v5.</p>
+        <div className="fixed inset-0 bg-[#000000]/95 z-[200] flex items-center justify-center p-6 backdrop-blur-xl animate-in fade-in duration-500 font-sans">
+          <div className="bg-gradient-to-b from-[#111928] to-[#0A0F1C] rounded-[32px] w-full max-w-[440px] p-10 text-center border-2 border-cyan-800/40 relative overflow-hidden shadow-[0_0_80px_-15px_rgba(6,182,212,0.3)]">
 
-            <div className="space-y-4">
+            {/* Hiệu ứng viền Cyberpunk */}
+            <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-transparent via-cyan-400 to-transparent"></div>
+            <div className="absolute bottom-0 left-0 w-full h-[3px] bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-50"></div>
+            <div className="absolute top-4 left-4 w-4 h-4 border-t-2 border-l-2 border-cyan-500/50 rounded-tl-lg"></div>
+            <div className="absolute top-4 right-4 w-4 h-4 border-t-2 border-r-2 border-cyan-500/50 rounded-tr-lg"></div>
+            <div className="absolute bottom-4 left-4 w-4 h-4 border-b-2 border-l-2 border-cyan-500/50 rounded-bl-lg"></div>
+            <div className="absolute bottom-4 right-4 w-4 h-4 border-b-2 border-r-2 border-cyan-500/50 rounded-br-lg"></div>
+
+            {/* Icon Khiên Neon */}
+            <div className="relative w-28 h-28 mx-auto mb-8 flex items-center justify-center">
+              <div className="absolute inset-0 bg-cyan-500/20 blur-2xl rounded-full"></div>
+              <div className="absolute inset-2 bg-gradient-to-b from-[#1E293B] to-[#0F172A] border-[3px] border-cyan-500 rounded-2xl rotate-45 flex items-center justify-center shadow-[0_0_30px_rgba(6,182,212,0.4)]"></div>
+              <ShieldAlert size={52} className="text-cyan-400 relative z-10 drop-shadow-[0_0_10px_rgba(6,182,212,0.8)]" />
+            </div>
+
+            <h2 className="text-[26px] font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-cyan-200 uppercase tracking-widest mb-3">Hệ thống bảo mật</h2>
+            <p className="text-cyan-100/60 text-[13px] font-medium mb-10 leading-relaxed px-2">Vui lòng nhập mã kích hoạt được cung cấp để bắt đầu trải nghiệm hệ thống Soạn Toán AI v5.</p>
+
+            <div className="space-y-4 relative z-10">
               <div className="relative group">
                 <input
                   type="text"
                   value={activationToken}
                   onChange={(e) => setActivationToken(e.target.value)}
                   placeholder="Nhập Token của bạn..."
-                  className="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl px-6 py-5 font-bold text-center focus:border-blue-600 outline-none transition-all group-hover:border-gray-200"
+                  className="w-full bg-[#1A253A]/80 border border-cyan-800/60 rounded-xl px-12 py-4 font-bold text-center text-cyan-50 placeholder:text-cyan-700 focus:border-cyan-400 focus:bg-[#1E2E4A]/80 flex items-center outline-none transition-all group-hover:border-cyan-500 shadow-inner"
                 />
-                <FileSignature size={18} className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400" />
+                <div className="absolute left-5 top-1/2 -translate-y-1/2 flex gap-1.5 items-center">
+                  <div className="w-4 h-4 border border-cyan-500 rounded-sm opacity-60"></div>
+                  <FileSignature size={18} className="text-cyan-500" />
+                </div>
               </div>
 
               <button
                 onClick={handleActivate}
                 disabled={isActivating}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-black py-5 rounded-2xl shadow-xl shadow-blue-600/20 transition-all flex items-center justify-center gap-3 uppercase tracking-widest text-sm"
+                className="relative overflow-hidden w-full bg-gradient-to-r from-blue-700 via-cyan-600 to-blue-700 hover:from-cyan-500 hover:to-blue-500 disabled:from-slate-700 disabled:to-slate-800 text-white font-black py-4.5 rounded-xl transition-all flex items-center justify-center gap-3 uppercase tracking-[0.2em] text-[13px] group border border-cyan-300/30"
               >
-                {isActivating ? <Loader2 className="animate-spin" /> : <>Kích hoạt ngay <ArrowRight size={18} /></>}
+                <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPjxyZWN0IHdpZHRoPSI0IiBoZWlnaHQ9IjQiIGZpbGw9IiNmZmZmZmYwNSIvPjwvc3ZnPg==')] opacity-50 mix-blend-overlay pointer-events-none"></div>
+                {isActivating ? <Loader2 className="animate-spin" /> : <>Kích hoạt ngay <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" /></>}
+              </button>
+
+              <div className="flex items-center justify-center gap-4 my-6 opacity-60">
+                <div className="h-[1px] w-12 bg-gradient-to-r from-transparent to-cyan-700"></div>
+                <span className="text-[10px] text-cyan-400 font-bold tracking-widest uppercase">OR</span>
+                <div className="h-[1px] w-12 bg-gradient-to-l from-transparent to-cyan-700"></div>
+              </div>
+
+              <button
+                onClick={() => {
+                  const input = window.prompt("Dán link bài tập vào đây (hoặc chỉ dán mã share):");
+                  if (!input) return;
+                  let shareCode = input.trim();
+                  const match = shareCode.match(/[?&]share=([^&]+)/);
+                  if (match) shareCode = match[1];
+                  if (shareCode) {
+                    window.location.href = `${window.location.pathname}?share=${shareCode}`;
+                  } else {
+                    alert("Mã không hợp lệ. Vui lòng thử lại.");
+                  }
+                }}
+                className="w-full bg-[#0F1D15] hover:bg-[#163024] border border-emerald-500/40 text-emerald-400 hover:text-emerald-300 font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 uppercase tracking-wide text-[12px] shadow-[inset_0_0_15px_rgba(16,185,129,0.1)] hover:shadow-[inset_0_0_20px_rgba(16,185,129,0.2)]"
+              >
+                <PenLine size={16} /> Chỉ Phục Vụ Làm Bài
               </button>
             </div>
 
-            <p className="mt-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Alla v5.3.3 (Auto-Retry + Fallback)</p>
+            <p className="mt-10 text-[9px] font-bold text-cyan-800/60 uppercase tracking-[0.3em]">Xây dựng bởi ThuongVd & Alla v5.2</p>
           </div>
         </div>
       )}

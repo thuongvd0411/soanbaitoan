@@ -45,9 +45,9 @@ export const firebaseService = {
      * Lưu một câu hỏi vào kho tư liệu trên Cloud
      */
     async saveQuestion(deviceId: string, question: Question): Promise<void> {
-        if (!deviceId) return;
+        // Tắt filter deviceId theo yêu cầu mới
         try {
-            const qRef = doc(db, "users", deviceId, "questionBank", question.id);
+            const qRef = doc(db, "global_questionBank", question.id);
             await setDoc(qRef, {
                 ...question,
                 updatedAt: new Date().toISOString()
@@ -62,9 +62,9 @@ export const firebaseService = {
      * Tải toàn bộ kho tư liệu từ Cloud
      */
     async getBank(deviceId: string): Promise<Question[]> {
-        if (!deviceId) return [];
+        // Tắt filter deviceId
         try {
-            const bankRef = collection(db, "users", deviceId, "questionBank");
+            const bankRef = collection(db, "global_questionBank");
             const q = query(bankRef, orderBy("number", "asc"));
             const querySnapshot = await getDocs(q);
             const questions: Question[] = [];
@@ -82,9 +82,8 @@ export const firebaseService = {
      * Xóa một câu hỏi khỏi Cloud
      */
     async deleteQuestion(deviceId: string, questionId: string): Promise<void> {
-        if (!deviceId) return;
         try {
-            const qRef = doc(db, "users", deviceId, "questionBank", questionId);
+            const qRef = doc(db, "global_questionBank", questionId);
             await deleteDoc(qRef);
         } catch (error) {
             console.error("Firebase deleteQuestion error:", error);
@@ -95,9 +94,8 @@ export const firebaseService = {
      * Lưu lịch sử soạn thảo lên Cloud
      */
     async saveHistory(deviceId: string, historyItem: HistoryItem): Promise<void> {
-        if (!deviceId) return;
         try {
-            const hRef = doc(db, "users", deviceId, "history", historyItem.id);
+            const hRef = doc(db, "global_history", historyItem.id);
             await setDoc(hRef, {
                 ...historyItem,
                 updatedAt: new Date().toISOString()
@@ -111,9 +109,8 @@ export const firebaseService = {
      * Tải lịch sử từ Cloud
      */
     async getHistory(deviceId: string): Promise<HistoryItem[]> {
-        if (!deviceId) return [];
         try {
-            const historyRef = collection(db, "users", deviceId, "history");
+            const historyRef = collection(db, "global_history");
             const q = query(historyRef, orderBy("timestamp", "desc"));
             const querySnapshot = await getDocs(q);
             const history: HistoryItem[] = [];
@@ -214,10 +211,9 @@ export const firebaseService = {
      * Lưu kết quả vào thống kê global của giáo viên
      */
     async saveGlobalResult(ownerId: string, result: any): Promise<void> {
-        if (!ownerId) return;
         try {
             const timestamp = new Date().toISOString();
-            const globalRef = doc(collection(db, "users", ownerId, "globalResults"));
+            const globalRef = doc(collection(db, "global_results"));
             await setDoc(globalRef, {
                 id: globalRef.id,
                 ...result,
@@ -251,9 +247,8 @@ export const firebaseService = {
      * Lấy toàn bộ kết quả của tất cả các đề (phục vụ thống kê)
      */
     async getGlobalResults(ownerId: string): Promise<any[]> {
-        if (!ownerId) return [];
         try {
-            const resultsRef = collection(db, "users", ownerId, "globalResults");
+            const resultsRef = collection(db, "global_results");
             const q = query(resultsRef, orderBy("submittedAt", "desc"));
             const snapshot = await getDocs(q);
             const results: any[] = [];
@@ -262,6 +257,19 @@ export const firebaseService = {
         } catch (error) {
             console.error("Firebase getGlobalResults error:", error);
             return [];
+        }
+    },
+
+    /**
+     * Xóa một kết quả khỏi dữ liệu chung
+     */
+    async deleteGlobalResult(resultId: string): Promise<void> {
+        if (!resultId) return;
+        try {
+            await deleteDoc(doc(db, "global_results", resultId));
+        } catch (error) {
+            console.error("Firebase deleteGlobalResult error:", error);
+            throw error;
         }
     }
 };
