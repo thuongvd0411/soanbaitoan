@@ -744,19 +744,47 @@ export default function App() {
 
       if (isTrueFalse) {
         // Fallback logic: thử parse từ correctAnswer, nếu không ra gì thì thử explanation
-        let tfResult = parseTFCorrectAnswer(String(q.correctAnswer));
-        if (Object.keys(tfResult).length < 4 && q.explanation) {
-          console.log(`Alla T/F Fallback for C${q.number} (trying explanation)`);
-          const fallbackResult = parseTFCorrectAnswer(q.explanation);
-          if (Object.keys(fallbackResult).length >= Object.keys(tfResult).length) {
-            tfResult = fallbackResult;
+        let tfMap = parseTFCorrectAnswer(String(q.correctAnswer));
+        if (Object.keys(tfMap).length < 4 && q.explanation) {
+          const fallbackMap = parseTFCorrectAnswer(q.explanation);
+          // Lấy map nào có nhiều key hơn
+          if (Object.keys(fallbackMap).length > Object.keys(tfMap).length) {
+            tfMap = fallbackMap;
           }
         }
 
         let correctParts = 0;
-        for (let i = 0; i < 4; i++) {
-          if (tfResult[i] && uAns[i] === tfResult[i]) correctParts++;
-        }
+        const choices = q.choices || [];
+
+        // So sánh bằng cách tìm chữ cái a, b, c, d trong nội dung choice
+        choices.forEach((choiceText: string, idx: number) => {
+          const studentAns = uAns[idx];
+          if (!studentAns) return;
+
+          // Tìm xem choice này là câu a, b, c hay d
+          const lowerLevel = choiceText.toLowerCase();
+          let letterFound = '';
+          ['a', 'b', 'c', 'd'].forEach(l => {
+            if (lowerLevel.startsWith(l + ')') || lowerLevel.includes(' ' + l + ')') || lowerLevel.includes('>' + l + ')')) {
+              letterFound = l;
+            }
+          });
+
+          // Nếu không thấy ở đầu, thử regex
+          if (!letterFound) {
+            const match = lowerLevel.match(/([abcd])\)/);
+            if (match) letterFound = match[1];
+          }
+
+          if (letterFound && tfMap[letterFound] === studentAns) {
+            correctParts++;
+          } else if (!letterFound) {
+            // Fallback: nếu không tìm thấy chữ cái trong choice, dùng index dự phòng
+            const fallbackLetter = ['a', 'b', 'c', 'd'][idx];
+            if (tfMap[fallbackLetter] === studentAns) correctParts++;
+          }
+        });
+
         const questionScore = (correctParts / 4) * pointsPerQuestion;
         totalCorrect += (correctParts / 4);
         details[q.id] = {
@@ -787,25 +815,25 @@ export default function App() {
     return { score: finalScore, details };
   };
 
-  // Hàm helper: parse đáp án Đúng/Sai linh hoạt — xử lý mọi format AI trả về
-  const parseTFCorrectAnswer = (correctAnswer: string): Record<number, 'Đ' | 'S'> => {
+  // Hàm helper: parse đáp án Đúng/Sai linh hoạt — trả về Map theo chữ cái a, b, c, d
+  const parseTFCorrectAnswer = (correctAnswer: string): Record<string, 'Đ' | 'S'> => {
     try {
       const str = correctAnswer;
       const lowerStr = str.toLowerCase();
-      const result: Record<number, 'Đ' | 'S'> = {};
+      const result: Record<string, 'Đ' | 'S'> = {};
       const letters = ['a', 'b', 'c', 'd'];
 
       // Tìm vị trí của a), b), c), d) trong chuỗi
-      const positions: { idx: number; pos: number }[] = [];
-      for (let i = 0; i < 4; i++) {
-        const pattern = letters[i] + ')';
+      const positions: { letter: string; pos: number }[] = [];
+      for (const l of letters) {
+        const pattern = l + ')';
         let searchFrom = 0;
         while (true) {
           const found = lowerStr.indexOf(pattern, searchFrom);
           if (found === -1) break;
           // Chấp nhận nếu ở đầu, sau dấu cách/phẩy/chấm HOẶC sau dấu ) của LaTeX
           if (found === 0 || /[\s,.;\)]/.test(lowerStr[found - 1])) {
-            positions.push({ idx: i, pos: found });
+            positions.push({ letter: l, pos: found });
             break;
           }
           searchFrom = found + 1;
@@ -820,22 +848,22 @@ export default function App() {
         const end = p + 1 < positions.length ? positions[p + 1].pos : str.length;
         const segment = str.substring(start, end).toLowerCase();
 
-        // Kiểm tra 30 ký tự đầu của segment (ví dụ: "a) đúng theo quy...")
-        const head = segment.substring(0, Math.min(30, segment.length));
+        // Kiểm tra 40 ký tự đầu của segment
+        const head = segment.substring(0, Math.min(40, segment.length));
         if (head.includes('đúng') || head.includes('đ)') || head.match(/[):]\s*đ(?!\w)/)) {
-          result[positions[p].idx] = 'Đ';
+          result[positions[p].letter] = 'Đ';
         } else if (head.includes('sai') || head.includes('s)') || head.match(/[):]\s*s(?!\w)/)) {
-          result[positions[p].idx] = 'S';
+          result[positions[p].letter] = 'S';
         } else {
           // Fallback: tìm từ cuối cùng "đúng" hoặc "sai" trong toàn đoạn
           const lastD = segment.lastIndexOf('đúng');
           const lastS = segment.lastIndexOf('sai');
-          if (lastD > lastS && lastD !== -1) result[positions[p].idx] = 'Đ';
-          else if (lastS !== -1) result[positions[p].idx] = 'S';
+          if (lastD > lastS && lastD !== -1) result[positions[p].letter] = 'Đ';
+          else if (lastS !== -1) result[positions[p].letter] = 'S';
         }
       }
 
-      console.log('Alla T/F Parser:', { input: correctAnswer.substring(0, 80), result });
+      console.log('Alla T/F Parser Result:', result);
       return result;
     } catch (e) {
       console.error("parseTFCorrectAnswer error:", e);
@@ -1589,20 +1617,34 @@ export default function App() {
                       const isTrueFalse = q.type?.includes('Đúng/Sai') || q.type === 'DUNGSAI';
                       const resDetails = calculateScore().details[q.id];
 
-                      // Hàm parse kết quả Đ/S từ chuỗi "a)Đ, b)S, c)Đ, d)S" ra mảng 4 phân tử [Đ, S, Đ, S]
                       let tfAnswers: (string | null)[] = [null, null, null, null];
                       if (isTrueFalse) {
-                        let tfParsed = parseTFCorrectAnswer(String(q.correctAnswer));
-                        // Fallback render logic
-                        if (Object.keys(tfParsed).length < 4 && q.explanation) {
-                          const fallbackParsed = parseTFCorrectAnswer(q.explanation);
-                          if (Object.keys(fallbackParsed).length >= Object.keys(tfParsed).length) {
-                            tfParsed = fallbackParsed;
+                        let tfMap = parseTFCorrectAnswer(String(q.correctAnswer));
+                        if (Object.keys(tfMap).length < 4 && q.explanation) {
+                          const fallbackMap = parseTFCorrectAnswer(q.explanation);
+                          if (Object.keys(fallbackMap).length > Object.keys(tfMap).length) {
+                            tfMap = fallbackMap;
                           }
                         }
-                        for (let i = 0; i < 4; i++) {
-                          tfAnswers[i] = tfParsed[i] === 'Đ' ? 'Đúng' : (tfParsed[i] === 'S' ? 'Sai' : '?');
-                        }
+
+                        // Map kết quả vào bảng dựa trên chữ cái trong choice
+                        (q.choices || []).forEach((choiceText: string, idx: number) => {
+                          const lowerLevel = choiceText.toLowerCase();
+                          let letterFound = '';
+                          ['a', 'b', 'c', 'd'].forEach(l => {
+                            if (lowerLevel.startsWith(l + ')') || lowerLevel.includes(' ' + l + ')') || lowerLevel.includes('>' + l + ')')) {
+                              letterFound = l;
+                            }
+                          });
+                          if (!letterFound) {
+                            const match = lowerLevel.match(/([abcd])\)/);
+                            if (match) letterFound = match[1];
+                          }
+
+                          const finalLetter = letterFound || ['a', 'b', 'c', 'd'][idx];
+                          const ans = tfMap[finalLetter];
+                          tfAnswers[idx] = ans === 'Đ' ? 'Đúng' : (ans === 'S' ? 'Sai' : '?');
+                        });
                       }
 
                       return (
