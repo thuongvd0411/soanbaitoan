@@ -1167,7 +1167,14 @@ export default function App() {
         <script type="text/javascript" id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
     </head>
     <body>
-        <div class="header"> <h1>Phiếu Bài Tập Toán Lớp ${config.grade}</h1> <p>${config.customLesson || (config.lessons.length > 0 ? config.lessons.join(", ") : "Tổng hợp")}</p> </div>
+        <div class="header"> 
+            <h1>Phiếu Bài Tập Toán Lớp ${config.grade}</h1> 
+            <p>${config.customLesson || (config.lessons.length > 0 ? config.lessons.join(", ") : "Tổng hợp")}</p> 
+            <div style="margin-top: 15px; font-weight: bold; font-size: 14pt; display: flex; justify-content: space-between; padding: 0 40px; text-align: left;">
+                <span>Họ và tên: ....................................................................</span>
+                <span>Lớp: ${config.grade}............</span>
+            </div>
+        </div>
         ${questionsHtml}
         <div class="answer-section"> <div class="header" style="border:none; margin-bottom:10px;"><h3>BẢNG ĐÁP ÁN</h3></div> ${answersTableHtml} ${detailedSolutionsHtml} </div>
     </body>
@@ -1476,7 +1483,7 @@ export default function App() {
             <div className="bg-blue-600 w-24 h-24 rounded-3xl rotate-12 flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-blue-500/20">
               <ShieldAlert size={48} className="text-white -rotate-12" />
             </div>
-            <h2 className="text-3xl font-black text-gray-900 uppercase tracking-tighter mb-2">Kích hoạt Bản quyền</h2>
+            <h2 className="text-3xl font-black text-gray-900 uppercase tracking-tighter mb-2">Hệ thống bảo mật</h2>
             <p className="text-gray-500 text-sm font-medium mb-8 leading-relaxed px-4">Vui lòng nhập mã kích hoạt được cung cấp để bắt đầu trải nghiệm hệ thống Soạn Toán AI v5.</p>
 
             <div className="space-y-4">
@@ -1525,7 +1532,7 @@ export default function App() {
               </button>
             </div>
 
-            <p className="mt-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Alla v5.2 (Shared Data)</p>
+            <p className="mt-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Xây dựng bởi ThuongVd & Alla v5.2</p>
           </div>
         </div>
       )}
