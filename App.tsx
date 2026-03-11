@@ -1230,14 +1230,10 @@ export default function App() {
 
             {/* THÔNG TIN HỌC SINH LÀM BÀI */}
             {isViewerMode && !isSubmitted && (
-              <div className="mb-10 bg-indigo-50/50 p-6 rounded-2xl border border-indigo-100 flex flex-col md:flex-row gap-4 max-w-2xl mx-auto shadow-sm no-print">
+              <div className="mb-10 bg-indigo-50/50 p-6 rounded-2xl border border-indigo-100 flex flex-col md:flex-row gap-4 max-w-xl mx-auto shadow-sm no-print">
                 <div className="flex-1">
-                  <label className="block text-sm font-bold text-indigo-900 mb-1">Họ và Tên Học Sinh <span className="text-red-500">*</span></label>
-                  <input type="text" value={studentName} onChange={(e) => setStudentName(e.target.value)} placeholder="Nhập họ tên của em..." className="w-full border-2 border-indigo-200 outline-none focus:border-indigo-500 px-4 py-2.5 rounded-xl font-medium text-gray-800" />
-                </div>
-                <div className="w-full md:w-1/3">
-                  <label className="block text-sm font-bold text-indigo-900 mb-1">Lớp <span className="text-red-500">*</span></label>
-                  <input type="text" value={studentClass} onChange={(e) => setStudentClass(e.target.value)} placeholder="VD: 12A1" className="w-full border-2 border-indigo-200 outline-none focus:border-indigo-500 px-4 py-2.5 rounded-xl font-medium text-gray-800" />
+                  <label className="block text-sm font-bold text-indigo-900 mb-2">Họ và Tên Học Sinh <span className="text-gray-400 font-normal ml-2">(không bắt buộc)</span></label>
+                  <input type="text" value={studentName} onChange={(e) => setStudentName(e.target.value)} placeholder="Nhập họ tên của em..." className="w-full border-2 border-indigo-200 outline-none focus:border-indigo-500 px-4 py-3 rounded-xl font-medium text-gray-800 shadow-sm transition-all" />
                 </div>
               </div>
             )}
@@ -1261,18 +1257,17 @@ export default function App() {
               {isViewerMode && !isSubmitted && questions.length > 0 && (
                 <div className="mt-12 flex justify-center no-print">
                   <button disabled={isSubmittingResult} onClick={async () => {
-                    if (!studentName.trim() || !studentClass.trim()) {
-                      alert("Em vui lòng điền đầy đủ Họ Tên và Lớp trước khi nộp bài nhé!");
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                      return;
-                    }
                     setIsSubmittingResult(true);
                     try {
                       const finalScore = calculateScore();
                       if (shareId) {
+                        // Lấy tên Học sinh/Khách và Lớp (từ config)
+                        const finalName = studentName.trim() || 'Khách';
+                        const finalClass = shareConfig?.grade ? `Lớp ${shareConfig.grade}` : 'Không rõ';
+
                         await firebaseService.saveStudentResult(shareId, {
-                          studentName: studentName.trim(),
-                          studentClass: studentClass.trim(),
+                          studentName: finalName,
+                          studentClass: finalClass,
                           score: finalScore,
                           answers: studentAnswers
                         });
@@ -1477,39 +1472,55 @@ export default function App() {
         </div>
       )}
       {showActivateModal && (
-        <div className="fixed inset-0 bg-[#000830]/95 z-[200] flex items-center justify-center p-6 backdrop-blur-md animate-in fade-in duration-500">
-          <div className="bg-white rounded-[40px] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.5)] w-full max-w-md p-10 text-center border-4 border-blue-600/20 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600"></div>
-            <div className="bg-blue-600 w-24 h-24 rounded-3xl rotate-12 flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-blue-500/20">
-              <ShieldAlert size={48} className="text-white -rotate-12" />
-            </div>
-            <h2 className="text-3xl font-black text-gray-900 uppercase tracking-tighter mb-2">Hệ thống bảo mật</h2>
-            <p className="text-gray-500 text-sm font-medium mb-8 leading-relaxed px-4">Vui lòng nhập mã kích hoạt được cung cấp để bắt đầu trải nghiệm hệ thống Soạn Toán AI v5.</p>
+        <div className="fixed inset-0 bg-[#000000]/95 z-[200] flex items-center justify-center p-6 backdrop-blur-xl animate-in fade-in duration-500 font-sans">
+          <div className="bg-gradient-to-b from-[#111928] to-[#0A0F1C] rounded-[32px] w-full max-w-[440px] p-10 text-center border-2 border-cyan-800/40 relative overflow-hidden shadow-[0_0_80px_-15px_rgba(6,182,212,0.3)]">
 
-            <div className="space-y-4">
+            {/* Hiệu ứng viền Cyberpunk */}
+            <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-transparent via-cyan-400 to-transparent"></div>
+            <div className="absolute bottom-0 left-0 w-full h-[3px] bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-50"></div>
+            <div className="absolute top-4 left-4 w-4 h-4 border-t-2 border-l-2 border-cyan-500/50 rounded-tl-lg"></div>
+            <div className="absolute top-4 right-4 w-4 h-4 border-t-2 border-r-2 border-cyan-500/50 rounded-tr-lg"></div>
+            <div className="absolute bottom-4 left-4 w-4 h-4 border-b-2 border-l-2 border-cyan-500/50 rounded-bl-lg"></div>
+            <div className="absolute bottom-4 right-4 w-4 h-4 border-b-2 border-r-2 border-cyan-500/50 rounded-br-lg"></div>
+
+            {/* Icon Khiên Neon */}
+            <div className="relative w-28 h-28 mx-auto mb-8 flex items-center justify-center">
+              <div className="absolute inset-0 bg-cyan-500/20 blur-2xl rounded-full"></div>
+              <div className="absolute inset-2 bg-gradient-to-b from-[#1E293B] to-[#0F172A] border-[3px] border-cyan-500 rounded-2xl rotate-45 flex items-center justify-center shadow-[0_0_30px_rgba(6,182,212,0.4)]"></div>
+              <ShieldAlert size={52} className="text-cyan-400 relative z-10 drop-shadow-[0_0_10px_rgba(6,182,212,0.8)]" />
+            </div>
+
+            <h2 className="text-[26px] font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-cyan-200 uppercase tracking-widest mb-3">Hệ thống bảo mật</h2>
+            <p className="text-cyan-100/60 text-[13px] font-medium mb-10 leading-relaxed px-2">Vui lòng nhập mã kích hoạt được cung cấp để bắt đầu trải nghiệm hệ thống Soạn Toán AI v5.</p>
+
+            <div className="space-y-4 relative z-10">
               <div className="relative group">
                 <input
                   type="text"
                   value={activationToken}
                   onChange={(e) => setActivationToken(e.target.value)}
                   placeholder="Nhập Token của bạn..."
-                  className="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl px-6 py-5 font-bold text-center focus:border-blue-600 outline-none transition-all group-hover:border-gray-200"
+                  className="w-full bg-[#1A253A]/80 border border-cyan-800/60 rounded-xl px-12 py-4 font-bold text-center text-cyan-50 placeholder:text-cyan-700 focus:border-cyan-400 focus:bg-[#1E2E4A]/80 flex items-center outline-none transition-all group-hover:border-cyan-500 shadow-inner"
                 />
-                <FileSignature size={18} className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400" />
+                <div className="absolute left-5 top-1/2 -translate-y-1/2 flex gap-1.5 items-center">
+                  <div className="w-4 h-4 border border-cyan-500 rounded-sm opacity-60"></div>
+                  <FileSignature size={18} className="text-cyan-500" />
+                </div>
               </div>
 
               <button
                 onClick={handleActivate}
                 disabled={isActivating}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-black py-5 rounded-2xl shadow-xl shadow-blue-600/20 transition-all flex items-center justify-center gap-3 uppercase tracking-widest text-sm"
+                className="relative overflow-hidden w-full bg-gradient-to-r from-blue-700 via-cyan-600 to-blue-700 hover:from-cyan-500 hover:to-blue-500 disabled:from-slate-700 disabled:to-slate-800 text-white font-black py-4.5 rounded-xl transition-all flex items-center justify-center gap-3 uppercase tracking-[0.2em] text-[13px] group border border-cyan-300/30"
               >
-                {isActivating ? <Loader2 className="animate-spin" /> : <>Kích hoạt ngay <ArrowRight size={18} /></>}
+                <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPjxyZWN0IHdpZHRoPSI0IiBoZWlnaHQ9IjQiIGZpbGw9IiNmZmZmZmYwNSIvPjwvc3ZnPg==')] opacity-50 mix-blend-overlay pointer-events-none"></div>
+                {isActivating ? <Loader2 className="animate-spin" /> : <>Kích hoạt ngay <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" /></>}
               </button>
 
-              <div className="relative flex items-center my-2">
-                <div className="flex-1 border-t border-gray-200"></div>
-                <span className="px-3 text-[10px] text-gray-400 font-black uppercase">hoặc</span>
-                <div className="flex-1 border-t border-gray-200"></div>
+              <div className="flex items-center justify-center gap-4 my-6 opacity-60">
+                <div className="h-[1px] w-12 bg-gradient-to-r from-transparent to-cyan-700"></div>
+                <span className="text-[10px] text-cyan-400 font-bold tracking-widest uppercase">OR</span>
+                <div className="h-[1px] w-12 bg-gradient-to-l from-transparent to-cyan-700"></div>
               </div>
 
               <button
@@ -1517,7 +1528,6 @@ export default function App() {
                   const input = window.prompt("Dán link bài tập vào đây (hoặc chỉ dán mã share):");
                   if (!input) return;
                   let shareCode = input.trim();
-                  // Tách mã share từ URL đầy đủ hoặc chỉ mã
                   const match = shareCode.match(/[?&]share=([^&]+)/);
                   if (match) shareCode = match[1];
                   if (shareCode) {
@@ -1526,13 +1536,13 @@ export default function App() {
                     alert("Mã không hợp lệ. Vui lòng thử lại.");
                   }
                 }}
-                className="w-full bg-green-600 hover:bg-green-700 text-white font-black py-4 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-3 uppercase tracking-wider text-xs"
+                className="w-full bg-[#0F1D15] hover:bg-[#163024] border border-emerald-500/40 text-emerald-400 hover:text-emerald-300 font-bold py-3.5 rounded-xl transition-all flex items-center justify-center gap-2 uppercase tracking-wide text-[12px] shadow-[inset_0_0_15px_rgba(16,185,129,0.1)] hover:shadow-[inset_0_0_20px_rgba(16,185,129,0.2)]"
               >
-                <PenLine size={18} /> Chỉ Làm Bài Tập
+                <PenLine size={16} /> Chỉ Phục Vụ Làm Bài
               </button>
             </div>
 
-            <p className="mt-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Xây dựng bởi ThuongVd & Alla v5.2</p>
+            <p className="mt-10 text-[9px] font-bold text-cyan-800/60 uppercase tracking-[0.3em]">Xây dựng bởi ThuongVd & Alla v5.2</p>
           </div>
         </div>
       )}
