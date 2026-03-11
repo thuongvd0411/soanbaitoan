@@ -76,8 +76,6 @@ export interface AppState {
   imageRatio: number;
   // API Key tùy chỉnh
   customApiKey?: string;
-  // Mã đồng bộ cá nhân (Sync Key)
-  syncKey?: string;
   // Game state
   gameStatus: GameStatus;
 }

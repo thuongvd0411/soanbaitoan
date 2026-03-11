@@ -7,7 +7,7 @@ const DEVICE_ID_KEY = 'math_app_device_id';
 const FINGERPRINT_KEY = 'math_app_fingerprint';
 
 export const storageService = {
-  // Sinh hoặc lấy Device ID (UUID v4)
+  // Sinh hoặc lấy Device ID (UUID v4) — chỉ dùng cho bảo mật kích hoạt
   getDeviceId: (): string => {
     let id = localStorage.getItem(DEVICE_ID_KEY);
     if (!id) {
@@ -15,6 +15,22 @@ export const storageService = {
       localStorage.setItem(DEVICE_ID_KEY, id);
     }
     return id;
+  },
+
+  // Lấy Owner ID (dùng chung cho tất cả các máy cùng token)
+  // Ưu tiên: ownerId từ license > deviceId (fallback)
+  getOwnerId: (): string => {
+    try {
+      const sessionStr = localStorage.getItem('math_app_license_session');
+      if (sessionStr) {
+        const session = JSON.parse(sessionStr);
+        if (session.ownerId) return session.ownerId;
+      }
+    } catch (e) {
+      console.error("Error reading ownerId:", e);
+    }
+    // Fallback về deviceId nếu chưa có ownerId
+    return storageService.getDeviceId();
   },
 
   // Tạo Fingerprint từ thông tin trình duyệt (SHA-256)
@@ -44,12 +60,12 @@ export const storageService = {
     return hashHex;
   },
 
-  // Lấy Security Headers/Params (Hỗ trợ SyncKey)
+  // Lấy Security Headers/Params — dùng ownerId thay vì deviceId cho Firebase
   getSecurityParams: async (customSyncKey?: string) => {
     const deviceId = storageService.getDeviceId();
     const fingerprint = await storageService.getFingerprint();
-    const syncId = customSyncKey || deviceId;
-    return { deviceId, fingerprint, syncId };
+    const ownerId = storageService.getOwnerId();
+    return { deviceId, fingerprint, ownerId };
   },
 
   // Lấy toàn bộ câu hỏi trong kho
@@ -64,7 +80,7 @@ export const storageService = {
   },
 
   // Lưu một câu hỏi vào kho
-  saveQuestion: (question: Question, syncId?: string): boolean => {
+  saveQuestion: (question: Question): boolean => {
     try {
       const bank = storageService.getBank();
       // Kiểm tra trùng lặp (dựa trên nội dung)
@@ -81,9 +97,9 @@ export const storageService = {
       const updatedBank = [newSavedQuestion, ...bank];
       localStorage.setItem(BANK_KEY, JSON.stringify(updatedBank));
 
-      // Đồng bộ lên Cloud (Firebase) dùng syncId nếu có
-      const finalSyncId = syncId || storageService.getDeviceId();
-      firebaseService.saveQuestion(finalSyncId, newSavedQuestion).catch(console.error);
+      // Đồng bộ lên Cloud (Firebase) dùng ownerId
+      const ownerId = storageService.getOwnerId();
+      firebaseService.saveQuestion(ownerId, newSavedQuestion).catch(console.error);
 
       return true;
     } catch (error) {
@@ -93,7 +109,7 @@ export const storageService = {
   },
 
   // Nhập dữ liệu từ file backup (Merge data)
-  importBank: (importedQuestions: any[], syncId?: string): { success: number, failed: number } => {
+  importBank: (importedQuestions: any[]): { success: number, failed: number } => {
     try {
       if (!Array.isArray(importedQuestions)) return { success: 0, failed: 0 };
 
@@ -117,11 +133,11 @@ export const storageService = {
 
       localStorage.setItem(BANK_KEY, JSON.stringify(newBank));
 
-      // Đồng bộ Cloud
-      const finalSyncId = syncId || storageService.getDeviceId();
+      // Đồng bộ Cloud dùng ownerId
+      const ownerId = storageService.getOwnerId();
       if (addedCount > 0) {
         newBank.forEach(q => {
-          firebaseService.saveQuestion(finalSyncId, q).catch(console.error);
+          firebaseService.saveQuestion(ownerId, q).catch(console.error);
         });
       }
 
@@ -133,14 +149,14 @@ export const storageService = {
   },
 
   // Xóa câu hỏi khỏi kho
-  removeQuestion: (id: string, syncId?: string) => {
+  removeQuestion: (id: string) => {
     const bank = storageService.getBank();
     const updatedBank = bank.filter(q => q.id !== id);
     localStorage.setItem(BANK_KEY, JSON.stringify(updatedBank));
 
-    // Xóa trên Cloud
-    const finalSyncId = syncId || storageService.getDeviceId();
-    firebaseService.deleteQuestion(finalSyncId, id).catch(console.error);
+    // Xóa trên Cloud dùng ownerId
+    const ownerId = storageService.getOwnerId();
+    firebaseService.deleteQuestion(ownerId, id).catch(console.error);
 
     return updatedBank;
   },
@@ -155,30 +171,30 @@ export const storageService = {
     return bank;
   },
 
-  // Hàm đồng bộ toàn diện từ Local lên Cloud
-  syncCloud: async (syncId?: string): Promise<void> => {
+  // Hàm đồng bộ toàn diện từ Local lên Cloud — dùng ownerId
+  syncCloud: async (): Promise<void> => {
     try {
-      const finalSyncId = syncId || storageService.getDeviceId();
+      const ownerId = storageService.getOwnerId();
       const localBank = storageService.getBank();
       for (const q of localBank) {
-        await firebaseService.saveQuestion(finalSyncId, q);
+        await firebaseService.saveQuestion(ownerId, q);
       }
-      console.log("Alla Sync - Cloud Pushed Successfully for ID:", finalSyncId);
+      console.log("Alla Sync - Cloud Pushed Successfully for OwnerId:", ownerId);
     } catch (error) {
       console.error("Alla Sync - Error pushing to cloud:", error);
       throw error;
     }
   },
 
-  // Hàm tải dữ liệu từ Cloud về Local
-  pullCloud: async (syncId?: string): Promise<void> => {
+  // Hàm tải dữ liệu từ Cloud về Local — dùng ownerId
+  pullCloud: async (): Promise<void> => {
     try {
-      const finalSyncId = syncId || storageService.getDeviceId();
-      const cloudBank = await firebaseService.getBank(finalSyncId);
+      const ownerId = storageService.getOwnerId();
+      const cloudBank = await firebaseService.getBank(ownerId);
 
       if (cloudBank.length > 0) {
         localStorage.setItem(BANK_KEY, JSON.stringify(cloudBank));
-        console.log("Alla Sync - Cloud Pulled Successfully", cloudBank.length, "questions for ID:", finalSyncId);
+        console.log("Alla Sync - Cloud Pulled Successfully", cloudBank.length, "questions for OwnerId:", ownerId);
       }
     } catch (error) {
       console.error("Alla Sync - Error pulling from cloud:", error);
