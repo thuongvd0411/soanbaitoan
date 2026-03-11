@@ -190,29 +190,41 @@ export const firebaseService = {
     /**
      * Nộp bài của Học sinh
      */
-    async saveStudentResult(shareId: string, result: { studentName: string, studentClass: string, score: number, answers: Record<string, any> }, ownerId?: string): Promise<void> {
+    async saveStudentResult(shareId: string, result: { studentName: string, studentClass: string, score: number, answers: Record<string, any> }): Promise<void> {
         if (!shareId) return;
         try {
             const timestamp = new Date().toISOString();
             const resultData = {
-                id: "", // Sẽ được set sau
+                id: "",
                 shareId,
                 ...result,
                 submittedAt: timestamp
             };
 
-            // 1. Lưu vào kết quả riêng của mã đề (để xem theo từng đề)
             const resultRef = doc(collection(db, "shared_exams", shareId, "results"));
             resultData.id = resultRef.id;
             await setDoc(resultRef, resultData);
-
-            // 2. Lưu vào bảng điểm chung của giáo viên (để thống kê toàn diện)
-            if (ownerId) {
-                const globalRef = doc(collection(db, "users", ownerId, "globalResults"), resultRef.id);
-                await setDoc(globalRef, resultData);
-            }
         } catch (error) {
             console.error("Firebase saveStudentResult error:", error);
+            throw error;
+        }
+    },
+
+    /**
+     * Lưu kết quả vào thống kê global của giáo viên
+     */
+    async saveGlobalResult(ownerId: string, result: any): Promise<void> {
+        if (!ownerId) return;
+        try {
+            const timestamp = new Date().toISOString();
+            const globalRef = doc(collection(db, "users", ownerId, "globalResults"));
+            await setDoc(globalRef, {
+                id: globalRef.id,
+                ...result,
+                submittedAt: timestamp
+            });
+        } catch (error) {
+            console.error("Firebase saveGlobalResult error:", error);
             throw error;
         }
     },

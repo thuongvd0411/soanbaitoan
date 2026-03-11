@@ -601,7 +601,7 @@ const Sidebar = ({ config, setConfig, onGenerate, onStartGame, onVoiceCompose, i
 const QuestionItem = ({ question, onSave, readOnly = false, studentAnswer, onAnswerChange, showResult = false }: any) => {
   const isSvg = question.imageDescription && question.imageDescription.trim().startsWith('<svg');
   const [isSaved, setIsSaved] = useState(false);
-  useEffect(() => { const t = setTimeout(triggerMath, 100); return () => clearTimeout(t); }, [isSaved, question, studentAnswer, showResult]);
+  useEffect(() => { const t = setTimeout(triggerMath, 100); return () => clearTimeout(t); }, [question, showResult]);
 
   const isTrueFalse = question.type?.includes('Đúng/Sai') || question.type === 'DUNGSAI';
   const isShortAnswer = question.type?.includes('ngắn') || question.type === 'NGANGON';
@@ -1492,12 +1492,32 @@ export default function App() {
                         const finalClass = shareConfig?.grade ? `Lớp ${shareConfig.grade}` : 'Không rõ';
                         const ownerId = shareConfig?.ownerId;
 
-                        await firebaseService.saveStudentResult(shareId, {
-                          studentName: finalName,
-                          studentClass: finalClass,
-                          score: finalScore,
-                          answers: studentAnswers
-                        }, ownerId);
+                        // Bước 1: Lưu vào đề (bắt buộc)
+                        try {
+                          await firebaseService.saveStudentResult(shareId, {
+                            studentName: finalName,
+                            studentClass: finalClass,
+                            score: finalScore,
+                            answers: studentAnswers
+                          });
+                        } catch (saveErr: any) {
+                          console.warn("Lưu vào shared_exams failed:", saveErr?.message);
+                        }
+
+                        // Bước 2: Lưu vào thống kê global (không bắt buộc)
+                        if (ownerId) {
+                          try {
+                            await firebaseService.saveGlobalResult(ownerId, {
+                              shareId,
+                              studentName: finalName,
+                              studentClass: finalClass,
+                              score: finalScore,
+                              answers: studentAnswers
+                            });
+                          } catch (globalErr: any) {
+                            console.warn("Lưu vào globalResults failed (không ảnh hưởng):", globalErr?.message);
+                          }
+                        }
                       } else {
                         console.warn("Alla: shareId is null, cannot save result!");
                       }
