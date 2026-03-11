@@ -580,17 +580,71 @@ const Sidebar = ({ config, setConfig, onGenerate, onStartGame, isLoading, onShow
   );
 };
 
-const QuestionItem = ({ question, onSave, readOnly = false }: any) => {
+const QuestionItem = ({ question, onSave, readOnly = false, studentAnswer, onAnswerChange, showResult = false }: any) => {
   const isSvg = question.imageDescription && question.imageDescription.trim().startsWith('<svg');
   const [isSaved, setIsSaved] = useState(false);
-  useLayoutEffect(() => { triggerMath(); }, [isSaved, question]);
+  useLayoutEffect(() => { triggerMath(); }, [isSaved, question, studentAnswer, showResult]);
+
+  const isTrueFalse = question.type?.includes('Đúng/Sai') || question.type === 'DUNGSAI';
+  const isShortAnswer = question.type?.includes('ngắn') || question.type === 'NGANGON';
+
   return (
-    <div className={`mb-12 break-inside-avoid relative group ${readOnly ? 'p-6 border rounded-2xl bg-white mb-6 shadow-sm border-gray-100' : ''}`}>
+    <div className={`mb-12 break-inside-avoid relative group ${readOnly ? 'p-6 border rounded-2xl bg-white mb-6 shadow-sm ' + (showResult ? 'border-gray-200' : 'border-indigo-100 hover:border-indigo-300 transition-colors') : ''}`}>
       {!readOnly && (<div className="absolute -right-3 top-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10 no-print"> <button onClick={() => { onSave?.(question); setIsSaved(true); setTimeout(() => setIsSaved(false), 2000); }} className={`p-2.5 rounded-full shadow-lg text-white transition-all transform hover:scale-110 active:scale-90 ${isSaved ? 'bg-green-500' : 'bg-gray-400 hover:bg-primary'}`}> {isSaved ? <CheckSquare size={18} /> : <Save size={18} />} </button> </div>)}
-      <div className="flex gap-2 items-baseline mb-4"> <span className="font-black text-primary text-xl">Câu {question.number}.</span> {!readOnly && <span className="text-[10px] font-black bg-gray-100 text-gray-500 px-2 py-0.5 rounded-md border border-gray-200 uppercase tracking-wider">{question.difficulty}</span>} </div>
+      <div className="flex gap-2 items-baseline mb-4"> <span className="font-black text-primary text-xl">Câu {question.number}.</span> {!readOnly && <span className="text-[10px] font-black bg-gray-100 text-gray-500 px-2 py-0.5 rounded-md border border-gray-200 uppercase tracking-wider">{question.difficulty}</span>} {readOnly && showResult && <span className="ml-auto text-xs font-bold uppercase px-3 py-1 rounded-full border bg-gray-100 text-gray-500">Đã nộp</span>} </div>
       <div className="text-justify text-gray-900 leading-relaxed text-lg font-serif overflow-x-auto no-scrollbar mb-4" dangerouslySetInnerHTML={{ __html: question.content }}></div>
       {question.hasImage && (<div className="my-8 mx-auto max-w-full md:max-w-md bg-white p-4 rounded-3xl shadow-sm border border-gray-100 svg-container"> {isSvg ? <div className="w-full flex justify-center" dangerouslySetInnerHTML={{ __html: question.imageDescription! }} /> : <div className="p-8 border-2 border-dashed border-gray-300 rounded-2xl w-full text-center text-xs text-gray-400 font-medium italic">Hình minh họa đề bài</div>} </div>)}
-      {question.choices && (<div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-12 mt-6 ml-4"> {question.choices.map((choice: string, idx: number) => (<div key={idx} className="flex gap-3 items-start group/choice"> <span className="font-black text-gray-900 bg-gray-100 px-2.5 py-1 rounded-lg text-sm border border-gray-200 group-hover/choice:bg-primary group-hover/choice:text-white transition-all shadow-sm">{String.fromCharCode(65 + idx)}.</span> <span className="text-lg font-serif overflow-x-auto no-scrollbar group-hover/choice:text-primary transition-colors" dangerouslySetInnerHTML={{ __html: choice }}></span> </div>))} </div>)}
+
+      {/* RENDER DUNG/SAI */}
+      {isTrueFalse && question.choices && (
+        <div className="flex flex-col gap-3 mt-6 ml-4">
+          {question.choices.map((choice: string, idx: number) => {
+            const currentAns = studentAnswer ? studentAnswer[idx] : null; // 'Đ' hoặc 'S'
+            return (
+              <div key={idx} className="flex gap-4 items-start p-3 rounded-xl hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-100">
+                <div className="flex-1 mt-1 text-lg font-serif overflow-x-auto no-scrollbar" dangerouslySetInnerHTML={{ __html: choice }}></div>
+                {readOnly && (
+                  <div className="flex gap-2 shrink-0">
+                    <button disabled={showResult} onClick={() => { const newAns = { ...(studentAnswer || {}) }; newAns[idx] = 'Đ'; onAnswerChange?.(newAns); }} className={`w-10 h-10 rounded-lg flex items-center justify-center font-black text-sm transition-all shadow-sm ${currentAns === 'Đ' ? 'bg-green-500 text-white border-green-600' : 'bg-white text-gray-400 border-gray-200 border hover:bg-green-50 hover:text-green-600 hover:border-green-300'} ${showResult ? 'opacity-70 cursor-not-allowed' : ''}`}>Đ</button>
+                    <button disabled={showResult} onClick={() => { const newAns = { ...(studentAnswer || {}) }; newAns[idx] = 'S'; onAnswerChange?.(newAns); }} className={`w-10 h-10 rounded-lg flex items-center justify-center font-black text-sm transition-all shadow-sm ${currentAns === 'S' ? 'bg-red-500 text-white border-red-600' : 'bg-white text-gray-400 border-gray-200 border hover:bg-red-50 hover:text-red-600 hover:border-red-300'} ${showResult ? 'opacity-70 cursor-not-allowed' : ''}`}>S</button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* RENDER TRA LOI NGAN */}
+      {isShortAnswer && (
+        <div className="mt-6 ml-4">
+          {readOnly ? (
+            <input disabled={showResult} type="text" placeholder="Nhập đáp án của em..." value={studentAnswer || ''} onChange={(e) => onAnswerChange?.(e.target.value)} className={`w-full md:w-1/2 border-2 p-3 text-lg font-bold rounded-xl outline-none focus:border-indigo-500 shadow-sm transition-all ${showResult ? 'bg-gray-100 border-gray-300 text-gray-600' : 'bg-white border-indigo-200 text-indigo-900 focus:ring-4 ring-indigo-500/10'}`} />
+          ) : (
+            <div className="p-4 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 text-gray-400 text-sm font-medium italic w-full md:w-1/2">
+              (Học sinh sẽ điền đáp án ngắn vào ô trống này)
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* RENDER ABCD */}
+      {!isTrueFalse && !isShortAnswer && question.choices && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-12 mt-6 ml-4">
+          {question.choices.map((choice: string, idx: number) => {
+            const letter = String.fromCharCode(65 + idx);
+            const isSelected = studentAnswer === letter;
+            return (
+              <div key={idx} onClick={() => { if (readOnly && !showResult) onAnswerChange?.(letter); }} className={`flex gap-3 items-start p-2 rounded-xl transition-all ${readOnly && !showResult ? 'cursor-pointer hover:bg-indigo-50 border border-transparent hover:border-indigo-100' : 'group/choice'} ${isSelected && readOnly ? 'bg-indigo-50 border border-indigo-200 shadow-sm' : ''}`}>
+                <span className={`font-black px-2.5 py-1 rounded-lg text-sm border transition-all shadow-sm ${isSelected && readOnly ? 'bg-indigo-600 text-white border-indigo-700' : (!readOnly ? 'text-gray-900 bg-gray-100 border-gray-200 group-hover/choice:bg-primary group-hover/choice:text-white' : 'text-gray-500 bg-white border-gray-200 group-hover:bg-indigo-100 group-hover:text-indigo-600')}`}>
+                  {letter}.
+                </span>
+                <span className={`text-lg font-serif overflow-x-auto no-scrollbar mt-0.5 transition-colors ${isSelected && readOnly ? 'text-indigo-900' : (!readOnly ? 'group-hover/choice:text-primary' : 'text-gray-700')}`} dangerouslySetInnerHTML={{ __html: choice }}></span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };
@@ -604,7 +658,7 @@ export default function App() {
     customLesson: '',
     questionTypes: [QuestionType.MultipleChoice],
     answerMode: AnswerMode.Basic,
-    imageRatio: 30,
+    imageRatio: 0,
     examType: ExamType.None,
     imageMode: ImageMode.None,
     gameStatus: GameStatus.Idle
@@ -624,6 +678,43 @@ export default function App() {
   const [shareId, setShareId] = useState<string | null>(null);
   const [isSharing, setIsSharing] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("AI Đang soạn thảo...");
+
+  // States cho Học sinh làm bài
+  const [studentAnswers, setStudentAnswers] = useState<Record<string, any>>({});
+  const [isSubmitted, setIsSubmitted] = useState(false);
+
+  const calculateScore = () => {
+    let correct = 0;
+    const total = questions.length;
+    if (total === 0) return 0;
+
+    questions.forEach(q => {
+      const uAns = studentAnswers[q.id];
+      if (!uAns) return;
+
+      const isTrueFalse = q.type?.includes('Đúng/Sai') || q.type === 'DUNGSAI';
+      const isShortAnswer = q.type?.includes('ngắn') || q.type === 'NGANGON';
+
+      if (isTrueFalse) {
+        // q.correctAnswer mẫu: "a)Đ, b)S, c)Đ, d)S"
+        const correctStr = String(q.correctAnswer).replace(/\s/g, '').toLowerCase();
+        let scoreForThis = 1;
+        for (let i = 0; i < 4; i++) {
+          const letter = String.fromCharCode(97 + i); // a, b, c, d
+          const expected = correctStr.includes(`${letter})đ`) ? 'Đ' : (correctStr.includes(`${letter})s`) ? 'S' : null);
+          if (expected && uAns[i] !== expected) {
+            scoreForThis = 0; // Sai 1 ý là sai cả câu (hoặc anh có thể chia 0.25đ/ý)
+          }
+        }
+        correct += scoreForThis;
+      } else if (isShortAnswer) {
+        if (String(uAns).trim().toLowerCase() === String(q.correctAnswer).trim().toLowerCase()) correct += 1;
+      } else {
+        if (uAns === q.correctAnswer) correct += 1;
+      }
+    });
+    return Math.round((correct / total) * 10) * 1; // Thang điểm 10
+  };
 
   useEffect(() => {
     const saved = localStorage.getItem('math_app_history');
@@ -1126,11 +1217,37 @@ export default function App() {
               </div>
             )}
 
-            <div className="content-area"> {questions.map(q => <QuestionItem key={q.id} question={q} onSave={!isViewerMode ? (quest: any) => storageService.saveQuestion(quest) : undefined} readOnly={isViewerMode} />)}
-              {(!isViewerMode && config.answerMode !== AnswerMode.None) && (
+            <div className="content-area"> {questions.map(q => <QuestionItem key={q.id} question={q} onSave={!isViewerMode ? (quest: any) => storageService.saveQuestion(quest) : undefined} readOnly={isViewerMode} studentAnswer={studentAnswers[q.id]} onAnswerChange={(val: any) => setStudentAnswers(prev => ({ ...prev, [q.id]: val }))} showResult={isSubmitted} />)}
+
+              {/* PHU LUC LÀM BÀI CHO HỌC SINH */}
+              {isViewerMode && !isSubmitted && questions.length > 0 && (
+                <div className="mt-12 flex justify-center no-print">
+                  <button onClick={() => {
+                    const confirm = window.confirm('Em đã chắc chắn muốn nộp bài chưa?');
+                    if (confirm) {
+                      setIsSubmitted(true);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                  }} className="bg-gradient-to-r from-green-500 to-emerald-600 text-white font-black text-xl py-4 px-12 rounded-full shadow-[0_10px_20px_-10px_rgba(16,185,129,0.5)] border-b-4 border-emerald-800 hover:translate-y-1 hover:border-b-0 transition-all uppercase tracking-widest">
+                    Nộp Bài Ngay
+                  </button>
+                </div>
+              )}
+
+              {isViewerMode && isSubmitted && (
+                <div className="mt-12 p-8 bg-gradient-to-br from-indigo-50 to-blue-50 border-2 border-indigo-200 rounded-3xl text-center shadow-inner no-print animate-in zoom-in-95 duration-500">
+                  <h2 className="text-3xl font-black text-indigo-900 mb-2 uppercase">Kết Quả Làm Bài</h2>
+                  <div className="text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600 my-6 drop-shadow-sm">{calculateScore()}<span className="text-3xl text-indigo-400">/10</span></div>
+                  <p className="text-lg text-indigo-700 font-medium">Bên dưới là đáp án chi tiết. Em hãy đối chiếu với bài làm của mình nhé!</p>
+                  <button onClick={() => window.location.reload()} className="mt-6 font-bold text-indigo-600 underline">Làm bài lại</button>
+                </div>
+              )}
+
+              {/* ĐÁP ÁN VÀ LỜI GIẢI */}
+              {((!isViewerMode && config.answerMode !== AnswerMode.None) || (isViewerMode && isSubmitted)) && (
                 <div className="mt-20 pt-10 border-t-2 border-dashed border-gray-300 break-before-page">
                   <div className="flex items-center justify-center gap-4 mb-10"> <div className="h-0.5 flex-1 bg-gray-200"></div> <h2 className="text-2xl font-black uppercase tracking-widest text-gray-400">ĐÁP ÁN VÀ LỜI GIẢI</h2> <div className="h-0.5 flex-1 bg-gray-200"></div> </div>
-                  <div className="space-y-10"> {questions.map(q => (<div key={`ans_${q.id}`} className="p-6 bg-gray-50 rounded-3xl border border-gray-200"> <div className="flex items-center gap-3 mb-3"> <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-black">C{q.number}</div> <span className="font-black text-lg text-green-600 uppercase">Đáp án: {q.correctAnswer}</span> </div> {config.answerMode === AnswerMode.Detailed && (<div className="text-base text-gray-700 leading-relaxed font-serif bg-white p-5 rounded-2xl border border-gray-100 shadow-inner" dangerouslySetInnerHTML={{ __html: q.explanation }}></div>)} </div>))} </div>
+                  <div className="space-y-10"> {questions.map(q => (<div key={`ans_${q.id}`} className="p-6 bg-gray-50 rounded-3xl border border-gray-200"> <div className="flex items-center gap-3 mb-3"> <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-black">C{q.number}</div> <span className="font-black text-lg text-green-600 uppercase">Đáp án: {q.correctAnswer}</span> </div> {(!isViewerMode ? config.answerMode === AnswerMode.Detailed : true) && (<div className="text-base text-gray-700 leading-relaxed font-serif bg-white p-5 rounded-2xl border border-gray-100 shadow-inner" dangerouslySetInnerHTML={{ __html: q.explanation }}></div>)} </div>))} </div>
                 </div>
               )}
             </div>

@@ -21,12 +21,12 @@ const JSON_SCHEMA_INSTRUCTION = `
 BẮT BUỘC trả về JSON hợp lệ. KHÔNG dùng ký tự đặc biệt ngoài JSON chuẩn.
 Với công thức LaTeX, dùng \\\\( và \\\\) thay vì \\( và \\).
 Cấu trúc:
-{"questions":[{"content":"text","type":"ABCD hoặc DUNGSAI hoặc NGANGON","difficulty":"Nhận biết","choices":["A. ...","B. ...","C. ...","D. ..."],"correctAnswer":"A","hint":"text","explanation":"text","hasImage":false,"imageDescription":""}]}
+{"questions":[{"content":"text","type":"Trắc nghiệm ABCD hoặc Trắc nghiệm Đúng/Sai hoặc Trả lời ngắn","difficulty":"Nhận biết","choices":["A. ...","B. ...","C. ...","D. ..."],"correctAnswer":"A","hint":"text","explanation":"text","hasImage":false,"imageDescription":""}]}
 
 CÁC DẠNG CÂU HỎI:
-- type="ABCD": Trắc nghiệm chọn 1 đáp án đúng từ A,B,C,D. choices có 4 phần tử. correctAnswer là "A", "B", "C" hoặc "D".
-- type="DUNGSAI": Trắc nghiệm đúng/sai 4 ý (a,b,c,d). Content chứa câu hỏi chính + 4 phát biểu (a), (b), (c), (d). choices=["a) Đúng/Sai","b) Đúng/Sai","c) Đúng/Sai","d) Đúng/Sai"]. correctAnswer = "a)Đ, b)S, c)Đ, d)S" (liệt kê Đ/S cho từng ý).
-- type="NGANGON": Trả lời ngắn (điền số hoặc biểu thức). choices=[] (mảng rỗng). correctAnswer là đáp án cần điền.
+- type="Trắc nghiệm ABCD": Trắc nghiệm chọn 1 đáp án đúng từ A,B,C,D. choices có 4 phần tử. correctAnswer là "A", "B", "C" hoặc "D".
+- type="Trắc nghiệm Đúng/Sai": Trắc nghiệm đúng/sai 4 ý. Content chứa câu hỏi chính. choices=["a) ...","b) ...","c) ...","d) ..."]. correctAnswer = "a)Đ, b)S, c)Đ, d)S" (liệt kê Đ/S cho từng ý).
+- type="Trả lời ngắn": Trả lời ngắn (điền số hoặc biểu thức). choices=[] (mảng rỗng). correctAnswer là đáp án cần điền.
 `;
 
 // Hàm làm sạch JSON trước khi parse
@@ -136,9 +136,9 @@ export const generateQuestions = async (
   // Xây dựng hướng dẫn dạng câu hỏi
   const selectedTypes = config.questionTypes || [QuestionType.MultipleChoice];
   const typeInstructions: string[] = [];
-  if (selectedTypes.includes(QuestionType.MultipleChoice)) typeInstructions.push('Trắc nghiệm ABCD (type="ABCD"): 4 lựa chọn A,B,C,D, chọn 1 đáp án đúng');
-  if (selectedTypes.includes(QuestionType.TrueFalse)) typeInstructions.push('Trắc nghiệm Đúng/Sai (type="DUNGSAI"): Cho 4 phát biểu (a)(b)(c)(d), mỗi ý đúng hoặc sai');
-  if (selectedTypes.includes(QuestionType.ShortAnswer)) typeInstructions.push('Trả lời ngắn (type="NGANGON"): Điền đáp số, không có choices');
+  if (selectedTypes.includes(QuestionType.MultipleChoice)) typeInstructions.push(`Trắc nghiệm ABCD (type="${QuestionType.MultipleChoice}"): 4 lựa chọn A,B,C,D, chọn 1 đáp án đúng`);
+  if (selectedTypes.includes(QuestionType.TrueFalse)) typeInstructions.push(`Trắc nghiệm Đúng/Sai (type="${QuestionType.TrueFalse}"): Cho 4 phát biểu (a)(b)(c)(d), mỗi ý đúng hoặc sai`);
+  if (selectedTypes.includes(QuestionType.ShortAnswer)) typeInstructions.push(`Trả lời ngắn (type="${QuestionType.ShortAnswer}"): Điền đáp số, không có choices`);
 
   const typeContext = typeInstructions.length > 0
     ? `Dạng câu hỏi cần tạo: ${typeInstructions.join('; ')}. ${selectedTypes.length > 1 ? 'Chia đều các câu hỏi cho các dạng được yêu cầu.' : ''}`
