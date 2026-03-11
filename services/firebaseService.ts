@@ -190,15 +190,27 @@ export const firebaseService = {
     /**
      * Nộp bài của Học sinh
      */
-    async saveStudentResult(shareId: string, result: { studentName: string, studentClass: string, score: number, answers: Record<string, any> }): Promise<void> {
+    async saveStudentResult(shareId: string, result: { studentName: string, studentClass: string, score: number, answers: Record<string, any> }, ownerId?: string): Promise<void> {
         if (!shareId) return;
         try {
-            const resultRef = doc(collection(db, "shared_exams", shareId, "results"));
-            await setDoc(resultRef, {
-                id: resultRef.id,
+            const timestamp = new Date().toISOString();
+            const resultData = {
+                id: "", // Sẽ được set sau
+                shareId,
                 ...result,
-                submittedAt: new Date().toISOString()
-            });
+                submittedAt: timestamp
+            };
+
+            // 1. Lưu vào kết quả riêng của mã đề (để xem theo từng đề)
+            const resultRef = doc(collection(db, "shared_exams", shareId, "results"));
+            resultData.id = resultRef.id;
+            await setDoc(resultRef, resultData);
+
+            // 2. Lưu vào bảng điểm chung của giáo viên (để thống kê toàn diện)
+            if (ownerId) {
+                const globalRef = doc(collection(db, "users", ownerId, "globalResults"), resultRef.id);
+                await setDoc(globalRef, resultData);
+            }
         } catch (error) {
             console.error("Firebase saveStudentResult error:", error);
             throw error;
@@ -219,6 +231,24 @@ export const firebaseService = {
             return results;
         } catch (error) {
             console.error("Firebase getStudentResults error:", error);
+            return [];
+        }
+    },
+
+    /**
+     * Lấy toàn bộ kết quả của tất cả các đề (phục vụ thống kê)
+     */
+    async getGlobalResults(ownerId: string): Promise<any[]> {
+        if (!ownerId) return [];
+        try {
+            const resultsRef = collection(db, "users", ownerId, "globalResults");
+            const q = query(resultsRef, orderBy("submittedAt", "desc"));
+            const snapshot = await getDocs(q);
+            const results: any[] = [];
+            snapshot.forEach(doc => results.push(doc.data()));
+            return results;
+        } catch (error) {
+            console.error("Firebase getGlobalResults error:", error);
             return [];
         }
     }

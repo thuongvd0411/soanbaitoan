@@ -198,3 +198,51 @@ ${JSON_SCHEMA_INSTRUCTION}`;
     throw error;
   }
 };
+
+/**
+ * Chuyển đổi giọng nói thành cấu hình ứng dụng
+ */
+export const parseVoiceCommand = async (
+  voiceText: string,
+  currentConfig: AppState
+): Promise<Partial<AppState>> => {
+  const env = (import.meta as any).env || {};
+  const apiKey = (currentConfig.customApiKey || env.VITE_GEMINI_API_KEY)?.trim();
+  if (!apiKey) throw new Error("API Key chưa sẵn sàng.");
+
+  const ai = new GoogleGenAI({ apiKey });
+
+  const prompt = `Bạn là trợ lý AI cho ứng dụng Soạn Toán. 
+Nhiệm vụ: Phân tích câu lệnh giọng nói của người dùng và chuyển đổi thành cấu hình JSON.
+
+CÂU LỆNH GIỌNG NÓI: "${voiceText}"
+
+Cấu hình hiện tại để tham khảo:
+${JSON.stringify({
+    grade: currentConfig.grade,
+    questionCount: currentConfig.questionCount,
+    questionTypes: currentConfig.questionTypes,
+    lessons: currentConfig.lessons,
+    customLesson: currentConfig.customLesson
+  })}
+
+Yêu cầu trích xuất các trường sau (chỉ trả về các trường có sự thay đổi hoặc được nhắc đến):
+- grade (số): Lớp (1-12)
+- questionCount (số): Số lượng câu hỏi
+- selectedDifficulties (mảng string): Nhận biết, Thông hiểu, Vận dụng, Vận dụng cao
+- questionTypes (mảng string): Trắc nghiệm ABCD, Trắc nghiệm Đúng/Sai, Trả lời ngắn
+- customLesson (string): Chủ đề bài học hoặc yêu cầu riêng
+
+BẮT BUỘC trả về JSON thuần túy, không giải thích gì thêm.
+Ví dụ: {"grade": 10, "questionCount": 5, "customLesson": "Phương trình bậc hai"}
+`;
+
+  try {
+    const text = await retryWithFallback(ai, prompt, { temperature: 0.1 });
+    const cleanText = sanitizeJSON(text);
+    return JSON.parse(cleanText);
+  } catch (error) {
+    console.error("Alla Debug - Voice Parse Error:", error);
+    return {};
+  }
+};

@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { AppState, Difficulty, Question, QuestionType, HistoryItem, AnswerMode, ExamType, ImageMode, GameStatus } from './types';
-import { generateQuestions, generateMillionaireQuestions } from './services/geminiService';
+import { generateQuestions, generateMillionaireQuestions, parseVoiceCommand } from './services/geminiService';
 import { getLessonOptions } from './services/syllabusData';
 import { storageService } from './services/storageService';
 import { firebaseService } from './services/firebaseService';
 import {
   Download, PlusCircle, BookOpen, Loader2, X, FileSignature, Menu, Trophy, Sparkles, RotateCcw, Home, HelpCircle, FastForward, HeartPulse, HandMetal, PartyPopper, Volume2, VolumeX, ArrowRight, Wallet, Info, Flame, ShieldAlert, Crown, History, Search,
+  Mic, MicOff,
   Database,
   Cloud,
   CheckSquare,
@@ -508,7 +509,7 @@ const LessonPicker = ({ grade, selectedLessons, onChange }: { grade: number, sel
   );
 };
 
-const Sidebar = ({ config, setConfig, onGenerate, onStartGame, isLoading, onShowHistory, onShowBank, onSync, isSyncing, isOpen, onClose }: any) => {
+const Sidebar = ({ config, setConfig, onGenerate, onStartGame, onVoiceCompose, isListening, isLoading, onShowHistory, onShowBank, onShowStats, onSync, isSyncing, isOpen, onClose }: any) => {
   const handleDifficultyChange = (diff: Difficulty) => { setConfig((prev: AppState) => { const exists = prev.selectedDifficulties.includes(diff); if (exists) return { ...prev, selectedDifficulties: prev.selectedDifficulties.filter(d => d !== diff) }; return { ...prev, selectedDifficulties: [...prev.selectedDifficulties, diff] }; }); };
   const handleTypeChange = (type: QuestionType) => { setConfig((prev: AppState) => { const exists = prev.questionTypes.includes(type); if (exists) { if (prev.questionTypes.length === 1) return prev; return { ...prev, questionTypes: prev.questionTypes.filter(t => t !== type) }; } return { ...prev, questionTypes: [...prev.questionTypes, type] }; }); };
   return (
@@ -562,6 +563,15 @@ const Sidebar = ({ config, setConfig, onGenerate, onStartGame, isLoading, onShow
           <div className="bg-purple-50 p-4 rounded-2xl border border-purple-100 shadow-sm text-center relative overflow-hidden group"> <Trophy size={28} className="mx-auto text-purple-600 mb-1" /> <p className="text-[10px] font-black text-purple-700 uppercase mb-3 tracking-tighter italic">Ai Là Triệu Phú Toán Học</p> <button onClick={() => { onStartGame(); onClose(); }} disabled={isLoading} className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-black py-3 rounded-xl shadow-lg active:scale-95 transition-all text-[10px] uppercase border-b-4 border-indigo-800">BẮT ĐẦU CHƠI</button> </div>
         </div>
         <div className="mt-8 space-y-3">
+          <button
+            onClick={() => { onVoiceCompose(); onClose(); }}
+            disabled={isLoading || isListening}
+            className={`w-full py-4 rounded-xl flex items-center justify-center gap-3 font-black uppercase text-sm transition-all shadow-lg mb-3 ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:scale-105 active:scale-95'}`}
+          >
+            {isListening ? <MicOff size={22} /> : <Mic size={22} />}
+            {isListening ? 'Alla Đang Nghe...' : 'Soạn bằng Giọng nói'}
+          </button>
+
           <button onClick={() => { onGenerate(); onClose(); }} disabled={isLoading} className="w-full bg-primary hover:bg-blue-800 text-white font-black py-4 rounded-xl shadow-xl flex items-center justify-center gap-2 uppercase tracking-tight transition-all border-b-4 border-blue-900"> {isLoading ? <Loader2 className="animate-spin" /> : <PlusCircle size={22} />} Soạn bộ câu hỏi AI </button>
 
           <button
@@ -574,6 +584,10 @@ const Sidebar = ({ config, setConfig, onGenerate, onStartGame, isLoading, onShow
           </button>
 
           <div className="flex gap-2"> <button onClick={onShowHistory} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2.5 rounded-xl text-[10px] uppercase flex items-center justify-center gap-1 transition-colors"><History size={14} /> Lịch sử</button> <button onClick={onShowBank} className="flex-1 bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold py-2.5 rounded-xl text-[10px] border border-amber-200 uppercase flex items-center justify-center gap-1 transition-colors"><Database size={14} /> Kho lưu</button> </div>
+          <button onClick={onShowStats} className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-black py-3 rounded-xl flex items-center justify-center gap-2 uppercase text-[10px] transition-all border border-indigo-100">
+            <Trophy size={18} />
+            Thống kê điểm số
+          </button>
         </div>
       </div >
     </>
@@ -680,6 +694,10 @@ export default function App() {
   const [loadingMessage, setLoadingMessage] = useState("AI Đang soạn thảo...");
   const [showResultsModal, setShowResultsModal] = useState(false);
   const [resultsData, setResultsData] = useState<any[]>([]);
+  const [showStatsModal, setShowStatsModal] = useState(false);
+  const [globalResults, setGlobalResults] = useState<any[]>([]);
+  const [statsMonth, setStatsMonth] = useState<string>(new Date().toISOString().substring(0, 7)); // YYYY-MM
+  const [statsClass, setStatsClass] = useState<string>("All");
 
   // States cho Học sinh làm bài
   const [studentAnswers, setStudentAnswers] = useState<Record<string, any>>({});
@@ -687,6 +705,7 @@ export default function App() {
   const [studentName, setStudentName] = useState("");
   const [studentClass, setStudentClass] = useState("");
   const [isSubmittingResult, setIsSubmittingResult] = useState(false);
+  const [isListening, setIsListening] = useState(false);
 
   const calculateScore = () => {
     let correct = 0;
@@ -955,8 +974,11 @@ export default function App() {
       // Upload Firebase ngầm với timeout 10 giây
       const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Firebase timeout")), 10000));
       try {
+        const ownerId = storageService.getOwnerId();
+        const shareDataConfig = { ...config, ownerId }; // Đính kèm ownerId vào metadata của đề
+
         await Promise.race([
-          firebaseService.saveSharedExam(questions, config, currentShareId),
+          firebaseService.saveSharedExam(questions, shareDataConfig, currentShareId),
           timeoutPromise
         ]);
         console.log("Share saved to Firebase:", currentShareId);
@@ -1188,6 +1210,96 @@ export default function App() {
     link.click();
   };
 
+  const handleShowStats = async () => {
+    const ownerId = storageService.getOwnerId();
+    if (!ownerId) return alert("Anh cần kích hoạt bản quyền để sử dụng tính năng này nhé.");
+
+    setIsLoading(true);
+    setLoadingMessage("Đang tải dữ liệu thống kê...");
+    try {
+      const results = await firebaseService.getGlobalResults(ownerId);
+      setGlobalResults(results);
+      setShowStatsModal(true);
+    } catch (err) {
+      alert("Lỗi khi tải dữ liệu thống kê!");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVoiceCompose = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) return alert("Trình duyệt của anh không hỗ trợ giọng nói. Anh dùng Chrome hoặc Edge nhé!");
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'vi-VN';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
+
+    recognition.onresult = async (event: any) => {
+      const text = event.results[0][0].transcript;
+      setIsListening(false);
+      setLoadingMessage(`Đang phân tích lệnh: "${text}"...`);
+      setIsLoading(true);
+
+      try {
+        const partialConfig = await parseVoiceCommand(text, config);
+        setConfig(prev => {
+          const newConfig = { ...prev, ...partialConfig };
+          // Tự động soạn đề ngay sau khi update config
+          setTimeout(() => {
+            handleGenerateWithConfig(newConfig);
+          }, 100);
+          return newConfig;
+        });
+      } catch (err) {
+        alert("Alla không hiểu lệnh này, anh thử nói lại nhé.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    recognition.onerror = () => {
+      setIsListening(false);
+      alert("Lỗi nhận diện giọng nói.");
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.start();
+  };
+
+  // Hàm bổ trợ để generate trực tiếp với config mới
+  const handleGenerateWithConfig = async (newConfig: AppState) => {
+    setIsLoading(true); setProgress(0);
+    const progressTimer = setInterval(() => setProgress(prev => prev >= 98 ? 98 : prev + 4), 500);
+    try {
+      const res = await generateQuestions(newConfig);
+      setQuestions(res);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      const ownerId = storageService.getOwnerId();
+      if (ownerId) {
+        firebaseService.saveHistory(ownerId, {
+          id: 'hist_' + Date.now(),
+          timestamp: Date.now(),
+          config: { ...newConfig },
+          questions: res
+        }).catch(console.error);
+      }
+    } catch (e) {
+      alert("Lỗi AI: " + (e as Error).message);
+    } finally {
+      clearInterval(progressTimer);
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-gray-100 font-sans overflow-hidden">
       <header className="md:hidden bg-primary text-white p-4 flex justify-between items-center sticky top-0 z-30 shadow-lg">
@@ -1203,9 +1315,12 @@ export default function App() {
           setConfig={setConfig}
           onGenerate={handleGenerate}
           onStartGame={handleStartGame}
+          onVoiceCompose={handleVoiceCompose}
+          isListening={isListening}
           isLoading={isLoading}
           onShowHistory={() => setShowHistoryModal(true)}
           onShowBank={() => setShowBankModal(true)}
+          onShowStats={handleShowStats}
           onSync={handleSync}
           isSyncing={isSyncing}
           isOpen={isSidebarOpen}
@@ -1264,13 +1379,14 @@ export default function App() {
                         // Lấy tên Học sinh/Khách và Lớp (từ config)
                         const finalName = studentName.trim() || 'Khách';
                         const finalClass = shareConfig?.grade ? `Lớp ${shareConfig.grade}` : 'Không rõ';
+                        const ownerId = shareConfig?.ownerId; // Lấy ownerId từ config của đề được chia sẻ
 
                         await firebaseService.saveStudentResult(shareId, {
                           studentName: finalName,
                           studentClass: finalClass,
                           score: finalScore,
                           answers: studentAnswers
-                        });
+                        }, ownerId);
                       }
                       setIsSubmitted(true);
                       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1417,6 +1533,148 @@ export default function App() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL THỐNG KÊ TOÀN DIỆN */}
+      {showStatsModal && (
+        <div className="fixed inset-0 bg-black/70 z-[80] flex items-center justify-center p-4 md:p-10 animate-in fade-in">
+          <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-6xl h-full md:max-h-[90vh] flex flex-col overflow-hidden border-4 border-indigo-100">
+            <div className="p-8 border-b flex justify-between items-center bg-gradient-to-r from-indigo-50 to-blue-50">
+              <div>
+                <h2 className="font-black text-2xl uppercase text-indigo-900 flex items-center gap-3">
+                  <Award className="text-indigo-600" size={32} />
+                  Báo Cáo Thống Kê Điểm Số
+                </h2>
+                <p className="text-gray-500 font-medium text-sm mt-1">Phân tích kết quả học tập của tất cả học sinh</p>
+              </div>
+              <button onClick={() => setShowStatsModal(false)} className="p-3 hover:bg-white rounded-full transition-colors shadow-sm"><X size={32} /></button>
+            </div>
+
+            {/* BỘ LỌC */}
+            <div className="p-6 bg-gray-50/80 border-b flex flex-col md:flex-row gap-6 items-end">
+              <div className="flex-1 w-full">
+                <label className="block text-[10px] font-black text-gray-400 mb-2 uppercase tracking-widest">Lọc theo Tháng</label>
+                <input
+                  type="month"
+                  value={statsMonth}
+                  onChange={(e) => setStatsMonth(e.target.value)}
+                  className="w-full border-2 border-gray-200 rounded-2xl p-3 font-bold text-gray-700 outline-none focus:border-indigo-500 bg-white transition-all shadow-sm"
+                />
+              </div>
+              <div className="flex-1 w-full">
+                <label className="block text-[10px] font-black text-gray-400 mb-2 uppercase tracking-widest">Lọc theo Lớp</label>
+                <select
+                  value={statsClass}
+                  onChange={(e) => setStatsClass(e.target.value)}
+                  className="w-full border-2 border-gray-200 rounded-2xl p-3 font-bold text-gray-700 outline-none focus:border-indigo-500 bg-white transition-all shadow-sm"
+                >
+                  <option value="All">Tất cả các lớp</option>
+                  {Array.from(new Set(globalResults.map(r => r.studentClass))).filter(Boolean).map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex-1 w-full md:w-auto">
+                <div className="bg-indigo-600 text-white p-3 rounded-2xl flex items-center justify-between shadow-lg">
+                  <div className="px-2">
+                    <p className="text-[10px] font-black uppercase opacity-60">Tổng số bài làm</p>
+                    <p className="text-2xl font-black">
+                      {globalResults.filter(r => {
+                        const dateMatch = r.submittedAt?.startsWith(statsMonth);
+                        const classMatch = statsClass === "All" || r.studentClass === statsClass;
+                        return dateMatch && classMatch;
+                      }).length}
+                    </p>
+                  </div>
+                  <Sparkles size={24} className="mr-2 opacity-50" />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-8">
+              {globalResults.length === 0 ? (
+                <div className="text-center py-32">
+                  <div className="bg-gray-100 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <History size={48} className="text-gray-300" />
+                  </div>
+                  <p className="text-gray-400 font-bold uppercase tracking-widest text-sm">Chưa có dữ liệu thống kê tập trung.</p>
+                  <p className="text-gray-300 text-xs mt-2 italic">Dữ liệu sẽ bắt đầu cập nhật từ các bài nộp mới nhất.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="overflow-x-auto rounded-[30px] border border-gray-200 shadow-xl bg-white">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-indigo-900 text-white text-[10px] font-black uppercase tracking-[0.2em]">
+                          <th className="px-8 py-5">Học Sinh</th>
+                          <th className="px-8 py-5">Lớp / Nhãn</th>
+                          <th className="px-8 py-5 text-center">Điểm số</th>
+                          <th className="px-8 py-5">Thời gian nộp</th>
+                          <th className="px-8 py-5">Hành động</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {globalResults
+                          .filter(r => {
+                            const dateMatch = r.submittedAt?.startsWith(statsMonth);
+                            const classMatch = statsClass === "All" || r.studentClass === statsClass;
+                            return dateMatch && classMatch;
+                          })
+                          .map((res: any, idx: number) => (
+                            <tr key={idx} className="hover:bg-indigo-50/50 transition-colors group">
+                              <td className="px-8 py-5">
+                                <p className="font-black text-gray-900 text-lg">{res.studentName}</p>
+                                <p className="text-[10px] text-indigo-400 font-bold uppercase">ID: {res.id?.substring(0, 8)}</p>
+                              </td>
+                              <td className="px-8 py-5">
+                                <span className="px-4 py-1.5 bg-gray-100 text-gray-600 rounded-full text-[11px] font-black uppercase border border-gray-200">
+                                  {res.studentClass || 'Tự do'}
+                                </span>
+                              </td>
+                              <td className="px-8 py-5 text-center">
+                                <div className={`inline-flex items-center gap-2 px-5 py-2 rounded-2xl font-black text-xl shadow-sm ${res.score >= 8 ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : res.score >= 5 ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-red-100 text-red-700 border border-red-200'}`}>
+                                  {res.score}
+                                  <span className="text-[10px] opacity-50 uppercase">/ 10</span>
+                                </div>
+                              </td>
+                              <td className="px-8 py-5">
+                                <p className="text-gray-500 font-bold text-sm">{new Date(res.submittedAt).toLocaleDateString('vi-VN')}</p>
+                                <p className="text-[10px] text-gray-400 uppercase font-medium">{new Date(res.submittedAt).toLocaleTimeString('vi-VN')}</p>
+                              </td>
+                              <td className="px-8 py-5">
+                                <button
+                                  onClick={async () => {
+                                    setLoadingMessage("Đang tải đề gốc...");
+                                    setIsLoading(true);
+                                    try {
+                                      const data = await firebaseService.getSharedExam(res.shareId);
+                                      if (data) {
+                                        setQuestions(data.questions);
+                                        setShareConfig(data.config);
+                                        setStudentAnswers(res.answers || {});
+                                        setIsSubmitted(true);
+                                        setIsViewerMode(true);
+                                        setShowStatsModal(false);
+                                      }
+                                    } catch (e) { alert("Lỗi tải đề!"); }
+                                    finally { setIsLoading(false); }
+                                  }}
+                                  className="p-3 bg-white border-2 border-gray-200 text-gray-400 rounded-2xl hover:border-indigo-500 hover:text-indigo-600 transition-all group-hover:shadow-md"
+                                  title="Xem chi tiết bài làm của em này"
+                                >
+                                  <Search size={20} />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
