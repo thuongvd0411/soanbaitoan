@@ -4,12 +4,12 @@ import { getFirestore } from "firebase/firestore";
 
 // Cấu hình Firebase Config từ người dùng
 const firebaseConfig = {
-  apiKey: "AIzaSyBedNFGrTwDPm-Kum4IwCTG8mY-K5srGGU",
-  authDomain: "dulieudayhoc-156f6.firebaseapp.com",
-  projectId: "dulieudayhoc-156f6",
-  storageBucket: "dulieudayhoc-156f6.firebasestorage.app",
-  messagingSenderId: "950467818683",
-  appId: "1:950467818683:web:75839da992d0981180259e"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
 // Khởi tạo ứng dụng Firebase

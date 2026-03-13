@@ -25,6 +25,8 @@ import { onSnapshot, doc } from 'firebase/firestore';
 import { db } from './services/firebaseService';
 import { Student, StudyRecord, Schedule } from './types';
 
+const APP_VERSION = "v5.3.0";
+
 declare global {
   interface Window {
     MathJax: any;
@@ -505,12 +507,15 @@ const Sidebar = ({
     <>
       {isOpen && <div className="fixed inset-0 bg-black/60 z-40 md:hidden animate-in fade-in" onClick={onClose} />}
       <div className={`fixed md:relative inset-y-0 left-0 w-80 bg-white border-r border-gray-200 h-screen overflow-y-auto p-4 flex flex-col no-print z-50 transition-transform duration-300 ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
-        <div className="flex items-center justify-between mb-6 text-primary"> <div className="flex items-center gap-2"><BookOpen size={28} /><h1 className="text-xl font-black uppercase tracking-tighter text-blue-900">Soạn Toán AI</h1></div> <button onClick={onClose} className="md:hidden p-2"><X size={24} /></button> </div>
+        <div className="flex items-center justify-between mb-6 text-primary"> <div className="flex items-center gap-2"><BookOpen size={28} /><h1 className="text-xl font-black uppercase tracking-tighter text-blue-900">Quản Lý Học</h1></div> <button onClick={onClose} className="md:hidden p-2"><X size={24} /></button> </div>
         <div className="space-y-6 flex-1">
           <div className="p-4 bg-orange-50 rounded-2xl border border-orange-100 shadow-sm mb-4">
-            <label className="block text-[10px] font-black text-orange-600 mb-2 uppercase tracking-widest flex items-center gap-2">
-              <ShieldAlert size={14} /> Cấu hình Gemini API Key
-            </label>
+            <div className="flex justify-between items-center mb-2">
+              <label className="text-[10px] font-black text-orange-600 uppercase tracking-widest flex items-center gap-2">
+                <ShieldAlert size={14} /> Cấu hình Gemini API Key
+              </label>
+              <span className="text-[9px] font-black text-gray-400 opacity-50">{APP_VERSION}</span>
+            </div>
             <div className="relative">
               <input
                 type="password"
@@ -694,6 +699,9 @@ const Sidebar = ({
             </div>
           </div>
         )}
+        <div className="mt-auto pt-10 pb-4 text-center opacity-20 select-none">
+          <span className="text-[9px] font-black uppercase tracking-[0.4em] text-gray-400">Alla System {APP_VERSION}</span>
+        </div>
       </div >
     </>
   );
@@ -2358,7 +2366,7 @@ export default function App() {
             </div>
 
             <h2 className="text-[26px] font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-cyan-200 uppercase tracking-widest mb-3">Hệ thống bảo mật</h2>
-            <p className="text-cyan-100/60 text-[13px] font-medium mb-10 leading-relaxed px-2">Vui lòng nhập mã kích hoạt được cung cấp để bắt đầu trải nghiệm hệ thống Soạn Toán AI v5.</p>
+            <p className="text-cyan-100/60 text-[13px] font-medium mb-10 leading-relaxed px-2">Hệ thống bảo mật, bạn cần nhập Key.</p>
 
             <div className="space-y-4 relative z-10">
               <div className="relative group">
@@ -2409,7 +2417,7 @@ export default function App() {
               </button>
             </div>
 
-            <p className="mt-10 text-[9px] font-bold text-cyan-800/60 uppercase tracking-[0.3em]">Xây dựng bởi ThuongVd & Alla v5.2</p>
+            <p className="mt-10 text-[9px] font-bold text-cyan-800/60 uppercase tracking-[0.3em]">Xây dựng bởi ThuongVd & Alla {APP_VERSION}</p>
           </div>
         </div>
       )}

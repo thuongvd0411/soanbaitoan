@@ -9,11 +9,11 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['pwa-icon.svg'],
+      includeAssets: ['pwa-icon.png', 'favicon.ico', 'robots.txt', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Soạn Bài Toán AI',
-        short_name: 'Soạn Toán',
-        description: 'Hệ thống soạn đề bài tập Toán AI chuyên nghiệp',
+        name: 'Quản Lý Học',
+        short_name: 'Quản Lý Học',
+        description: 'Hệ thống Quản Lý Học Tập & Soạn đề Toán AI v5.2',
         theme_color: '#4f46e5',
         background_color: '#ffffff',
         display: 'standalone',
@@ -22,27 +22,27 @@ export default defineConfig({
         start_url: '/soanbaitoan/',
         icons: [
           {
-            src: 'pwa-icon.svg',
+            src: 'pwa-icon.png',
             sizes: '192x192',
-            type: 'image/svg+xml',
+            type: 'image/png',
             purpose: 'any'
           },
           {
-            src: 'pwa-icon.svg',
+            src: 'pwa-icon.png',
             sizes: '512x512',
-            type: 'image/svg+xml',
+            type: 'image/png',
             purpose: 'any'
           },
           {
-            src: 'pwa-icon.svg',
+            src: 'pwa-icon.png',
             sizes: '192x192',
-            type: 'image/svg+xml',
+            type: 'image/png',
             purpose: 'maskable'
           },
           {
-            src: 'pwa-icon.svg',
+            src: 'pwa-icon.png',
             sizes: '512x512',
-            type: 'image/svg+xml',
+            type: 'image/png',
             purpose: 'maskable'
           }
         ]
