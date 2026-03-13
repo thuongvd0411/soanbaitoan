@@ -343,6 +343,69 @@ export const firebaseService = {
             console.error("Firebase assignExamToStudent error:", error);
             throw error;
         }
+    },
+
+    /**
+     * Đồng bộ điểm bài tập vào lịch sử học tập (History) của học sinh
+     */
+    async addExamRecordToStudent(studentId: string, recordInfo: { title: string, score: number, shareId: string }): Promise<void> {
+        try {
+            const docRef = doc(db, 'appData', 'studentsData_v5');
+            const docSnap = await getDoc(docRef);
+
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                const students = Array.isArray(data.students) ? [...data.students] : [];
+
+                const studentIndex = students.findIndex((s: any) => s.id === studentId);
+                if (studentIndex !== -1) {
+                    const student = { ...students[studentIndex] };
+                    if (!student.history) student.history = [];
+
+                    // Tạo bản ghi history mới loại "Bài tập"
+                    const newRecord = {
+                        id: "exam_" + Date.now(),
+                        date: new Date().toISOString().split('T')[0],
+                        weekday: new Date().getDay() === 0 ? 6 : new Date().getDay() - 1, // Fix 0..6 (CN..T7) -> (T2..CN)
+                        session: "Bài tập" as any, // Dùng as any để bypass enum nếu cần, hoặc ép kiểu
+                        status: 'attended',
+                        homework: 'N/A',
+                        formulaTest: 'N/A',
+                        oldLessonTest: 'N/A',
+                        regularHomeworkResult: 'N/A',
+                        testScore: recordInfo.score,
+                        evalNewKnowledge: recordInfo.score,
+                        evalQuantity: 100, // Mặc định 100%
+                        ignoreEarlyStats: true,
+                        ignoreMidStats: false,
+                        ignoreLateStats: true,
+                        ignoreOutsideStats: true,
+                        ignoreTestStats: false,
+                        absentReason: `Làm bài: ${recordInfo.title}`,
+                        mockTests: []
+                    };
+
+                    student.history = [newRecord, ...student.history];
+
+                    // Cập nhật trạng thái bài tập đã giao
+                    if (student.assignedExams) {
+                        const examIndex = student.assignedExams.findIndex((e: any) => e.id === recordInfo.shareId);
+                        if (examIndex !== -1) {
+                            student.assignedExams[examIndex] = {
+                                ...student.assignedExams[examIndex],
+                                status: 'completed'
+                            };
+                        }
+                    }
+
+                    students[studentIndex] = student;
+                    await this.syncManagementData(students);
+                }
+            }
+        } catch (error) {
+            console.error("Firebase addExamRecordToStudent error:", error);
+            throw error;
+        }
     }
 };
 

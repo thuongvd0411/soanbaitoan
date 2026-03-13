@@ -559,6 +559,18 @@ const Sidebar = ({
           <div className={activeTab === 'edu' ? 'hidden' : 'block space-y-6'}>
             {config.examType === ExamType.None && (
               <div>
+                <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-widest">Khối lớp</label>
+                <div className="flex gap-1.5 mb-4">
+                  {[10, 11, 12].map(g => (
+                    <button
+                      key={g}
+                      onClick={() => setConfig({ ...config, grade: g, lessons: [] })}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-black border transition-all ${config.grade === g ? 'bg-primary text-white border-primary shadow-md' : 'bg-gray-50 text-gray-400 border-gray-200'}`}
+                    >
+                      Lớp {g}
+                    </button>
+                  ))}
+                </div>
                 <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-widest">Nội dung bài học (Chọn nhiều)</label>
                 <LessonPicker grade={config.grade} selectedLessons={config.lessons} onChange={(lessons) => setConfig({ ...config, lessons })} />
                 <div className="mt-3">
@@ -1084,6 +1096,17 @@ export default function App() {
           setQuestions(data.questions);
           setShareConfig(data.config);
           setShareId(sharedId); // CRITICAL: Lưu shareId để đảm bảo nộp bài được lưu lên Firebase
+
+          // NEW: Nếu đề có gán cho học sinh cụ thể, tự động điền tên từ hệ thống quản lý
+          if (data.config?.assignedStudentId) {
+            firebaseService.getManagementStudents().then(allStudents => {
+              const student = allStudents.find(s => s.id === data.config.assignedStudentId);
+              if (student) {
+                setStudentName(student.fullName);
+                setStudentClass(student.className || `Lớp ${data.config.grade || 12}`);
+              }
+            });
+          }
         } else {
           alert("Link bài tập không hợp lệ hoặc đã bị xóa!");
           window.location.href = window.location.pathname;
@@ -1323,13 +1346,18 @@ export default function App() {
       const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Firebase timeout")), 10000));
       try {
         const ownerId = storageService.getOwnerId();
-        const shareDataConfig = { ...config, ownerId }; // Đính kèm ownerId vào metadata của đề
+        // Đính kèm assignedStudentId vào metadata của đề
+        const shareDataConfig = {
+          ...config,
+          ownerId,
+          assignedStudentId: selectedStudentIdForShare || null
+        };
 
         await Promise.race([
           firebaseService.saveSharedExam(questions, shareDataConfig, currentShareId),
           timeoutPromise
         ]);
-        console.log("Share saved to Firebase:", currentShareId);
+        console.log("Share saved to Firebase with integration:", currentShareId);
       } catch (firebaseErr) {
         console.error("Firebase share upload failed (link vẫn hoạt động nếu retry):", firebaseErr);
       }
@@ -1907,6 +1935,19 @@ export default function App() {
                             });
                           } catch (globalErr: any) {
                             console.warn("Lưu vào globalResults failed (không ảnh hưởng):", globalErr?.message);
+                          }
+                        }
+                        // Bước 3: Đồng bộ điểm vào hồ sơ học sinh (nếu có assignedStudentId)
+                        if (shareConfig?.assignedStudentId) {
+                          try {
+                            await firebaseService.addExamRecordToStudent(shareConfig.assignedStudentId, {
+                              title: shareConfig.customLesson || `Bài tập Lớp ${shareConfig.grade}`,
+                              score: finalScore,
+                              shareId: shareId
+                            });
+                            console.log("Synced exam result to student history.");
+                          } catch (syncErr: any) {
+                            console.warn("Đồng bộ điểm vào hồ sơ thất bại:", syncErr?.message);
                           }
                         }
                       } else {
