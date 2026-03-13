@@ -2,7 +2,7 @@
 **Ngày cập nhật:** 11/03/2026 12:58
 
 ## Trạng thái hiện tại
-- **Phiên bản app:** `v5.2 (Shared Data)` — Deploy thành công trên GitHub Pages
+- **Phiên bản app:** `v5.3 (Integrated with LMS)` — Tính năng giao bài cho học sinh
 - **Tính năng đã hoàn tất:**
     1. **Bảo mật v2**: DeviceId + Fingerprint (SHA-256) đã chạy ổn định.
     2. **Cloud Database**: Firebase Firestore đã tạo + Rules cho phép read/write.
@@ -10,6 +10,7 @@
     4. **Share Link hoạt động**: Sinh bài xong → copy link ngay, Firebase upload ngầm.
     5. **Dữ liệu chung**: Tất cả máy cùng token = cùng `ownerId` (hash SHA-256) = cùng kho dữ liệu.
     6. **Bỏ Sync ID UI**: Không cần sync key thủ công nữa.
+    7. **Tích hợp Quản lý học tập**: Giao bài trực tiếp cho học sinh từ dự án `quanlyhoc`.
 
 ## Kiến trúc dữ liệu hiện tại
 - **ownerId**: `owner_` + SHA256(token).substring(0,24) — tự tạo khi kích hoạt

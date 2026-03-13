@@ -9,7 +9,8 @@ import {
     getDocs,
     deleteDoc,
     query,
-    orderBy
+    orderBy,
+    onSnapshot
 } from "firebase/firestore";
 import { Question, HistoryItem } from "../types";
 
@@ -271,5 +272,78 @@ export const firebaseService = {
             console.error("Firebase deleteGlobalResult error:", error);
             throw error;
         }
+    },
+
+    /**
+     * --- TÍCH HỢP VỚI QUẢN LÝ HỌC TẬP ---
+     */
+
+    /**
+     * Lấy danh sách học sinh từ dự án Quản lý học tập
+     */
+    async getManagementStudents(): Promise<any[]> {
+        try {
+            const docRef = doc(db, 'appData', 'studentsData_v5');
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                return Array.isArray(data.students) ? data.students : [];
+            }
+            return [];
+        } catch (error) {
+            console.error("Firebase getManagementStudents error:", error);
+            return [];
+        }
+    },
+
+    /**
+     * Đồng bộ toàn bộ dữ liệu học sinh (giữ nguyên logic gốc của quanlyhoc)
+     */
+    async syncManagementData(students: any[]): Promise<void> {
+        try {
+            const docRef = doc(db, 'appData', 'studentsData_v5');
+            // Loại bỏ undefined để tránh lỗi Firestore
+            const sanitized = JSON.parse(JSON.stringify(students, (key, value) => {
+                return value === undefined ? null : value;
+            }));
+            await setDoc(docRef, { students: sanitized });
+        } catch (error) {
+            console.error("Firebase syncManagementData error:", error);
+            throw error;
+        }
+    },
+
+    /**
+     * Giao bài tập cho một học sinh cụ thể
+     */
+    async assignExamToStudent(studentId: string, assignedExam: any): Promise<void> {
+        try {
+            const docRef = doc(db, 'appData', 'studentsData_v5');
+            const docSnap = await getDoc(docRef);
+
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                const students = Array.isArray(data.students) ? [...data.students] : [];
+
+                const studentIndex = students.findIndex((s: any) => s.id === studentId);
+                if (studentIndex !== -1) {
+                    const student = { ...students[studentIndex] };
+                    if (!student.assignedExams) student.assignedExams = [];
+
+                    // Thêm bài tập mới vào đầu danh sách
+                    student.assignedExams = [assignedExam, ...student.assignedExams];
+
+                    students[studentIndex] = student;
+
+                    // Lưu lại bằng hàm sync đã sanitized
+                    await this.syncManagementData(students);
+                }
+            }
+        } catch (error) {
+            console.error("Firebase assignExamToStudent error:", error);
+            throw error;
+        }
     }
 };
+
+export { db };
