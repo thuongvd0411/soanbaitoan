@@ -23,13 +23,7 @@
 ## Việc cần làm tiếp theo
 1. **Siết Firestore Rules**: Hiện đang ở test mode, cần thêm authentication hoặc rules chặt hơn.
 2. **Bỏ debug log**: Xóa `console.log("Alla Firebase Config Status:...")` trong `firebaseService.ts`.
-3. **PWA**:
-    - **Trạng thái:** Đã cài đặt thành công PWA và deploy lên GitHub Pages.
-    - **Thành tựu mới:** 
-        - Cài đặt PWA với Manifest và Service Worker chuẩn.
-        - Tạo icon π cho dự án Soạn Toán AI.
-        - Tối ưu hóa giao diện di động.
-4. **Nâng cấp UI**: Cân nhắc thêm tính năng xem kết quả học sinh, thống kê điểm.
-5. **Migration dữ liệu cũ**: Dữ liệu Firebase cũ ở `users/{deviceId_cũ}/...` chưa được migrate.
+3. **Nâng cấp UI**: Cân nhắc thêm tính năng xem kết quả học sinh, thống kê điểm.
+4. **Migration dữ liệu cũ**: Dữ liệu Firebase cũ ở `users/{deviceId_cũ}/...` chưa được migrate.
 
 **Ghi chú cho Alla:** Ưu tiên kiểm tra nhãn phiên bản (v5.2) trước khi debug. Firestore cần được tạo thủ công trên Firebase Console — code không tự tạo được.
