@@ -52,10 +52,13 @@ export const calculateMonthlyStats = (
     }
   }
 
-  const activeRecords = records.filter(r => r.status === 'attended' || r.status === 'makeup');
-  const attendedCount = records.filter(r => r.status === 'attended').length;
-  const makeupCount = records.filter(r => r.status === 'makeup').length;
-  const absentCount = records.filter(r => r.status === 'absent').length;
+  const activeRecords = records.filter(r => {
+    const s = r.status?.trim().toLowerCase();
+    return s === 'attended' || s === 'makeup';
+  });
+  const attendedCount = records.filter(r => r.status?.trim().toLowerCase() === 'attended').length;
+  const makeupCount = records.filter(r => r.status?.trim().toLowerCase() === 'makeup').length;
+  const absentCount = records.filter(r => r.status?.trim().toLowerCase() === 'absent').length;
 
   const totalSalary = (attendedCount + makeupCount) * baseSalary;
 

@@ -560,16 +560,16 @@ const Sidebar = ({
             {config.examType === ExamType.None && (
               <div>
                 <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-widest">Khối lớp</label>
-                <div className="flex gap-1.5 mb-4">
-                  {[10, 11, 12].map(g => (
-                    <button
-                      key={g}
-                      onClick={() => setConfig({ ...config, grade: g, lessons: [] })}
-                      className={`flex-1 py-1.5 rounded-lg text-xs font-black border transition-all ${config.grade === g ? 'bg-primary text-white border-primary shadow-md' : 'bg-gray-50 text-gray-400 border-gray-200'}`}
-                    >
-                      Lớp {g}
-                    </button>
-                  ))}
+                <div className="mb-4">
+                  <select
+                    value={config.grade}
+                    onChange={(e) => setConfig({ ...config, grade: parseInt(e.target.value), lessons: [] })}
+                    className="w-full bg-gray-50 border-2 border-gray-200 text-gray-700 font-bold py-2 px-3 rounded-xl focus:border-primary outline-none transition-all shadow-sm"
+                  >
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map(g => (
+                      <option key={g} value={g}>Khối lớp {g}</option>
+                    ))}
+                  </select>
                 </div>
                 <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-widest">Nội dung bài học (Chọn nhiều)</label>
                 <LessonPicker grade={config.grade} selectedLessons={config.lessons} onChange={(lessons) => setConfig({ ...config, lessons })} />
@@ -1738,7 +1738,7 @@ export default function App() {
     <div className="flex flex-col md:flex-row min-h-screen bg-gray-100 font-sans overflow-hidden">
       <header className="md:hidden bg-primary text-white p-4 flex flex-col gap-4 sticky top-0 z-30 shadow-lg no-print">
         <div className="flex justify-between items-center">
-          <div className="flex items-center gap-2 font-black uppercase"><BookOpen size={24} /> {isViewerMode ? 'BÀI TẬP VỀ NHÀ' : 'Soạn Toán AI'}</div>
+          <div className="flex items-center gap-2 font-black uppercase"><BookOpen size={24} /> {isViewerMode ? 'BÀI TẬP VỀ NHÀ' : 'Quản Lý Học Tập'}</div>
           <div className="flex items-center gap-2">
             <button onClick={triggerMath} className="p-2 bg-white/20 rounded-full"><RefreshCw size={20} /></button>
             {!isViewerMode && <button onClick={() => setIsSidebarOpen(true)} className="p-2"><Menu size={28} /></button>}
