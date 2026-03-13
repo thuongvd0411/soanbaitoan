@@ -1,0 +1,79 @@
+
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Soạn Bài Tập Toán - Kết Nối Tri Thức</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: { primary: '#005b96', secondary: '#6497b1', accent: '#b3cde0' },
+            animation: {
+              'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              'bounce-once': 'bounce 0.5s ease-in-out 1',
+              'confetti': 'confetti-fall 3s ease-out forwards',
+              'float-up': 'float-up 2s ease-out forwards',
+            }
+          }
+        }
+      }
+    </script>
+    <script>
+      window.MathJax = {
+        tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']], processEscapes: true },
+        svg: { fontCache: 'global' },
+        options: { enableMenu: false },
+        startup: { typeset: false }
+      };
+    </script>
+    <script type="text/javascript" id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+    <style>
+      @media print { 
+        .no-print { display: none !important; } 
+        .print-only { display: block !important; } 
+        body { background: white; color: black; } 
+        #root { margin: 0; padding: 0; } 
+        svg { filter: none !important; }
+      }
+      .math { font-family: 'Times New Roman', serif; font-size: 1.1em; font-weight: 500; color: inherit !important; display: inline-block; padding: 0 2px; }
+      mjx-container svg { fill: currentColor !important; color: inherit !important; }
+      mjx-container { color: inherit !important; margin: 0 !important; display: inline-block !important; vertical-align: middle; }
+      
+      /* SVG Math Optimization */
+      svg { max-width: 100%; height: auto; shape-rendering: geometricPrecision; }
+      .svg-container { overflow: visible; display: flex; justify-content: center; align-items: center; }
+      text { font-family: 'Times New Roman', serif; font-style: italic; font-size: 14px; }
+      
+      @keyframes confetti-fall {
+        0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
+        100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+      }
+      @keyframes float-up {
+        0% { transform: translateY(0); opacity: 1; }
+        100% { transform: translateY(-100px); opacity: 0; }
+      }
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+
+<link rel="stylesheet" href="./index.css">
+  <script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0"
+  }
+}
+</script>
+  <script type="module" crossorigin src="/soanbaitoan/assets/index-DbgQ80Cf.js"></script>
+</head>
+  <body class="bg-gray-50 text-gray-800 font-sans">
+    <div id="root"></div>
+</body>
+</html>
