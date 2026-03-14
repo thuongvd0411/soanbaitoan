@@ -12,7 +12,7 @@ import {
   Cloud,
   CheckSquare,
   Save, ChevronRight, ListChecks, BrainCircuit, Star, Award, FileCode, Printer, RefreshCw, LogOut, PenLine, PenTool, ChevronDown, ChevronUp, Play, Gift, ImageIcon, CloudLightning, Trash2,
-  Users, Calendar, BarChart3, Settings, DollarSign, Bell
+  Users, Calendar, BarChart3, Settings, DollarSign, Bell, MessageSquare
 } from 'lucide-react';
 import StudentList from './components/StudentList';
 import StudentDetails from './components/StudentDetails';
@@ -24,8 +24,11 @@ import { calculateMonthlyStats, formatCurrency } from './utils/helpers';
 import { onSnapshot, doc } from 'firebase/firestore';
 import { db } from './services/firebaseService';
 import { Student, StudyRecord, Schedule } from './types';
+import ChatbotPanel from './components/ChatbotPanel';
 
-const APP_VERSION = "v5.3.0";
+
+const APP_VERSION = "v5.4.0";
+console.log("Alla Version:", APP_VERSION);
 
 declare global {
   interface Window {
@@ -838,6 +841,8 @@ export default function App() {
   const [isAddingRecord, setIsAddingRecord] = useState(false);
   const [hideValues, setHideValues] = useState(true);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'loading' | 'success' | 'error'>('idle');
+  const [isChatOpen, setIsChatOpen] = useState(false);
+
 
   // Khôi phục và đồng bộ realtime từ Firebase cho Quản lý học tập
   useEffect(() => {

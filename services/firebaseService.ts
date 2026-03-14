@@ -406,6 +406,77 @@ export const firebaseService = {
             console.error("Firebase addExamRecordToStudent error:", error);
             throw error;
         }
+    },
+
+    /**
+     * Phân tích chi tiết mức độ hoàn thành và các lỗi sai của một mã đề
+     */
+    async getDetailedExamAnalysis(shareId: string): Promise<any> {
+        if (!shareId) return null;
+        try {
+            // 1. Lấy thông tin gốc của đề bài
+            const examData = await this.getSharedExam(shareId);
+            if (!examData) return null;
+
+            // 2. Lấy toàn bộ kết quả nộp bài
+            const results = await this.getStudentResults(shareId);
+            if (results.length === 0) return { questions: examData.questions, results: [], analysis: {} };
+
+            // 3. Phân tích từng câu hỏi
+            const analysis: Record<number, any> = {};
+            examData.questions.forEach((q: Question) => {
+                analysis[q.number] = {
+                    questionId: q.id,
+                    content: q.content,
+                    correctAnswer: q.correctAnswer,
+                    totalAttempts: 0,
+                    correctCount: 0,
+                    wrongCount: 0,
+                    wrongAnswerDistribution: {} as Record<string, number>,
+                    isTrueFalse: q.type?.includes('Đúng/Sai'),
+                    isShortAnswer: q.type?.includes('ngắn')
+                };
+            });
+
+            results.forEach(res => {
+                examData.questions.forEach((q: Question) => {
+                    const studentAns = res.answers[q.id];
+                    if (studentAns === undefined || studentAns === null) return;
+
+                    const stats = analysis[q.number];
+                    stats.totalAttempts++;
+
+                    // Kiểm tra đúng sai tùy theo loại câu hỏi
+                    let isCorrect = false;
+                    if (stats.isTrueFalse) {
+                        // So sánh chuỗi "a)Đ, b)S, ..."
+                        isCorrect = studentAns === q.correctAnswer;
+                    } else if (stats.isShortAnswer) {
+                        isCorrect = String(studentAns).trim().toLowerCase() === String(q.correctAnswer).trim().toLowerCase();
+                    } else {
+                        isCorrect = studentAns === q.correctAnswer;
+                    }
+
+                    if (isCorrect) {
+                        stats.correctCount++;
+                    } else {
+                        stats.wrongCount++;
+                        const ansKey = typeof studentAns === 'object' ? JSON.stringify(studentAns) : String(studentAns);
+                        stats.wrongAnswerDistribution[ansKey] = (stats.wrongAnswerDistribution[ansKey] || 0) + 1;
+                    }
+                });
+            });
+
+            return {
+                examConfig: examData.config,
+                totalSubmissions: results.length,
+                averageScore: results.reduce((acc, r) => acc + (r.score || 0), 0) / results.length,
+                questionAnalysis: analysis
+            };
+        } catch (error) {
+            console.error("Firebase getDetailedExamAnalysis error:", error);
+            return null;
+        }
     }
 };
 
