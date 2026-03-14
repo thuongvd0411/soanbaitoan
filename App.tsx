@@ -2430,9 +2430,25 @@ export default function App() {
               </button>
             </div>
 
-            <p className="mt-10 text-[9px] font-bold text-cyan-800/60 uppercase tracking-[0.3em]">Xây dựng bởi ThuongVd & Alla {APP_VERSION}</p>
-          </div>
-        </div>
+      {/* ALLA CHATBOT ASSISTANT - Nút nổi chỉ hiện khi đã có đề bài để tránh trùng lặp */}
+      {!isViewerMode && questions.length > 0 && (
+        <>
+          <button 
+            onClick={() => setIsChatOpen(!isChatOpen)}
+            className={`fixed bottom-6 right-6 w-14 h-14 rounded-2xl shadow-2xl flex items-center justify-center transition-all z-[60] ${
+              isChatOpen ? 'bg-red-500 text-white rotate-90' : 'bg-gradient-to-br from-blue-600 to-indigo-700 text-white hover:scale-110 active:scale-90 hover:shadow-blue-500/40'
+            }`}
+          >
+            {isChatOpen ? <X size={28} /> : <MessageSquare size={28} className="animate-pulse" />}
+          </button>
+          
+          <ChatbotPanel 
+            isOpen={isChatOpen} 
+            onClose={() => setIsChatOpen(false)} 
+            config={config}
+            ownerId={storageService.getOwnerId() || ''}
+          />
+        </>
       )}
     </div>
   );
