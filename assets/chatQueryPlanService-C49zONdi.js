@@ -1,4 +1,4 @@
-import{c as h}from"./index-BJuGoZaV.js";const s=`
+import{c as h}from"./index-DHTABAVB.js";const s=`
 Bạn là chuyên gia chuyển đổi ngôn ngữ tự nhiên thành Query Plan cho hệ thống LMS.
 Dựa vào câu hỏi của giáo viên, hãy tạo JSON Query Plan.
 
