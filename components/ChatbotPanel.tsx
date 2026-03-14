@@ -116,7 +116,7 @@ const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen, onClose, config, ow
                         <img src="/soanbaitoan/alla-avatar.png" alt="Alla" className="w-full h-full object-cover" />
                     </div>
                     <div>
-                        <h3 className="font-black text-sm uppercase tracking-wider">Alla siu cute <span className="text-[10px] opacity-70">v5.3.2</span></h3>
+                        <h3 className="font-black text-sm uppercase tracking-wider">Alla siu cute <span className="text-[10px] opacity-70">v5.3.3</span></h3>
                         <div className="flex items-center gap-1.5">
                             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                             <span className="text-[10px] opacity-80 font-bold uppercase">Đang sẵn sàng</span>

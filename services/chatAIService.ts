@@ -8,28 +8,28 @@ export const chatAIService = {
         const apiKey = (config.customApiKey || env.VITE_GEMINI_API_KEY)?.trim();
         if (!apiKey) throw new Error("API Key chưa sẵn sàng.");
 
-        const genAI = new GoogleGenAI(apiKey);
+        const ai = new GoogleGenAI({ apiKey });
         
-        // Sử dụng danh sách model chuẩn (Cập nhật 2026)
+        // Luôn ưu tiên dòng Gemini 3.1 cho độ thông minh cao nhất (v5.3.3)
         const modelNames = isFlash 
-            ? ['gemini-1.5-flash', 'gemini-2.0-flash-exp', 'gemini-3-flash'] 
-            : ['gemini-1.5-pro', 'gemini-3.1-pro-preview', 'gemini-1.5-flash'];
+            ? ['gemini-3.1-flash-lite-preview', 'gemini-3-flash', 'gemini-1.5-flash'] 
+            : ['gemini-3.1-pro-preview', 'gemini-1.5-pro', 'gemini-1.5-flash'];
         
         let lastError = "";
 
         for (const modelName of modelNames) {
             try {
-                const model = genAI.getGenerativeModel({ 
+                // Sử dụng cú pháp ai.models.generateContent tương tự geminiService.ts để đảm bảo chạy được trên Browser
+                const result = await (ai as any).models.generateContent({
                     model: modelName,
-                    generationConfig: {
+                    contents: prompt,
+                    config: {
                         temperature: isJson ? 0.1 : 0.7,
                         responseMimeType: isJson ? "application/json" : "text/plain",
                     }
                 });
                 
-                const result = await model.generateContent(prompt);
-                const text = result.response.text();
-                
+                const text = result.text || "";
                 if (text && text.length > 0) return text;
             } catch (error: any) {
                 lastError = error.message || "Unknown error";
