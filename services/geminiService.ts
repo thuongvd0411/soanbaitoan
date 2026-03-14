@@ -52,8 +52,8 @@ async function retryWithFallback(
   config: { temperature: number },
   maxRetries: number = 3
 ): Promise<string> {
-  // Giữ nguyên dòng 1.5 (ổn định nhất) và gọi base / specific versions thay vì latest
-  const models = ['gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-1.5-pro', 'gemini-1.5-flash-001', 'gemini-1.5-flash-002', 'gemini-1.5-pro-001', 'gemini-1.5-pro-002'];
+  // Mở khóa dòng Gemini 2 (2.5 & 2.0) là những model duy nhất không bị 404 từ API Key
+  const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro', 'gemini-2.0-pro-exp-02-05'];
   let lastError = "";
 
   for (const modelName of models) {
