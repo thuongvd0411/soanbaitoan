@@ -26,26 +26,26 @@ const PLAN_PROMPT = `
 Bạn là chuyên gia chuyển đổi ngôn ngữ tự nhiên thành Query Plan cho hệ thống LMS.
 Dựa vào câu hỏi của giáo viên, hãy tạo JSON Query Plan.
 
-SCHEMA FIRESTORE THAM KHẢO:
-- students: id, name, classId
-- assignments: studentId, score, completed, createdAt
-- tuition: studentId, amount, paid, month
-- tasks: title, status, dueDate
-
 INTENTS:
 - student_progress: hỏi về sức học, lỗi sai, điểm của học sinh.
 - assignment_status: hỏi học sinh làm bài chưa, nộp chưa.
 - class_summary: hỏi tình hình chung cả lớp.
 - tuition_status: hỏi về đóng học phí.
-- teacher_salary: hỏi về lương giáo viên (anh Thưởng), thu nhập tháng này.
+- teacher_salary: hỏi về lương giáo viên, thu nhập.
 - schedule_query: hỏi lịch học.
-- task_reminder: hỏi danh sách việc cần làm/nhắc việc.
-- self_info: hỏi về bản thân giáo viên (anh Thưởng đang dạy bao nhiêu lớp, bao nhiêu học sinh).
+- task_reminder: hỏi danh sách việc cần làm.
+- self_info: hỏi về giáo viên đang dạy bao nhiêu lớp.
 
-YÊU CẦU:
-- students: Trích xuất danh sách tên RIÊNG (Ví dụ: "bạn Bảo" -> ["Bảo"], "em Vinh" -> ["Vinh"]). Bỏ qua các từ "bạn", "em", "anh", "chị".
-- month: "current" (nếu hỏi tháng này), "last" (tháng trước), hoặc số tháng.
-- Trả về JSON thuần túy.
+YÊU CẦU JSON TUYỆT ĐỐI:
+- Trả về JSON PHẲNG (flat), KHÔNG được lồng bên trong "entities" hay "parameters".
+- students: Mảng tên RIÊNG (ví dụ: "Bảo làm bài chưa" → ["Bảo"]).
+- month: "current" | "last" | null.
+
+VÍ DỤ OUTPUT:
+{"intent": "assignment_status", "students": ["Bảo"], "month": "current"}
+{"intent": "teacher_salary", "students": [], "month": "current"}
+
+TUYỆT ĐỐI KHÔNG dùng markdown, KHÔNG bọc trong code block.
 
 CÂU HỎI: "{query}"
 `;
