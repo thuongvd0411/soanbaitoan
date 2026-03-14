@@ -65,12 +65,13 @@ export const chatRouterService = {
         if (!plan.students || plan.students.length === 0) return "Em không rõ anh hỏi về học sinh nào ạ.";
         
         const allStudents = await firebaseService.getManagementStudents();
+        const globalResults = await firebaseService.getGlobalResults(ownerId);
         const results: Record<string, any> = {};
 
         for (const name of plan.students) {
             const normalizedTarget = nameResolver.normalizeName(name);
             
-            // So khớp thông minh
+            // Tìm trong quản lý học tập
             let student = allStudents.find((s: any) => {
                 const normalizedStudent = nameResolver.normalizeName(s.fullName || "");
                 const parts = normalizedStudent.split(" ");
@@ -78,8 +79,35 @@ export const chatRouterService = {
                 return lastName === normalizedTarget || normalizedStudent.includes(normalizedTarget);
             });
 
-            if (!student) {
-                // Gợi ý tên gần giống nếu không tìm thấy
+            // Tìm trong kho kết quả chung (Global Results) - Dùng cho các bài làm tự do
+            const matchedGlobalResults = globalResults.filter((r: any) => {
+                const normalizedResultName = nameResolver.normalizeName(r.studentName || "");
+                const parts = normalizedResultName.split(" ");
+                const lastName = parts[parts.length - 1];
+                
+                // Lọc theo tháng nếu AI yêu cầu
+                if (plan.month) {
+                    const d = safeParseDate(r.submittedAt);
+                    if (d) {
+                        const now = new Date();
+                        const currentMonth = now.getMonth();
+                        const currentYear = now.getFullYear();
+                        
+                        if (plan.month === "current") {
+                            if (d.getMonth() !== currentMonth || d.getFullYear() !== currentYear) return false;
+                        } else if (plan.month === "last") {
+                            const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+                            const yearOfLastMonth = currentMonth === 0 ? currentYear - 1 : currentYear;
+                            if (d.getMonth() !== lastMonth || d.getFullYear() !== yearOfLastMonth) return false;
+                        }
+                    }
+                }
+
+                return lastName === normalizedTarget || normalizedResultName.includes(normalizedTarget);
+            });
+
+            if (!student && matchedGlobalResults.length === 0) {
+                // Gợi ý tên gần giống nếu không tìm thấy ở cả 2 nguồn
                 const suggestions = allStudents
                     .map((s: any) => s.fullName)
                     .filter(n => nameResolver.normalizeName(n).includes(normalizedTarget))
@@ -92,33 +120,46 @@ export const chatRouterService = {
                 continue;
             }
 
+            const fullName = student ? student.fullName : (matchedGlobalResults[0]?.studentName || name);
+
             if (plan.intent === "assignment_status") {
-                // Lấy bài tập gần nhất được giao
-                const lastExam = student.assignedExams && student.assignedExams.length > 0 
-                    ? student.assignedExams[0] 
-                    : null;
-                
-                if (!lastExam) {
-                    results[student.fullName] = "Chưa được giao bài nào.";
-                    continue;
+                let isDone = false;
+                let score = "Chưa có điểm";
+                let examTitle = "Bài tập";
+
+                // Ưu tiên kiểm tra trong hồ sơ quản lý (nếu có)
+                if (student) {
+                    const lastExam = student.assignedExams && student.assignedExams.length > 0 
+                        ? student.assignedExams[0] 
+                        : null;
+                    
+                    if (lastExam) {
+                        examTitle = lastExam.title;
+                        const historyRecord = student.history?.find((h: any) => 
+                            h.absentReason?.includes(lastExam.title) || h.absentReason?.includes(lastExam.id)
+                        );
+                        const examRecord = student.examHistory?.find((e: any) => 
+                            e.id === lastExam.id || 
+                            (e.title && nameResolver.normalizeName(e.title).includes(nameResolver.normalizeName(lastExam.title)))
+                        );
+                        isDone = !!historyRecord || !!examRecord;
+                        score = examRecord ? examRecord.score : (historyRecord?.testScore ?? score);
+                    }
                 }
 
-                // Kiểm tra xem đã làm chưa và điểm số
-                // Dữ liệu điểm lấy từ history (StudyRecord - dữ liệu cũ) hoặc examHistory (dữ liệu mới v5.4.4)
-                const historyRecord = student.history?.find((h: any) => 
-                    h.absentReason?.includes(lastExam.title) || h.absentReason?.includes(lastExam.id)
-                );
+                // Nếu chưa thấy "Xong" trong hồ sơ, kiểm tra tiếp trong Global Results
+                if (!isDone && matchedGlobalResults.length > 0) {
+                    const latestResult = matchedGlobalResults[0]; // Đã được sort desc theo submittedAt trong firebaseService
+                    isDone = true;
+                    score = latestResult.score;
+                    if (examTitle === "Bài tập" && latestResult.shareId) {
+                        // Cố gắng tìm tên bài tập từ shareId hoặc config nếu có thể (nhưng global_results thường chỉ có data thô)
+                        examTitle = "Bài tập vừa nộp";
+                    }
+                }
 
-                const examRecord = student.examHistory?.find((e: any) => 
-                    e.id === lastExam.id || 
-                    (e.title && nameResolver.normalizeName(e.title).includes(nameResolver.normalizeName(lastExam.title)))
-                );
-
-                const isDone = !!historyRecord || !!examRecord;
-                const score = examRecord ? examRecord.score : (historyRecord?.testScore ?? "Chưa có điểm");
-
-                results[student.fullName] = {
-                    baiTap: lastExam.title,
+                results[fullName] = {
+                    baiTap: examTitle,
                     trangThai: isDone ? "Đã làm" : "Chưa làm",
                     diem: score
                 };
@@ -128,8 +169,8 @@ export const chatRouterService = {
                 const currentMonth = now.getMonth();
                 const currentYear = now.getFullYear();
                 
-                // Lọc history theo tháng
-                const relevantHistory = student.history?.filter((h: any) => {
+                // Lọc history học tập (chỉ có ở Management Student)
+                const relevantHistory = student?.history?.filter((h: any) => {
                     const d = safeParseDate(h.date);
                     if (!d) return false;
                     
@@ -143,12 +184,12 @@ export const chatRouterService = {
                     return true;
                 }) || [];
 
-                results[student.fullName] = {
-                    lop: student.className,
+                results[fullName] = {
+                    lop: student?.className || matchedGlobalResults[0]?.studentClass || "Tự do",
                     soBuoiHoc: relevantHistory.length,
                     thang: plan.month === "current" ? (currentMonth + 1) : "tất cả",
-                    diemGanNhat: student.history?.[0]?.testScore ?? "N/A",
-                    nhanXetGanNhat: student.history?.[0]?.absentReason ?? "Chưa có nhận xét"
+                    diemGanNhat: matchedGlobalResults.length > 0 ? matchedGlobalResults[0].score : (student?.history?.[0]?.testScore ?? "N/A"),
+                    nhanXetGanNhat: student?.history?.[0]?.absentReason ?? (matchedGlobalResults.length > 0 ? "Vừa hoàn thành bài tập trực tuyến" : "Chưa có nhận xét")
                 };
             }
         }
@@ -157,6 +198,7 @@ export const chatRouterService = {
             results,
             sys_info: {
                 totalStudents: allStudents.length,
+                totalGlobalResults: globalResults.length,
                 matchedCount: Object.keys(results).filter(k => !results[k].error).length
             }
         });
