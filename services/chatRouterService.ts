@@ -63,14 +63,30 @@ export const chatRouterService = {
     },
 
     async handleStudentData(plan: QueryPlan, ownerId: string): Promise<string> {
-        if (!plan.students || plan.students.length === 0) return "Em không rõ anh hỏi về học sinh nào ạ.";
+        // Gemini đôi khi trả về field tên khác nhau: students / student / names
+        const planAny = plan as any;
+        const studentList: string[] = plan.students 
+            || planAny.student 
+            || planAny.names 
+            || planAny.name 
+            || [];
+        
+        console.log("Alla handleStudentData — studentList:", studentList, "plan:", JSON.stringify(plan));
+
+        if (!studentList || studentList.length === 0) {
+            return JSON.stringify({ error: "Không xác định được tên học sinh trong câu hỏi." });
+        }
         
         const allStudents = await firebaseService.getManagementStudents();
         const globalResults = await firebaseService.getGlobalResults(ownerId);
+        
+        console.log("Alla DB:", { allStudents: allStudents.length, globalResults: globalResults.length });
+        
         const results: Record<string, any> = {};
 
-        for (const name of plan.students) {
+        for (const name of studentList) {
             const normalizedTarget = nameResolver.normalizeName(name);
+            console.log("Alla matching:", name, "→ normalized:", normalizedTarget);
             
             // Tìm trong quản lý học tập
             let student = allStudents.find((s: any) => {
