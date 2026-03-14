@@ -52,8 +52,8 @@ async function retryWithFallback(
   config: { temperature: number },
   maxRetries: number = 3
 ): Promise<string> {
-  // Sử dụng các model Gemini ổn định nhất và có hậu tố cụ thể để tránh lỗi 404 trên v1beta
-  const models = ['gemini-1.5-flash-latest', 'gemini-1.5-pro-latest', 'gemini-1.5-flash-001', 'gemini-1.5-flash-002'];
+  // Cập nhật triệt để lên API Gemini 3.1 / 3.0 (2026)
+  const models = ['gemini-3.1-flash', 'gemini-3.1-pro', 'gemini-3.1-flash-lite', 'gemini-3-flash', 'gemini-3-pro'];
   let lastError = "";
 
   for (const modelName of models) {
