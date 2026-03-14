@@ -4,35 +4,32 @@ import { QueryPlan } from "./chatQueryPlanService";
 import { nameResolver } from "./nameResolver";
 
 const safeParseDate = (dateStr: string): Date | null => {
-    if (!dateStr) return null;
+    if (!dateStr || typeof dateStr !== 'string') return null;
     try {
-        // Thử định dạng chuẩn YYYY-MM-DD
-        let d = new Date(dateStr);
-        if (!isNaN(d.getTime())) return d;
+        // Hỗ trợ cả / và - làm dấu phân cách
+        const parts = dateStr.includes('/') ? dateStr.split('/') : dateStr.split('-');
+        if (parts.length !== 3) return null;
 
-        // Thử định dạng VN: DD/MM/YYYY
+        let day, month, year;
+
         if (dateStr.includes('/')) {
-            const parts = dateStr.split('/');
-            if (parts.length === 3) {
-                const day = parseInt(parts[0], 10);
-                const month = parseInt(parts[1], 10) - 1;
-                const year = parseInt(parts[2], 10);
-                d = new Date(year, month, day);
-                if (!isNaN(d.getTime())) return d;
-            }
-        }
-        
-        // Thử định dạng ghi chú lộn xộn: YYYY-M-D
-        if (dateStr.includes('-')) {
-            const parts = dateStr.split('-');
-            if (parts.length === 3) {
-                const [y, m, d_part] = parts.map(p => parseInt(p, 10));
-                d = new Date(y, m - 1, d_part);
-                if (!isNaN(d.getTime())) return d;
-            }
+            // Định dạng VN: DD/MM/YYYY
+            day = parseInt(parts[0], 10);
+            month = parseInt(parts[1], 10);
+            year = parseInt(parts[2], 10);
+        } else {
+            // Định dạng ISO: YYYY-MM-DD
+            year = parseInt(parts[0], 10);
+            month = parseInt(parts[1], 10);
+            day = parseInt(parts[2], 10);
         }
 
-        return null;
+        // Kiểm tra tính hợp lệ của số
+        if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
+        
+        // Tạo Date theo (year, monthIndex, day)
+        const d = new Date(year, month - 1, day);
+        return isNaN(d.getTime()) ? null : d;
     } catch (e) {
         return null;
     }
@@ -73,20 +70,25 @@ export const chatRouterService = {
         for (const name of plan.students) {
             const normalizedTarget = nameResolver.normalizeName(name);
             
-            // So khớp thông minh:
-            // 1. Ưu tiên khớp chính xác tên gọi (tên cuối cùng)
-            // 2. Sau đó mới khớp mờ (includes)
+            // So khớp thông minh
             let student = allStudents.find((s: any) => {
-                const studentFullName = s.fullName || "";
-                const normalizedStudent = nameResolver.normalizeName(studentFullName);
-                const studentNameParts = normalizedStudent.split(" ");
-                const lastName = studentNameParts[studentNameParts.length - 1];
-                
+                const normalizedStudent = nameResolver.normalizeName(s.fullName || "");
+                const parts = normalizedStudent.split(" ");
+                const lastName = parts[parts.length - 1];
                 return lastName === normalizedTarget || normalizedStudent.includes(normalizedTarget);
             });
 
             if (!student) {
-                results[name] = "Hệ thống không tìm thấy học sinh này. Anh vui lòng kiểm tra lại tên học sinh nhé.";
+                // Gợi ý tên gần giống nếu không tìm thấy
+                const suggestions = allStudents
+                    .map((s: any) => s.fullName)
+                    .filter(n => nameResolver.normalizeName(n).includes(normalizedTarget))
+                    .slice(0, 3);
+
+                results[name] = {
+                    error: "Không tìm thấy học sinh.",
+                    suggestions: suggestions.length > 0 ? suggestions : "Không có gợi ý."
+                };
                 continue;
             }
 
@@ -151,7 +153,13 @@ export const chatRouterService = {
             }
         }
 
-        return JSON.stringify(results);
+        return JSON.stringify({
+            results,
+            sys_info: {
+                totalStudents: allStudents.length,
+                matchedCount: Object.keys(results).filter(k => !results[k].error).length
+            }
+        });
     },
 
     async handleClassSummary(className: string | undefined): Promise<string> {

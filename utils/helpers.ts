@@ -1,27 +1,25 @@
 import { Student, StudyRecord, MonthlyStats, Schedule } from '../types';
 
 const safeParseDate = (dateStr: string): Date | null => {
-  if (!dateStr) return null;
+  if (!dateStr || typeof dateStr !== 'string') return null;
   try {
-    let d = new Date(dateStr);
-    if (!isNaN(d.getTime())) return d;
-
-    // DD/MM/YYYY
+    const parts = dateStr.includes('/') ? dateStr.split('/') : dateStr.split('-');
+    if (parts.length !== 3) return null;
+    
+    let day, month, year;
     if (dateStr.includes('/')) {
-      const parts = dateStr.split('/');
-      if (parts.length === 3) {
-        return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
-      }
+      day = parseInt(parts[0], 10);
+      month = parseInt(parts[1], 10);
+      year = parseInt(parts[2], 10);
+    } else {
+      year = parseInt(parts[0], 10);
+      month = parseInt(parts[1], 10);
+      day = parseInt(parts[2], 10);
     }
-
-    // YYYY-MM-DD hoặc YYYY-M-D
-    if (dateStr.includes('-')) {
-      const parts = dateStr.split('-');
-      if (parts.length === 3) {
-        return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-      }
-    }
-    return null;
+    
+    if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
+    const d = new Date(year, month - 1, day);
+    return isNaN(d.getTime()) ? null : d;
   } catch (e) { return null; }
 };
 
