@@ -52,9 +52,8 @@ async function retryWithFallback(
   config: { temperature: number },
   maxRetries: number = 3
 ): Promise<string> {
-  // Sử dụng các model cao cấp nhất hiện nay
-  // SỬ DỤNG CÁC MODEL GEMINI 3.x MỚI NHẤT (Cập nhật 2026)
-  const models = ['gemini-3.1-flash-lite-preview', 'gemini-3.1-pro-preview', 'gemini-3-flash'];
+  // Sử dụng các model Gemini ổn định nhất và có hậu tố cụ thể để tránh lỗi 404 trên v1beta
+  const models = ['gemini-1.5-flash-latest', 'gemini-1.5-pro-latest', 'gemini-1.5-flash-001', 'gemini-1.5-flash-002'];
   let lastError = "";
 
   for (const modelName of models) {

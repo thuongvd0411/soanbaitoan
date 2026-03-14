@@ -10,10 +10,11 @@ export const chatAIService = {
 
         const ai = new GoogleGenAI({ apiKey });
         
-        // Dùng Gemini 3 family (v5.5.3)
+        // Dùng các phiên bản ổn định nhất của Gemini 1.5, vì endpoint v1beta trên một số key
+        // không hỗ trợ tên model chung chung như 'gemini-2.0-flash' hoặc 'gemini-1.5-flash'
         const modelNames = isFlash 
-            ? ['gemini-3-flash', 'gemini-2.5-flash', 'gemini-2.0-flash'] 
-            : ['gemini-3-pro', 'gemini-2.5-pro', 'gemini-2.0-flash'];
+            ? ['gemini-1.5-flash-latest', 'gemini-1.5-flash-001', 'gemini-1.5-flash-002', 'gemini-1.5-flash'] 
+            : ['gemini-1.5-pro-latest', 'gemini-1.5-pro-001', 'gemini-1.5-pro-002', 'gemini-1.5-pro'];
         
         let lastError = "";
 
