@@ -27,7 +27,7 @@ import { Student, StudyRecord, Schedule } from './types';
 import ChatbotPanel from './components/ChatbotPanel';
 
 
-const APP_VERSION = "v5.4.1";
+const APP_VERSION = "v5.4.2";
 console.log("Alla Version:", APP_VERSION);
 
 declare global {

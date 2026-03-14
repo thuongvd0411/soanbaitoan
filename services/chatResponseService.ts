@@ -1,26 +1,15 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { chatAIService } from "./chatAIService";
 import { AppState } from "../types";
 
 const RESPONSE_CACHE: Record<string, { response: string, timestamp: number }> = {};
-const CACHE_DURATION = 5 * 60 * 1000; // 5 phút
 
 export const chatResponseService = {
     async generateResponse(query: string, summary: string, config: AppState): Promise<string> {
-        // 1. Kiểm tra cache
-        const cacheKey = btoa(unescape(encodeURIComponent(query + summary)));
-        const cached = RESPONSE_CACHE[cacheKey];
-        if (cached && (Date.now() - cached.timestamp < CACHE_DURATION)) {
-            console.debug("CHAT_RESPONSE_CACHE_HIT");
-            return cached.response;
+        const cacheKey = `${query}_${summary}`;
+        if (RESPONSE_CACHE[cacheKey] && Date.now() - RESPONSE_CACHE[cacheKey].timestamp < 5 * 60 * 1000) {
+            return RESPONSE_CACHE[cacheKey].response;
         }
-
-        const env = (import.meta as any).env || {};
-        const apiKey = (config.customApiKey || env.VITE_GEMINI_API_KEY)?.trim();
-        if (!apiKey) throw new Error("API Key chưa sẵn sàng.");
-
-        const ai = new GoogleGenAI({ apiKey });
-        const modelName = "gemini-1.5-flash";
 
         const prompt = `
 Bạn là Alla, một trợ lý AI thân thiện dành cho giáo viên.
@@ -38,16 +27,7 @@ YÊU CẦU:
 `;
 
         try {
-            const result = await ai.models.generateContent({
-                model: modelName,
-                contents: [{ role: "user", parts: [{ text: prompt }] }],
-                config: {
-                    temperature: 0.7,
-                    maxOutputTokens: 150,
-                }
-            });
-
-            const response = (result.text || "").trim();
+            const response = await chatAIService.generateContent(prompt, config);
             
             // Lưu cache
             RESPONSE_CACHE[cacheKey] = {
@@ -58,7 +38,7 @@ YÊU CẦU:
             return response;
         } catch (error) {
             console.error("chatResponseService error:", error);
-            return "Em xin lỗi, em đang gặp chút vấn đề khi kết nối với AI. Anh thử lại sau nhé!";
+            throw error;
         }
     }
 };

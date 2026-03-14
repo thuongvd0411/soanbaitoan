@@ -1,5 +1,5 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { chatAIService } from "./chatAIService";
 import { AppState } from "../types";
 
 export type ChatIntent = "student_progress" | "class_summary" | "assignment_analysis" | "generate_exercise" | "general_question";
@@ -32,25 +32,9 @@ CÂU HỎI: "{query}"
 
 export const chatIntentService = {
     async detectIntent(query: string, config: AppState): Promise<IntentResult> {
-        const env = (import.meta as any).env || {};
-        const apiKey = (config.customApiKey || env.VITE_GEMINI_API_KEY)?.trim();
-        if (!apiKey) throw new Error("API Key chưa sẵn sàng.");
-
-        const ai = new GoogleGenAI({ apiKey });
-        const modelName = "gemini-1.5-flash"; 
-
         try {
             const prompt = INTENT_PROMPT.replace("{query}", query);
-            const result = await ai.models.generateContent({
-                model: modelName,
-                contents: [{ role: "user", parts: [{ text: prompt }] }],
-                config: {
-                    temperature: 0.1,
-                    responseMimeType: "application/json",
-                }
-            });
-
-            const text = result.text || "";
+            const text = await chatAIService.generateContent(prompt, config, true);
             console.debug("CHAT_INTENT", text);
             return JSON.parse(text) as IntentResult;
         } catch (error) {

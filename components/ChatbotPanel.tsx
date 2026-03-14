@@ -52,8 +52,9 @@ const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen, onClose, config, ow
             const response = await chatResponseService.generateResponse(userText, summary || "Không có dữ liệu cụ thể.", config);
             
             setMessages(prev => [...prev, { role: 'alla', text: response }]);
-        } catch (error) {
-            setMessages(prev => [...prev, { role: 'alla', text: "Em xin lỗi, em gặp lỗi rồi. Anh thử lại nhé!" }]);
+        } catch (error: any) {
+            console.error("Chatbot Error Detail:", error);
+            setMessages(prev => [...prev, { role: 'alla', text: "Em xin lỗi, em đang gặp chút vấn đề khi kết nối với AI. Anh thử lại sau nhé!" }]);
         } finally {
             setIsLoading(false);
         }
