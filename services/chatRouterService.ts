@@ -63,15 +63,25 @@ export const chatRouterService = {
     },
 
     async handleStudentData(plan: QueryPlan, ownerId: string): Promise<string> {
-        // Gemini đôi khi trả về field tên khác nhau: students / student / names
+        // Gemini đôi khi trả về cấu trúc nested: {entities: {students: [...]}}
+        // hoặc flat: {students: [...]}. Phải xử lý cả 2 trường hợp.
         const planAny = plan as any;
-        const studentList: string[] = plan.students 
+        const entities = planAny.entities || {};
+        
+        const studentList: string[] = (
+            plan.students 
+            || entities.students
             || planAny.student 
+            || entities.student
             || planAny.names 
             || planAny.name 
-            || [];
+            || []
+        );
         
-        console.log("Alla handleStudentData — studentList:", studentList, "plan:", JSON.stringify(plan));
+        // Lấy month từ plan hoặc từ entities
+        const month = plan.month || entities.month;
+        
+        console.log("Alla handleStudentData — studentList:", studentList, "month:", month, "plan:", JSON.stringify(plan));
 
         if (!studentList || studentList.length === 0) {
             return JSON.stringify({ error: "Không xác định được tên học sinh trong câu hỏi." });
@@ -103,16 +113,16 @@ export const chatRouterService = {
                 const lastName = parts[parts.length - 1];
                 
                 // Lọc theo tháng nếu AI yêu cầu
-                if (plan.month) {
+                if (month) {
                     const d = safeParseDate(r.submittedAt);
                     if (d) {
                         const now = new Date();
                         const currentMonth = now.getMonth();
                         const currentYear = now.getFullYear();
                         
-                        if (plan.month === "current") {
+                        if (month === "current") {
                             if (d.getMonth() !== currentMonth || d.getFullYear() !== currentYear) return false;
-                        } else if (plan.month === "last") {
+                        } else if (month === "last") {
                             const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
                             const yearOfLastMonth = currentMonth === 0 ? currentYear - 1 : currentYear;
                             if (d.getMonth() !== lastMonth || d.getFullYear() !== yearOfLastMonth) return false;
@@ -191,9 +201,9 @@ export const chatRouterService = {
                     const d = safeParseDate(h.date);
                     if (!d) return false;
                     
-                    if (plan.month === "current") {
+                    if (month === "current") {
                         return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-                    } else if (plan.month === "last") {
+                    } else if (month === "last") {
                         const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
                         const yearOfLastMonth = currentMonth === 0 ? currentYear - 1 : currentYear;
                         return d.getMonth() === lastMonth && d.getFullYear() === yearOfLastMonth;
@@ -204,7 +214,7 @@ export const chatRouterService = {
                 results[fullName] = {
                     lop: student?.className || matchedGlobalResults[0]?.studentClass || "Tự do",
                     soBuoiHoc: relevantHistory.length,
-                    thang: plan.month === "current" ? (currentMonth + 1) : "tất cả",
+                    thang: month === "current" ? (currentMonth + 1) : "tất cả",
                     diemGanNhat: matchedGlobalResults.length > 0 ? matchedGlobalResults[0].score : (student?.history?.[0]?.testScore ?? "N/A"),
                     nhanXetGanNhat: student?.history?.[0]?.absentReason ?? (matchedGlobalResults.length > 0 ? "Vừa hoàn thành bài tập trực tuyến" : "Chưa có nhận xét")
                 };
