@@ -11,6 +11,17 @@ export interface QueryPlan {
     timeRange?: string;
 }
 
+// Hàm bóc tách JSON từ phản hồi có thể chứa markdown code block
+const extractJSON = (text: string): string => {
+    // Xóa ```json ... ``` hoặc ``` ... ```
+    const match = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (match) return match[1].trim();
+    // Tìm { ... } đầu tiên trong chuỗi
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) return jsonMatch[0].trim();
+    return text.trim();
+};
+
 const PLAN_PROMPT = `
 Bạn là chuyên gia chuyển đổi ngôn ngữ tự nhiên thành Query Plan cho hệ thống LMS.
 Dựa vào câu hỏi của giáo viên, hãy tạo JSON Query Plan.
@@ -44,8 +55,10 @@ export const chatQueryPlanService = {
         try {
             const prompt = PLAN_PROMPT.replace("{query}", query);
             const text = await chatAIService.generateContent(prompt, config, true);
-            console.debug("CHAT_QUERY_PLAN", text);
-            return JSON.parse(text) as QueryPlan;
+            const cleanText = extractJSON(text);
+            console.log("Alla QueryPlan RAW:", text);
+            console.log("Alla QueryPlan CLEAN:", cleanText);
+            return JSON.parse(cleanText) as QueryPlan;
         } catch (error) {
             console.error("chatQueryPlanService error:", error);
             return { intent: "unknown" };
