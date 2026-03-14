@@ -10,10 +10,10 @@ export const chatAIService = {
 
         const ai = new GoogleGenAI({ apiKey });
         
-        // Luôn ưu tiên dòng Gemini 3.1 cho độ thông minh cao nhất (v5.3.3)
+        // Dùng Gemini 3 family (v5.5.3)
         const modelNames = isFlash 
-            ? ['gemini-3.1-flash-lite-preview', 'gemini-3-flash', 'gemini-1.5-flash'] 
-            : ['gemini-3.1-pro-preview', 'gemini-1.5-pro', 'gemini-1.5-flash'];
+            ? ['gemini-3-flash', 'gemini-2.5-flash', 'gemini-2.0-flash'] 
+            : ['gemini-3-pro', 'gemini-2.5-pro', 'gemini-2.0-flash'];
         
         let lastError = "";
 

@@ -150,46 +150,51 @@ export const chatRouterService = {
             const fullName = student ? student.fullName : (matchedGlobalResults[0]?.studentName || name);
 
             if (plan.intent === "assignment_status") {
-                let isDone = false;
-                let score = "Chưa có điểm";
-                let examTitle = "Bài tập";
-
-                // Ưu tiên kiểm tra trong hồ sơ quản lý (nếu có)
-                if (student) {
-                    const lastExam = student.assignedExams && student.assignedExams.length > 0 
-                        ? student.assignedExams[0] 
-                        : null;
+                // Danh sách bài tập đã giao cho học sinh này
+                const assignedExams = student?.assignedExams || [];
+                
+                if (assignedExams.length === 0 && matchedGlobalResults.length === 0) {
+                    results[fullName] = {
+                        trangThai: "Chưa được giao bài tập nào",
+                        diem: "N/A"
+                    };
+                } else if (assignedExams.length > 0) {
+                    // Kiểm tra TỪNG bài đã giao theo shareId
+                    const baiTapList: any[] = [];
+                    for (const exam of assignedExams) {
+                        const shareIdOfExam = exam.id;
+                        
+                        // Tìm kết quả trong examHistory theo shareId
+                        const examRecord = student?.examHistory?.find((e: any) => e.id === shareIdOfExam);
+                        
+                        // Tìm kết quả trong global_results theo shareId
+                        const globalRecord = globalResults.find((r: any) => 
+                            r.shareId === shareIdOfExam && 
+                            nameResolver.normalizeName(r.studentName || "").includes(normalizedTarget)
+                        );
+                        
+                        const isDone = exam.status === 'completed' || !!examRecord || !!globalRecord;
+                        const score = examRecord?.score ?? globalRecord?.score ?? "Chưa có điểm";
+                        
+                        baiTapList.push({
+                            tenBai: exam.title || "Bài tập",
+                            ngayGiao: exam.assignedAt?.split("T")[0] || "N/A",
+                            trangThai: isDone ? "Đã làm" : "Chưa làm",
+                            diem: isDone ? score : "Chưa làm"
+                        });
+                    }
                     
-                    if (lastExam) {
-                        examTitle = lastExam.title;
-                        const historyRecord = student.history?.find((h: any) => 
-                            h.absentReason?.includes(lastExam.title) || h.absentReason?.includes(lastExam.id)
-                        );
-                        const examRecord = student.examHistory?.find((e: any) => 
-                            e.id === lastExam.id || 
-                            (e.title && nameResolver.normalizeName(e.title).includes(nameResolver.normalizeName(lastExam.title)))
-                        );
-                        isDone = !!historyRecord || !!examRecord;
-                        score = examRecord ? examRecord.score : (historyRecord?.testScore ?? score);
-                    }
+                    results[fullName] = { danhSachBaiTap: baiTapList };
+                } else {
+                    // Không có assignedExams nhưng có global_results → bài làm tự do
+                    const latestResult = matchedGlobalResults[0];
+                    results[fullName] = {
+                        baiTap: "Bài tập tự do (không giao chính thức)",
+                        trangThai: "Đã làm",
+                        diem: latestResult.score,
+                        ngayNop: latestResult.submittedAt?.split("T")[0] || "N/A"
+                    };
                 }
-
-                // Nếu chưa thấy "Xong" trong hồ sơ, kiểm tra tiếp trong Global Results
-                if (!isDone && matchedGlobalResults.length > 0) {
-                    const latestResult = matchedGlobalResults[0]; // Đã được sort desc theo submittedAt trong firebaseService
-                    isDone = true;
-                    score = latestResult.score;
-                    if (examTitle === "Bài tập" && latestResult.shareId) {
-                        // Cố gắng tìm tên bài tập từ shareId hoặc config nếu có thể (nhưng global_results thường chỉ có data thô)
-                        examTitle = "Bài tập vừa nộp";
-                    }
-                }
-
-                results[fullName] = {
-                    baiTap: examTitle,
-                    trangThai: isDone ? "Đã làm" : "Chưa làm",
-                    diem: score
-                };
             } else {
                 // student_progress (hỏi về tiến độ, số buổi, điểm)
                 const now = new Date();
