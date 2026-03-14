@@ -2444,7 +2444,7 @@ export default function App() {
               isChatOpen ? 'bg-red-500 text-white rotate-90' : 'bg-gradient-to-br from-blue-600 to-indigo-700 text-white hover:scale-110 active:scale-90 hover:shadow-blue-500/40'
             }`}
           >
-            {isChatOpen ? <X size={28} /> : <img src="alla-avatar.png" alt="Alla" className="w-full h-full object-cover rounded-2xl animate-pulse" />}
+            {isChatOpen ? <X size={28} /> : <img src="/soanbaitoan/alla-avatar.png" alt="Alla" className="w-full h-full object-cover rounded-2xl animate-pulse" />}
           </button>
           
           <ChatbotPanel 

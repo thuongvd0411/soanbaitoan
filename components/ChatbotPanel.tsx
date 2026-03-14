@@ -113,10 +113,10 @@ const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen, onClose, config, ow
             <div className="p-5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex justify-between items-center shrink-0">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center overflow-hidden border border-white/30 shadow-inner backdrop-blur-md">
-                        <img src="alla-avatar.png" alt="Alla" className="w-full h-full object-cover" />
+                        <img src="/soanbaitoan/alla-avatar.png" alt="Alla" className="w-full h-full object-cover" />
                     </div>
                     <div>
-                        <h3 className="font-black text-sm uppercase tracking-wider">Alla siu cute</h3>
+                        <h3 className="font-black text-sm uppercase tracking-wider">Alla siu cute <span className="text-[10px] opacity-70">v5.3.2</span></h3>
                         <div className="flex items-center gap-1.5">
                             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                             <span className="text-[10px] opacity-80 font-bold uppercase">Đang sẵn sàng</span>
@@ -137,7 +137,7 @@ const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen, onClose, config, ow
                     <div key={i} className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                         {msg.role === 'alla' && (
                             <div className="w-8 h-8 rounded-full overflow-hidden border border-blue-100 shrink-0 mt-1 shadow-sm">
-                                <img src="alla-avatar.png" alt="A" className="w-full h-full object-cover" />
+                                <img src="/soanbaitoan/alla-avatar.png" alt="A" className="w-full h-full object-cover" />
                             </div>
                         )}
                         <div className={`max-w-[85%] p-4 rounded-[24px] text-sm shadow-sm ${

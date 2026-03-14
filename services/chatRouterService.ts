@@ -38,7 +38,8 @@ export const chatRouterService = {
             );
 
             if (!student) {
-                results[name] = "Không tìm thấy";
+                // Thử tìm kiếm mờ hơn: nếu tên hỏi là một từ trong tên đầy đủ
+                results[name] = "Không tìm thấy thông tin. Anh kiểm tra giúp em xem tên học sinh có đúng không ạ?";
                 continue;
             }
 
