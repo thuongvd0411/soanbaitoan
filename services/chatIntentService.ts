@@ -10,9 +10,9 @@ export interface IntentResult {
 
 const INTENT_PROMPT = `
 Phân loại câu hỏi sau thành 1 trong 3 loại:
-1. system_query: hỏi dữ liệu LMS (học sinh, lớp, lịch học, học phí, điểm, làm bài chưa...)
+1. system_query: hỏi dữ liệu LMS (học sinh, lớp, lịch học, học phí, điểm, làm bài chưa, lương của anh, thông tin lớp tôi đang dạy...)
 2. ai_task: yêu cầu AI tạo nội dung (soạn đề, giải toán, tạo câu hỏi...)
-3. general_chat: câu hỏi kiến thức chung, chào hỏi hoặc trò chuyện linh tinh.
+3. general_chat: câu hỏi kiến thức chung, chào hỏi hoặc trò chuyện linh tinh, bạn là ai.
 
 BẮT BUỘC TRẢ VỀ JSON: { "intent": "..." }
 

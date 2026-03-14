@@ -3,7 +3,7 @@ import { chatAIService } from "./chatAIService";
 import { AppState } from "../types";
 
 export interface QueryPlan {
-    intent: "student_progress" | "assignment_status" | "class_summary" | "tuition_status" | "teacher_salary" | "schedule_query" | "task_reminder" | "unknown";
+    intent: "student_progress" | "assignment_status" | "class_summary" | "tuition_status" | "teacher_salary" | "schedule_query" | "task_reminder" | "self_info" | "unknown";
     students?: string[];
     className?: string;
     filter?: string;
@@ -26,9 +26,10 @@ INTENTS:
 - assignment_status: hỏi học sinh làm bài chưa, nộp chưa.
 - class_summary: hỏi tình hình chung cả lớp.
 - tuition_status: hỏi về đóng học phí.
-- teacher_salary: hỏi về lương giáo viên.
+- teacher_salary: hỏi về lương giáo viên (anh Thưởng), thu nhập tháng này.
 - schedule_query: hỏi lịch học.
 - task_reminder: hỏi danh sách việc cần làm/nhắc việc.
+- self_info: hỏi về bản thân giáo viên (anh Thưởng đang dạy bao nhiêu lớp, bao nhiêu học sinh).
 
 YÊU CẦU:
 - students: Trích xuất danh sách tên (ví dụ: ["Bảo", "Đạt"]).

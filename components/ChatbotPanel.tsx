@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, Bot, User, Loader2, Sparkles, MessageSquare } from 'lucide-react';
+import { X, Send, Bot, User, Loader2, Sparkles, MessageSquare, Trash2 } from 'lucide-react';
 import { chatIntentService } from '../services/chatIntentService';
 import { chatRouterService } from '../services/chatRouterService';
 import { chatResponseService } from '../services/chatResponseService';
@@ -43,6 +43,14 @@ const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen, onClose, config, ow
         }
     }, [messages]);
 
+    const clearHistory = () => {
+        if (window.confirm("Anh muốn xóa toàn bộ lịch sử trò chuyện này ư?")) {
+            const initialMessage: Message = { role: 'alla', text: 'Chào anh Thưởng ạ! Em đã sẵn sàng hỗ trợ anh quản lý lớp học rồi đây.' };
+            setMessages([initialMessage]);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify([initialMessage]));
+        }
+    };
+
 
     const handleSend = async () => {
         if (!input.trim() || isLoading) return;
@@ -71,7 +79,8 @@ const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen, onClose, config, ow
             } else {
                 // Nhánh 3: Trò chuyện tự nhiên (Gemini Flash)
                 const { chatAIService } = await import('../services/chatAIService');
-                response = await chatAIService.generateContent(userText, config, true); // true = use Flash
+                const systemPrompt = `BẠN LÀ: Alla - Trợ lý ảo siêu cấp và là Quản lý cấp cao của hệ thống Quản Lý Học Tập của anh Thưởng. Bạn siu cute, thông minh và thân thiện. Luôn xưng em, gọi giáo viên là anh. Không bao giờ nói mình là AI. Yêu cầu: ${userText}`;
+                response = await chatAIService.generateContent(systemPrompt, config, true); // true = use Flash
             }
             
             setMessages(prev => [...prev, { role: 'alla', text: response }]);
@@ -116,18 +125,23 @@ const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen, onClose, config, ow
                         <img src="/soanbaitoan/alla-avatar.png" alt="Alla" className="w-full h-full object-cover" />
                     </div>
                     <div>
-                        <h3 className="font-black text-sm uppercase tracking-wider">Alla siu cute <span className="text-[10px] opacity-70">v5.3.3</span></h3>
+                        <h3 className="font-black text-sm uppercase tracking-wider">Alla siu cute <span className="text-[10px] opacity-70">v5.4.4</span></h3>
                         <div className="flex items-center gap-1.5">
                             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                             <span className="text-[10px] opacity-80 font-bold uppercase">Đang sẵn sàng</span>
                         </div>
                     </div>
                 </div>
-                {!isEmbedded && (
-                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
-                        <X size={20} />
+                <div className="flex items-center gap-1">
+                    <button onClick={clearHistory} title="Xóa lịch sử" className="p-2 hover:bg-white/10 rounded-xl transition-colors text-white/70 hover:text-white">
+                        <Trash2 size={18} />
                     </button>
-                )}
+                    {!isEmbedded && (
+                        <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
+                            <X size={20} />
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Messages */}

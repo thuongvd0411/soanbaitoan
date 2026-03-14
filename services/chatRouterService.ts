@@ -16,6 +16,10 @@ export const chatRouterService = {
                     return await this.handleTuitionStatus(ownerId, plan.filter);
                 case "schedule_query":
                     return await this.handleScheduleQuery(plan.className);
+                case "teacher_salary":
+                    return await this.handleTeacherSalary(ownerId);
+                case "self_info":
+                    return await this.handleSelfInfo();
                 default:
                     return "";
             }
@@ -123,6 +127,43 @@ export const chatRouterService = {
         return JSON.stringify({
             lop: student.className,
             lich: student.schedules
+        });
+    },
+
+    async handleTeacherSalary(ownerId: string): Promise<string> {
+        const students = await firebaseService.getManagementStudents();
+        const { calculateMonthlyStats } = await import("../utils/helpers");
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+
+        let totalSalary = 0;
+        let totalSessions = 0;
+
+        students.forEach(s => {
+            const stats = calculateMonthlyStats(s.history, s.schedules, currentMonth, currentYear, s.baseSalary);
+            totalSalary += stats.totalSalary;
+            totalSessions += (stats.attendedCount + stats.makeupCount);
+        });
+
+        return JSON.stringify({
+            thang: currentMonth + 1,
+            nam: currentYear,
+            tongLuong: totalSalary,
+            tongBuoiDay: totalSessions,
+            soHocSinh: students.length
+        });
+    },
+
+    async handleSelfInfo(): Promise<string> {
+        const students = await firebaseService.getManagementStudents();
+        const classes = [...new Set(students.map(s => s.className))];
+        
+        return JSON.stringify({
+            tenGiaoVien: "Anh Thưởng",
+            soHocSinh: students.length,
+            soLop: classes.length,
+            danhSachLop: classes
         });
     }
 };
