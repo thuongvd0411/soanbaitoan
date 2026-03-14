@@ -216,12 +216,43 @@ export const chatRouterService = {
                     return true;
                 }) || [];
 
+                let wrongQuestionsAnalysis = "Không có dữ liệu bài làm chi tiết gần đây.";
+                if (matchedGlobalResults.length > 0) {
+                    const latestResult = matchedGlobalResults[0];
+                    if (latestResult.shareId && latestResult.answers) {
+                        try {
+                            const examData = await firebaseService.getSharedExam(latestResult.shareId);
+                            if (examData && examData.questions) {
+                                const wrongList: any[] = [];
+                                examData.questions.forEach((q: any) => {
+                                    const studentAns = latestResult.answers[q.id];
+                                    const correctAns = q.correctAnswer;
+                                    if (studentAns !== correctAns) {
+                                        wrongList.push({
+                                            cauHoi: q.content,
+                                            saiO: `Chon: ${studentAns || 'Bỏ trống'} - DapAnDung: ${correctAns}`
+                                        });
+                                    }
+                                });
+                                if (wrongList.length > 0) {
+                                    wrongQuestionsAnalysis = `Sai ${wrongList.length} câu. Chi tiết: ` + JSON.stringify(wrongList.slice(0, 5)); // Lấy max 5 câu sai để tránh prompt quá dài
+                                } else {
+                                    wrongQuestionsAnalysis = "Tuyệt vời, học sinh làm đúng 100% bài gần nhất!";
+                                }
+                            }
+                        } catch (e) {
+                            console.error("Lỗi khi phân tích bài sai:", e);
+                        }
+                    }
+                }
+
                 results[fullName] = {
                     lop: student?.className || matchedGlobalResults[0]?.studentClass || "Tự do",
                     soBuoiHoc: relevantHistory.length,
                     thang: month === "current" ? (currentMonth + 1) : "tất cả",
                     diemGanNhat: matchedGlobalResults.length > 0 ? matchedGlobalResults[0].score : (student?.history?.[0]?.testScore ?? "N/A"),
-                    nhanXetGanNhat: student?.history?.[0]?.absentReason ?? (matchedGlobalResults.length > 0 ? "Vừa hoàn thành bài tập trực tuyến" : "Chưa có nhận xét")
+                    nhanXetGanNhat: student?.history?.[0]?.absentReason ?? (matchedGlobalResults.length > 0 ? "Vừa hoàn thành bài tập trực tuyến" : "Chưa có nhận xét"),
+                    phanTichBaiSaiGanNhat: wrongQuestionsAnalysis
                 };
             }
         }
