@@ -55,15 +55,22 @@ export const chatRouterService = {
                 }
 
                 // Kiểm tra xem đã làm chưa và điểm số
-                // Dữ liệu điểm lấy từ history (StudyRecord) có absentReason chứa tên bài tập
+                // Dữ liệu điểm lấy từ history (StudyRecord - dữ liệu cũ) hoặc examHistory (dữ liệu mới v5.4.4)
                 const historyRecord = student.history?.find((h: any) => 
                     h.absentReason?.includes(lastExam.title) || h.absentReason?.includes(lastExam.id)
                 );
 
+                const examRecord = student.examHistory?.find((e: any) => 
+                    e.id === lastExam.id || e.title === lastExam.title
+                );
+
+                const isDone = !!historyRecord || !!examRecord;
+                const score = examRecord ? examRecord.score : (historyRecord?.testScore ?? "Chưa có điểm");
+
                 results[student.fullName] = {
                     baiTap: lastExam.title,
-                    trangThai: historyRecord ? "Đã làm" : "Chưa làm",
-                    diem: historyRecord?.testScore ?? "Chưa có điểm"
+                    trangThai: isDone ? "Đã làm" : "Chưa làm",
+                    diem: score
                 };
             } else {
                 // student_progress

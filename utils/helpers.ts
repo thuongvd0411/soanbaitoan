@@ -33,6 +33,10 @@ export const calculateMonthlyStats = (
   const records = (history || []).filter(r => {
     try {
       if (!r?.date || typeof r.date !== 'string') return false;
+      
+      // LỌC BỎ BÀI TẬP: Nếu bản ghi có session là "Bài tập", không tính vào chuyên cần/lương (v5.4.4)
+      if (r.session === "Bài tập" as any || (r.absentReason && r.absentReason.includes("Làm bài:"))) return false;
+
       const d = new Date(r.date);
       if (isNaN(d.getTime())) return false;
       return d.getMonth() === month && d.getFullYear() === year;

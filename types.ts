@@ -72,6 +72,14 @@ export interface StudentResult {
   submittedAt: string;
 }
 
+export interface ExamHistoryRecord {
+  id: string; // shareId
+  title: string;
+  date: string;
+  score: number;
+  details?: any;
+}
+
 export interface AppState {
   grade: number;
   questionCount: number;
@@ -178,6 +186,7 @@ export interface Student {
   schedules: Schedule[];
   history: StudyRecord[];
   assignedExams?: AssignedExam[];
+  examHistory?: ExamHistoryRecord[];
 }
 
 export interface MonthlyStats {

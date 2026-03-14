@@ -346,7 +346,7 @@ export const firebaseService = {
     },
 
     /**
-     * Đồng bộ điểm bài tập vào lịch sử học tập (History) của học sinh
+     * Đồng bộ điểm bài tập vào lịch sử làm bài (ExamHistory) của học sinh
      */
     async addExamRecordToStudent(studentId: string, recordInfo: { title: string, score: number, shareId: string }): Promise<void> {
         try {
@@ -360,34 +360,22 @@ export const firebaseService = {
                 const studentIndex = students.findIndex((s: any) => s.id === studentId);
                 if (studentIndex !== -1) {
                     const student = { ...students[studentIndex] };
-                    if (!student.history) student.history = [];
+                    
+                    // Khởi tạo examHistory nếu chưa có
+                    if (!student.examHistory) student.examHistory = [];
 
-                    // Tạo bản ghi history mới loại "Bài tập"
-                    const newRecord = {
-                        id: "exam_" + Date.now(),
+                    // Tạo bản ghi examHistory mới
+                    const newExamRecord = {
+                        id: recordInfo.shareId,
+                        title: recordInfo.title,
                         date: new Date().toISOString().split('T')[0],
-                        weekday: new Date().getDay() === 0 ? 6 : new Date().getDay() - 1, // Fix 0..6 (CN..T7) -> (T2..CN)
-                        session: "Bài tập" as any, // Dùng as any để bypass enum nếu cần, hoặc ép kiểu
-                        status: 'attended',
-                        homework: 'N/A',
-                        formulaTest: 'N/A',
-                        oldLessonTest: 'N/A',
-                        regularHomeworkResult: 'N/A',
-                        testScore: recordInfo.score,
-                        evalNewKnowledge: recordInfo.score,
-                        evalQuantity: 100, // Mặc định 100%
-                        ignoreEarlyStats: true,
-                        ignoreMidStats: false,
-                        ignoreLateStats: true,
-                        ignoreOutsideStats: true,
-                        ignoreTestStats: false,
-                        absentReason: `Làm bài: ${recordInfo.title}`,
-                        mockTests: []
+                        score: recordInfo.score
                     };
 
-                    student.history = [newRecord, ...student.history];
+                    // Thêm vào đầu danh sách
+                    student.examHistory = [newExamRecord, ...student.examHistory];
 
-                    // Cập nhật trạng thái bài tập đã giao
+                    // Vẫn giữ cập nhật status trong assignedExams nếu có
                     if (student.assignedExams) {
                         const examIndex = student.assignedExams.findIndex((e: any) => e.id === recordInfo.shareId);
                         if (examIndex !== -1) {
