@@ -81,17 +81,22 @@ const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen, onClose, config, ow
                 const { firebaseService } = await import('../services/firebaseService');
                 const { db } = await import('../services/firebaseService');
                 const { collection, addDoc, serverTimestamp } = await import('firebase/firestore');
+                console.log("Logging chat to Firebase...");
                 await addDoc(collection(db, "chat_logs"), {
                     ownerId,
                     question: userText,
                     intent: intentResult.intent,
                     timestamp: serverTimestamp()
                 });
-            } catch (e) { console.warn("Log to Firebase failed", e); }
+            } catch (e) { 
+                console.error("Log to Firebase failed:", e); 
+            }
 
         } catch (error: any) {
             console.error("Chatbot Error Detail:", error);
-            setMessages(prev => [...prev, { role: 'alla', text: "Em siu cute đang bận xíu, anh thử lại sau nhé!" }]);
+            // Log chi tiết lỗi ra console để debug
+            if (error.stack) console.error(error.stack);
+            setMessages(prev => [...prev, { role: 'alla', text: "Em siu cute đang bận xíu (lỗi: " + (error.message || "kết nối") + "), anh thử lại sau nhé!" }]);
         } finally {
             setIsLoading(false);
         }
@@ -108,7 +113,7 @@ const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen, onClose, config, ow
             <div className="p-5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex justify-between items-center shrink-0">
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center overflow-hidden border border-white/30 shadow-inner backdrop-blur-md">
-                        <img src="/soanbaitoan/alla-avatar.png" alt="Alla" className="w-full h-full object-cover" />
+                        <img src="alla-avatar.png" alt="Alla" className="w-full h-full object-cover" />
                     </div>
                     <div>
                         <h3 className="font-black text-sm uppercase tracking-wider">Alla siu cute</h3>
@@ -132,7 +137,7 @@ const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen, onClose, config, ow
                     <div key={i} className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                         {msg.role === 'alla' && (
                             <div className="w-8 h-8 rounded-full overflow-hidden border border-blue-100 shrink-0 mt-1 shadow-sm">
-                                <img src="/soanbaitoan/alla-avatar.png" alt="A" className="w-full h-full object-cover" />
+                                <img src="alla-avatar.png" alt="A" className="w-full h-full object-cover" />
                             </div>
                         )}
                         <div className={`max-w-[85%] p-4 rounded-[24px] text-sm shadow-sm ${

@@ -1,6 +1,6 @@
 
 import { GoogleGenAI } from "@google/genai";
-import { AppState } from "./types";
+import { AppState } from "../types";
 
 export const chatAIService = {
     async generateContent(prompt: string, config: AppState, isFlash: boolean = true, isJson: boolean = false): Promise<string> {
@@ -10,25 +10,26 @@ export const chatAIService = {
 
         const ai = new GoogleGenAI({ apiKey });
         
-        // Flash cho tác vụ nhanh, Pro cho sáng tạo/soạn bài
-        const models = isFlash 
-            ? ['gemini-1.5-flash', 'gemini-3-flash'] 
-            : ['gemini-1.5-pro', 'gemini-3.1-pro-preview', 'gemini-1.5-flash']; // Fallback to flash if pro fails
+        // Sử dụng danh sách model giống geminiService.ts (Cập nhật 2026)
+        const modelNames = isFlash 
+            ? ['gemini-3.1-flash-lite-preview', 'gemini-1.5-flash', 'gemini-3-flash'] 
+            : ['gemini-3.1-pro-preview', 'gemini-1.5-pro', 'gemini-1.5-flash'];
         
         let lastError = "";
 
-        for (const modelName of models) {
+        for (const modelName of modelNames) {
             try {
-                const model = ai.getGenerativeModel({ 
+                const result = await (ai as any).models.generateContent({
                     model: modelName,
-                    generationConfig: {
+                    contents: prompt,
+                    config: {
                         temperature: isJson ? 0.1 : 0.7,
                         responseMimeType: isJson ? "application/json" : "text/plain",
                     }
                 });
-                const result = await model.generateContent(prompt);
-                const text = result.response.text();
-                if (text.length > 0) return text;
+                
+                const text = result.text || "";
+                if (text && text.length > 0) return text;
             } catch (error: any) {
                 lastError = error.message || "Unknown error";
                 console.warn(`ChatAI - Failed with ${modelName}:`, lastError);
