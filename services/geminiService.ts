@@ -52,8 +52,8 @@ async function retryWithFallback(
   config: { temperature: number },
   maxRetries: number = 3
 ): Promise<string> {
-  // Giữ nguyên dòng 1.5 (ổn định nhất) để tránh spam lỗi 404 làm chậm ứng dụng
-  const models = ['gemini-1.5-flash-latest', 'gemini-1.5-pro-latest', 'gemini-1.5-flash-8b'];
+  // Giữ nguyên dòng 1.5 (ổn định nhất) và gọi base / specific versions thay vì latest
+  const models = ['gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-1.5-pro', 'gemini-1.5-flash-001', 'gemini-1.5-flash-002', 'gemini-1.5-pro-001', 'gemini-1.5-pro-002'];
   let lastError = "";
 
   for (const modelName of models) {

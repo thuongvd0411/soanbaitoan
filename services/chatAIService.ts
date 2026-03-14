@@ -10,11 +10,9 @@ export const chatAIService = {
 
         const ai = new GoogleGenAI({ apiKey });
         
-        // Dựa theo log thực tế, API Key hiện hành chỉ được cấp quyền (whitelist)
-        // cho các model dòng 1.5. Xóa các bản 3.x, 2.x để tránh spam request báo lỗi 404.
         const modelNames = isFlash 
-            ? ['gemini-1.5-flash-latest', 'gemini-1.5-flash-8b', 'gemini-1.5-flash'] 
-            : ['gemini-1.5-pro-latest', 'gemini-1.5-pro'];
+            ? ['gemini-1.5-flash', 'gemini-1.5-flash-8b', 'gemini-1.5-flash-001', 'gemini-1.5-flash-002'] 
+            : ['gemini-1.5-pro', 'gemini-1.5-pro-001', 'gemini-1.5-pro-002'];
         
         let lastError = "";
 
