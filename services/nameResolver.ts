@@ -29,7 +29,10 @@ export const nameResolver = {
      * Chuẩn hóa tên: viết thường, bỏ dấu
      */
     normalizeName(name: string): string {
-        return name
+        // Loại bỏ xưng hô phổ biến
+        let cleaned = name.replace(/^(ban|em|anh|chi|thanh nien|hoc sinh)\s+/i, "");
+        
+        return cleaned
             .toLowerCase()
             .normalize("NFD")
             .replace(/[\u0300-\u036f]/g, "")

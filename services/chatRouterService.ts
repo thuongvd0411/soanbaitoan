@@ -65,7 +65,8 @@ export const chatRouterService = {
                 );
 
                 const examRecord = student.examHistory?.find((e: any) => 
-                    e.id === lastExam.id || e.title === lastExam.title
+                    e.id === lastExam.id || 
+                    (e.title && nameResolver.normalizeName(e.title).includes(nameResolver.normalizeName(lastExam.title)))
                 );
 
                 const isDone = !!historyRecord || !!examRecord;
@@ -77,13 +78,22 @@ export const chatRouterService = {
                     diem: score
                 };
             } else {
-                // student_progress
-                const recentHistory = student.history?.slice(0, 5) || [];
-                // Sửa lỗi logic điểm: lấy testScore trực tiếp
+                // student_progress (hỏi về tiến độ, số buổi, điểm)
+                const currentMonth = new Date().getMonth();
+                const currentYear = new Date().getFullYear();
+                
+                // Lọc history theo tháng nếu là "current"
+                const relevantHistory = student.history?.filter((h: any) => {
+                    const d = new Date(h.date);
+                    if (plan.month === "current") return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+                    return true;
+                }) || [];
+
                 results[student.fullName] = {
                     lop: student.className,
-                    diemGanNhat: recentHistory[0]?.testScore ?? "N/A",
-                    nhanXet: recentHistory[0]?.absentReason ?? "Không có dữ liệu gần đây"
+                    soBuoiThangNay: relevantHistory.length,
+                    diemGanNhat: student.history?.[0]?.testScore ?? "N/A",
+                    nhanXetGanNhat: student.history?.[0]?.absentReason ?? "Chưa có nhận xét"
                 };
             }
         }

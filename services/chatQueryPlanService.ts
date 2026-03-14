@@ -32,8 +32,8 @@ INTENTS:
 - self_info: hỏi về bản thân giáo viên (anh Thưởng đang dạy bao nhiêu lớp, bao nhiêu học sinh).
 
 YÊU CẦU:
-- students: Trích xuất danh sách tên (ví dụ: ["Bảo", "Đạt"]).
-- month: "current" hoặc số tháng.
+- students: Trích xuất danh sách tên RIÊNG (Ví dụ: "bạn Bảo" -> ["Bảo"], "em Vinh" -> ["Vinh"]). Bỏ qua các từ "bạn", "em", "anh", "chị".
+- month: "current" (nếu hỏi tháng này), "last" (tháng trước), hoặc số tháng.
 - Trả về JSON thuần túy.
 
 CÂU HỎI: "{query}"
