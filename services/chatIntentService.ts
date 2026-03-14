@@ -2,30 +2,19 @@
 import { chatAIService } from "./chatAIService";
 import { AppState } from "../types";
 
-export type ChatIntent = "student_progress" | "class_summary" | "assignment_analysis" | "generate_exercise" | "general_question";
+export type ChatIntent = "system_query" | "ai_task" | "general_chat";
 
 export interface IntentResult {
     intent: ChatIntent;
-    studentName?: string;
-    className?: string;
-    topic?: string;
-    timeRange?: string;
 }
 
 const INTENT_PROMPT = `
-Bạn là bộ phân loại ý định (Intent Classifier) cho chatbot giáo dục.
-Nhiệm vụ: Phân loại câu hỏi của người dùng và trích xuất thực thể.
+Phân loại câu hỏi sau thành 1 trong 3 loại:
+1. system_query: hỏi dữ liệu LMS (học sinh, lớp, lịch học, học phí, điểm, làm bài chưa...)
+2. ai_task: yêu cầu AI tạo nội dung (soạn đề, giải toán, tạo câu hỏi...)
+3. general_chat: câu hỏi kiến thức chung, chào hỏi hoặc trò chuyện linh tinh.
 
-CÁC INTENT:
-- student_progress: Hỏi về tiến độ, kết quả của 1 học sinh cụ thể.
-- class_summary: Hỏi về tình hình chung của một lớp học.
-- assignment_analysis: Phân tích kết quả của một bài tập/mã đề cụ thể.
-- generate_exercise: Yêu cầu tạo bài tập luyện tập.
-- general_question: Các câu hỏi làm quen, chào hỏi hoặc không thuộc các loại trên.
-
-BẮT BUỘC TRẢ VỀ JSON:
-{ "intent": "...", "studentName": "...", "className": "...", "topic": "...", "timeRange": "..." }
-(Chỉ điền các trường tìm thấy, nếu không có để null)
+BẮT BUỘC TRẢ VỀ JSON: { "intent": "..." }
 
 CÂU HỎI: "{query}"
 `;
@@ -39,7 +28,7 @@ export const chatIntentService = {
             return JSON.parse(text) as IntentResult;
         } catch (error) {
             console.error("chatIntentService error:", error);
-            return { intent: "general_question" };
+            return { intent: "general_chat" };
         }
     }
 };

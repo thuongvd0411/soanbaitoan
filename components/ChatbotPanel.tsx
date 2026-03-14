@@ -20,12 +20,22 @@ interface ChatbotPanelProps {
 }
 
 const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen, onClose, config, ownerId, isEmbedded }) => {
-    const [messages, setMessages] = useState<Message[]>([
-        { role: 'alla', text: 'Chào anh Thưởng! Em là Alla, em có thể giúp anh xem tình hình học tập của học sinh hoặc hỗ trợ anh soạn bài ạ.' }
-    ]);
+    const STORAGE_KEY = `alla_chat_history_${ownerId}`;
+    
+    const [messages, setMessages] = useState<Message[]>(() => {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        return saved ? JSON.parse(saved) : [
+            { role: 'alla', text: 'Chúc 1 ngày tốt lành, em ở ngay đây rồi ạ' }
+        ];
+    });
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
+
+    // Lưu history mỗi khi messages thay đổi
+    useEffect(() => {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+    }, [messages, STORAGE_KEY]);
 
     useEffect(() => {
         if (scrollRef.current) {
@@ -33,28 +43,55 @@ const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen, onClose, config, ow
         }
     }, [messages]);
 
+
     const handleSend = async () => {
         if (!input.trim() || isLoading) return;
 
         const userText = input.trim();
         setInput('');
-        setMessages(prev => [...prev.slice(-9), { role: 'user', text: userText }]); // Giữ tối đa 10 messages
+        setMessages(prev => [...prev.slice(-19), { role: 'user', text: userText }]); 
         setIsLoading(true);
 
         try {
-            // 1. Detect Intent
-            const intent = await chatIntentService.detectIntent(userText, config);
-            
-            // 2. Route & Get Summary
-            const summary = await chatRouterService.routeAndSummary(intent, ownerId);
-            
-            // 3. Generate Response
-            const response = await chatResponseService.generateResponse(userText, summary || "Không có dữ liệu cụ thể.", config);
+            // 1. Phân loại Intent (Gemini Flash)
+            const intentResult = await chatIntentService.detectIntent(userText, config);
+            let response = "";
+
+            if (intentResult.intent === "system_query") {
+                // Nhánh 1: Truy vấn hệ thống
+                const { chatQueryPlanService } = await import('../services/chatQueryPlanService');
+                const plan = await chatQueryPlanService.generatePlan(userText, config);
+                const summary = await chatRouterService.routeAndSummary(plan, ownerId);
+                response = await chatResponseService.generateResponse(userText, summary || "Không tìm thấy dữ liệu phù hợp.", config);
+            } else if (intentResult.intent === "ai_task") {
+                // Nhánh 2: Tác vụ AI (Gemini Pro)
+                const { chatAIService } = await import('../services/chatAIService');
+                const prompt = `Bạn là trợ lý AI chuyên về nội dung giáo dục. Hãy thực hiện yêu cầu sau: ${userText}. Trả lời ngắn gọn, chuyên nghiệp, không vơi 150 tokens.`;
+                response = await chatAIService.generateContent(prompt, config, false); // false = use Pro
+            } else {
+                // Nhánh 3: Trò chuyện tự nhiên (Gemini Flash)
+                const { chatAIService } = await import('../services/chatAIService');
+                response = await chatAIService.generateContent(userText, config, true); // true = use Flash
+            }
             
             setMessages(prev => [...prev, { role: 'alla', text: response }]);
+
+            // Ghi log vào Firebase
+            try {
+                const { firebaseService } = await import('../services/firebaseService');
+                const { db } = await import('../services/firebaseService');
+                const { collection, addDoc, serverTimestamp } = await import('firebase/firestore');
+                await addDoc(collection(db, "chat_logs"), {
+                    ownerId,
+                    question: userText,
+                    intent: intentResult.intent,
+                    timestamp: serverTimestamp()
+                });
+            } catch (e) { console.warn("Log to Firebase failed", e); }
+
         } catch (error: any) {
             console.error("Chatbot Error Detail:", error);
-            setMessages(prev => [...prev, { role: 'alla', text: "Em xin lỗi, em đang gặp chút vấn đề khi kết nối với AI. Anh thử lại sau nhé!" }]);
+            setMessages(prev => [...prev, { role: 'alla', text: "Em siu cute đang bận xíu, anh thử lại sau nhé!" }]);
         } finally {
             setIsLoading(false);
         }
@@ -74,7 +111,7 @@ const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen, onClose, config, ow
                         <Sparkles size={20} className="text-yellow-300" />
                     </div>
                     <div>
-                        <h3 className="font-black text-sm uppercase tracking-wider">Alla AI Assistant</h3>
+                        <h3 className="font-black text-sm uppercase tracking-wider">Alla siu cute</h3>
                         <div className="flex items-center gap-1.5">
                             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                             <span className="text-[10px] opacity-80 font-bold uppercase">Đang sẵn sàng</span>
@@ -89,6 +126,7 @@ const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen, onClose, config, ow
             </div>
 
             {/* Messages */}
+            {/* ... (giữ nguyên logic render messages) */}
             <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar bg-gray-50/50">
                 {messages.map((msg, i) => (
                     <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -125,7 +163,7 @@ const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen, onClose, config, ow
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                        placeholder="Hỏi em về học sinh hoặc bài tập..."
+                        placeholder="Hỏi em về học sinh, tài chính hoặc bài tập..."
                         className="w-full bg-gray-100 border-none rounded-2xl py-4 pl-5 pr-12 text-sm focus:ring-2 ring-blue-500/20 outline-none font-medium placeholder:text-gray-400"
                     />
                     <button 
@@ -138,7 +176,7 @@ const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen, onClose, config, ow
                         <Send size={18} />
                     </button>
                 </div>
-                <p className="text-[9px] text-center text-gray-400 mt-2 font-bold uppercase tracking-widest opacity-50">Powered by Gemini AI</p>
+                <p className="text-[9px] text-center text-gray-400 mt-2 font-bold uppercase tracking-widest opacity-50">Xây dựng bởi ThuongVD & Alla</p>
             </div>
         </div>
     );

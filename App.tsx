@@ -27,7 +27,7 @@ import { Student, StudyRecord, Schedule } from './types';
 import ChatbotPanel from './components/ChatbotPanel';
 
 
-const APP_VERSION = "v5.4.2";
+const APP_VERSION = "v5.4.3";
 console.log("Alla Version:", APP_VERSION);
 
 declare global {
@@ -2436,7 +2436,7 @@ export default function App() {
       )}
 
       {/* ALLA CHATBOT ASSISTANT - Nút nổi chỉ hiện khi đã có đề bài để tránh trùng lặp */}
-      {!isViewerMode && questions.length > 0 && (
+      {!isViewerMode && (
         <>
           <button 
             onClick={() => setIsChatOpen(!isChatOpen)}
