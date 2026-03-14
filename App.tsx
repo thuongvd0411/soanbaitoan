@@ -2430,6 +2430,11 @@ export default function App() {
               </button>
             </div>
 
+            <p className="mt-10 text-[9px] font-bold text-cyan-800/60 uppercase tracking-[0.3em]">Xây dựng bởi ThuongVd & Alla {APP_VERSION}</p>
+          </div>
+        </div>
+      )}
+
       {/* ALLA CHATBOT ASSISTANT - Nút nổi chỉ hiện khi đã có đề bài để tránh trùng lặp */}
       {!isViewerMode && questions.length > 0 && (
         <>
