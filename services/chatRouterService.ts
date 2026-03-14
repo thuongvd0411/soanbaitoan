@@ -41,6 +41,7 @@ export const chatRouterService = {
             switch (plan.intent) {
                 case "student_progress":
                 case "assignment_status":
+                    console.log("Alla Routing:", plan.intent, plan.students);
                     return await this.handleStudentData(plan, ownerId);
                 case "class_summary":
                     return await this.handleClassSummary(plan.className);
@@ -193,6 +194,9 @@ export const chatRouterService = {
                 };
             }
         }
+
+        console.log("Alla Metadata:", { allStudents: allStudents.length, globalResults: globalResults.length });
+        console.log("Alla Results Map:", results);
 
         return JSON.stringify({
             results,

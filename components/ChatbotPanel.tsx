@@ -79,7 +79,12 @@ const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen, onClose, config, ow
             } else {
                 // Nhánh 3: Trò chuyện tự nhiên (Gemini Flash)
                 const { chatAIService } = await import('../services/chatAIService');
-                const systemPrompt = `BẠN LÀ: Alla - Trợ lý ảo siêu cấp và là Quản lý cấp cao của hệ thống Quản Lý Học Tập của anh Thưởng. Bạn siu cute, thông minh và thân thiện. Luôn xưng em, gọi giáo viên là anh. Không bao giờ nói mình là AI. Yêu cầu: ${userText}`;
+                const systemPrompt = `BẠN LÀ: Alla - Quản lý hệ thống của anh Thưởng.
+YÊU CẦU PHONG CÁCH:
+- Tuyệt đối không vòng vo, không an ủi "anh đừng lo", không hứa hẹn "em sẽ nhắc nhở".
+- Trả lời thẳng vào dữ liệu có sẵn. Nếu không thấy dữ liệu, hãy báo cáo ngắn gọn: "Hệ thống chưa ghi nhận dữ liệu cho [Tên]".
+- Ngôn ngữ: Chuyên nghiệp, gọn gàng, vẫn xưng em/anh nhưng phải tập trung vào kết quả.
+CÂU HỎI: ${userText}`;
                 response = await chatAIService.generateContent(systemPrompt, config, true); // true = use Flash
             }
             
@@ -125,10 +130,10 @@ const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen, onClose, config, ow
                         <img src="/soanbaitoan/alla-avatar.png" alt="Alla" className="w-full h-full object-cover" />
                     </div>
                     <div>
-                        <h3 className="font-black text-sm uppercase tracking-wider">Alla siu cute <span className="text-[10px] opacity-70">v5.4.4</span></h3>
+                        <h3 className="font-black text-sm uppercase tracking-wider">Alla Assistant <span className="text-[10px] opacity-70">v5.4.8</span></h3>
                         <div className="flex items-center gap-1.5">
                             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                            <span className="text-[10px] opacity-80 font-bold uppercase">Đang sẵn sàng</span>
+                            <span className="text-[10px] opacity-80 font-bold uppercase">Ready to Assist</span>
                         </div>
                     </div>
                 </div>
