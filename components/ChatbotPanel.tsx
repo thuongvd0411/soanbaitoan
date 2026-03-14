@@ -16,9 +16,10 @@ interface ChatbotPanelProps {
     onClose: () => void;
     config: AppState;
     ownerId: string;
+    isEmbedded?: boolean;
 }
 
-const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen, onClose, config, ownerId }) => {
+const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen, onClose, config, ownerId, isEmbedded }) => {
     const [messages, setMessages] = useState<Message[]>([
         { role: 'alla', text: 'Chào anh Thưởng! Em là Alla, em có thể giúp anh xem tình hình học tập của học sinh hoặc hỗ trợ anh soạn bài ạ.' }
     ]);
@@ -61,7 +62,10 @@ const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen, onClose, config, ow
     if (!isOpen) return null;
 
     return (
-        <div className="fixed bottom-24 right-6 w-[350px] md:w-[400px] h-[500px] bg-white rounded-[32px] shadow-[0_20px_60px_rgba(0,0,0,0.15)] flex flex-col border border-gray-100 overflow-hidden z-[100] animate-in slide-in-from-bottom-10 fade-in duration-300">
+        <div className={isEmbedded 
+            ? "w-full h-full min-h-[500px] bg-white rounded-[32px] shadow-sm flex flex-col border border-gray-100 overflow-hidden"
+            : "fixed bottom-24 right-6 w-[350px] md:w-[400px] h-[500px] bg-white rounded-[32px] shadow-[0_20px_60px_rgba(0,0,0,0.15)] flex flex-col border border-gray-100 overflow-hidden z-[100] animate-in slide-in-from-bottom-10 fade-in duration-300"
+        }>
             {/* Header */}
             <div className="p-5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex justify-between items-center shrink-0">
                 <div className="flex items-center gap-3">
@@ -76,9 +80,11 @@ const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen, onClose, config, ow
                         </div>
                     </div>
                 </div>
-                <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
-                    <X size={20} />
-                </button>
+                {!isEmbedded && (
+                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
+                        <X size={20} />
+                    </button>
+                )}
             </div>
 
             {/* Messages */}

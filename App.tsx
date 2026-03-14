@@ -27,7 +27,7 @@ import { Student, StudyRecord, Schedule } from './types';
 import ChatbotPanel from './components/ChatbotPanel';
 
 
-const APP_VERSION = "v5.4.0";
+const APP_VERSION = "v5.4.1";
 console.log("Alla Version:", APP_VERSION);
 
 declare global {
@@ -1850,7 +1850,15 @@ export default function App() {
         ) : config.gameStatus === GameStatus.Playing && gameQuestions.length > 0 ? (
           <MillionaireGame questions={gameQuestions} grade={config.grade} lessonName={config.customLesson || (config.lessons.length > 0 ? config.lessons.join(", ") : "")} onClose={() => setConfig(prev => ({ ...prev, gameStatus: GameStatus.Idle }))} onRestart={handleStartGame} />
         ) : questions.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-gray-400 p-8 text-center max-w-lg mx-auto animate-in fade-in duration-700"> <div className="bg-white p-12 rounded-full shadow-2xl mb-8"><PartyPopper size={100} className="text-primary/15" /></div> <h2 className="text-2xl font-black text-gray-700 mb-3 uppercase tracking-tighter">AI Assistant Sẵn sàng!</h2> <p className="text-base text-gray-500 font-medium italic">Chọn bài học để bắt đầu.</p> </div>
+          <div className="h-full flex flex-col items-center justify-center p-4 md:p-8 w-full max-w-5xl mx-auto animate-in fade-in duration-700">
+            <ChatbotPanel 
+                isOpen={true} 
+                onClose={() => {}} 
+                config={config} 
+                ownerId={storageService.getOwnerId() || ''} 
+                isEmbedded={true} 
+            />
+          </div>
         ) : (
           <div className="max-w-4xl mx-auto bg-white shadow-2xl p-6 md:p-16 min-h-[29.7cm] rounded-none md:rounded-lg animate-in slide-in-from-bottom-6 duration-500 relative">
             <div className="text-center mb-16 border-b-2 border-black pb-8 relative">

@@ -1,8 +1,8 @@
 # Nhật ký công việc - Soạn Toán AI
-**Ngày cập nhật:** 14/03/2026 13:05
+**Ngày cập nhật:** 14/03/2026 13:10
 
 ## Trạng thái hiện tại
-- **Phiên bản app:** `v5.4.0 (AI Assistant & Analysis)` — Tích hợp Chatbot AI và Phân tích điểm
+- **Phiên bản app:** `v5.4.1 (Centralized Chatbot)` — Đưa Chatbot ra giữa màn hình chính
 - **Tính năng đã hoàn tất:**
     1. **Bảo mật v2**: DeviceId + Fingerprint (SHA-256) đã chạy ổn định.
     2. **Cloud Database**: Firebase Firestore đã tạo + Rules cho phép read/write.
