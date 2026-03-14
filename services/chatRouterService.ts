@@ -3,6 +3,41 @@ import { firebaseService } from "./firebaseService";
 import { QueryPlan } from "./chatQueryPlanService";
 import { nameResolver } from "./nameResolver";
 
+const safeParseDate = (dateStr: string): Date | null => {
+    if (!dateStr) return null;
+    try {
+        // Thử định dạng chuẩn YYYY-MM-DD
+        let d = new Date(dateStr);
+        if (!isNaN(d.getTime())) return d;
+
+        // Thử định dạng VN: DD/MM/YYYY
+        if (dateStr.includes('/')) {
+            const parts = dateStr.split('/');
+            if (parts.length === 3) {
+                const day = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10) - 1;
+                const year = parseInt(parts[2], 10);
+                d = new Date(year, month, day);
+                if (!isNaN(d.getTime())) return d;
+            }
+        }
+        
+        // Thử định dạng ghi chú lộn xộn: YYYY-M-D
+        if (dateStr.includes('-')) {
+            const parts = dateStr.split('-');
+            if (parts.length === 3) {
+                const [y, m, d_part] = parts.map(p => parseInt(p, 10));
+                d = new Date(y, m - 1, d_part);
+                if (!isNaN(d.getTime())) return d;
+            }
+        }
+
+        return null;
+    } catch (e) {
+        return null;
+    }
+};
+
 export const chatRouterService = {
     async routeAndSummary(plan: QueryPlan, ownerId: string): Promise<string> {
         try {
@@ -36,14 +71,22 @@ export const chatRouterService = {
         const results: Record<string, any> = {};
 
         for (const name of plan.students) {
-            const normalized = nameResolver.normalizeName(name);
-            const student = allStudents.find((s: any) => 
-                nameResolver.normalizeName(s.fullName).includes(normalized)
-            );
+            const normalizedTarget = nameResolver.normalizeName(name);
+            
+            // So khớp thông minh:
+            // 1. Ưu tiên khớp chính xác tên gọi (tên cuối cùng)
+            // 2. Sau đó mới khớp mờ (includes)
+            let student = allStudents.find((s: any) => {
+                const studentFullName = s.fullName || "";
+                const normalizedStudent = nameResolver.normalizeName(studentFullName);
+                const studentNameParts = normalizedStudent.split(" ");
+                const lastName = studentNameParts[studentNameParts.length - 1];
+                
+                return lastName === normalizedTarget || normalizedStudent.includes(normalizedTarget);
+            });
 
             if (!student) {
-                // Thử tìm kiếm mờ hơn: nếu tên hỏi là một từ trong tên đầy đủ
-                results[name] = "Không tìm thấy thông tin. Anh kiểm tra giúp em xem tên học sinh có đúng không ạ?";
+                results[name] = "Hệ thống không tìm thấy học sinh này. Anh vui lòng kiểm tra lại tên học sinh nhé.";
                 continue;
             }
 
@@ -79,19 +122,29 @@ export const chatRouterService = {
                 };
             } else {
                 // student_progress (hỏi về tiến độ, số buổi, điểm)
-                const currentMonth = new Date().getMonth();
-                const currentYear = new Date().getFullYear();
+                const now = new Date();
+                const currentMonth = now.getMonth();
+                const currentYear = now.getFullYear();
                 
-                // Lọc history theo tháng nếu là "current"
+                // Lọc history theo tháng
                 const relevantHistory = student.history?.filter((h: any) => {
-                    const d = new Date(h.date);
-                    if (plan.month === "current") return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+                    const d = safeParseDate(h.date);
+                    if (!d) return false;
+                    
+                    if (plan.month === "current") {
+                        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+                    } else if (plan.month === "last") {
+                        const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+                        const yearOfLastMonth = currentMonth === 0 ? currentYear - 1 : currentYear;
+                        return d.getMonth() === lastMonth && d.getFullYear() === yearOfLastMonth;
+                    }
                     return true;
                 }) || [];
 
                 results[student.fullName] = {
                     lop: student.className,
-                    soBuoiThangNay: relevantHistory.length,
+                    soBuoiHoc: relevantHistory.length,
+                    thang: plan.month === "current" ? (currentMonth + 1) : "tất cả",
                     diemGanNhat: student.history?.[0]?.testScore ?? "N/A",
                     nhanXetGanNhat: student.history?.[0]?.absentReason ?? "Chưa có nhận xét"
                 };

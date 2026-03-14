@@ -1,5 +1,29 @@
-
 import { Student, StudyRecord, MonthlyStats, Schedule } from '../types';
+
+const safeParseDate = (dateStr: string): Date | null => {
+  if (!dateStr) return null;
+  try {
+    let d = new Date(dateStr);
+    if (!isNaN(d.getTime())) return d;
+
+    // DD/MM/YYYY
+    if (dateStr.includes('/')) {
+      const parts = dateStr.split('/');
+      if (parts.length === 3) {
+        return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
+      }
+    }
+
+    // YYYY-MM-DD hoặc YYYY-M-D
+    if (dateStr.includes('-')) {
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+      }
+    }
+    return null;
+  } catch (e) { return null; }
+};
 
 export const getWeekday = (dateStr: string): number => {
   try {
@@ -37,8 +61,8 @@ export const calculateMonthlyStats = (
       // LỌC BỎ BÀI TẬP: Nếu bản ghi có session là "Bài tập", không tính vào chuyên cần/lương (v5.4.4)
       if (r.session === "Bài tập" as any || (r.absentReason && r.absentReason.includes("Làm bài:"))) return false;
 
-      const d = new Date(r.date);
-      if (isNaN(d.getTime())) return false;
+      const d = safeParseDate(r.date);
+      if (!d || isNaN(d.getTime())) return false;
       return d.getMonth() === month && d.getFullYear() === year;
     } catch (e) { return false; }
   });

@@ -37,6 +37,8 @@ export const nameResolver = {
             .normalize("NFD")
             .replace(/[\u0300-\u036f]/g, "")
             .replace(/đ/g, "d")
+            .replace(/[^a-z0-9\s]/g, "") // Xóa ký tự đặc biệt
+            .replace(/\s+/g, " ") // Xóa khoảng trắng thừa
             .trim();
     }
 };
