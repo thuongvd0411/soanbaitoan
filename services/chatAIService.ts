@@ -25,9 +25,12 @@ export const chatAIService = {
         // Thử từng API Key khả dụng
         for (const apiKey of keys) {
             const ai = new GoogleGenAI({ apiKey });
+            let keyExhausted = false;
             
             // Với mỗi Key, thử từng Model dự phòng
             for (const modelName of modelNames) {
+                if (keyExhausted) break;
+
                 try {
                     const result = await (ai as any).models.generateContent({
                         model: modelName,
@@ -44,12 +47,15 @@ export const chatAIService = {
                     lastError = error.message || "Unknown error";
                     console.warn(`ChatAI - Key [${apiKey.substring(0,6)}...] Failed with ${modelName}:`, lastError);
                     
-                    // Nếu lỗi chỉ là 429 (hết quota) của model này, vẫn nên thử các model khác cùng Key
-                    // đặc biệt là khi 'limit: 0' cho model mới.
+                    // Nếu lỗi là 429 (hết quota) hoặc 403 (bị chặn), chuyển ngay sang Key tiếp theo
+                    if (lastError.includes("429") || lastError.includes("quota") || lastError.includes("RESOURCE_EXHAUSTED") || lastError.includes("403")) {
+                        keyExhausted = true;
+                        break; 
+                    }
                 }
             }
         }
 
-        throw new Error(lastError || "Không kết nối được AI.");
+        throw new Error(lastError || "Dạ anh, hiện tại cả 2 Key đều đang bận hoặc quá tải, anh vui lòng đợi lát rồi thử lại giúp em nhé!");
     }
 };

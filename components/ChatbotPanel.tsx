@@ -97,29 +97,30 @@ const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen, onClose, config, ow
             let response = "";
 
             if (intentResult.intent === "system_query") {
-                // Nhánh 1: Truy vấn hệ thống
-                const { chatQueryPlanService } = await import('../services/chatQueryPlanService');
-                const plan = await chatQueryPlanService.generatePlan(userText, config);
-                const summary = await chatRouterService.routeAndSummary(plan, ownerId);
+            // BƯỚC 1: Phân tích ý định & Lập kế hoạch (Chỉ 1 AI Call thay vì 2)
+            const { chatAnalyzerService } = await import('../services/chatAnalyzerService');
+            const analysis = await chatAnalyzerService.analyze(userText, config);
+            
+            let response = "";
+
+            if (analysis.type === "system_query" && analysis.plan) {
+                // Bước 2: Truy vấn dữ liệu thực tế từ Firebase
+                const summary = await chatRouterService.routeAndSummary(analysis.plan, ownerId);
+                
+                // Bước 3: Tạo phản hồi thân thiện (AI Call thứ 2)
+                const { chatResponseService } = await import('../services/chatResponseService');
                 response = await chatResponseService.generateResponse(userText, summary || "Không tìm thấy dữ liệu phù hợp.", config);
-            } else if (intentResult.intent === "ai_task") {
-                // Nhánh 2: Tác vụ AI (Gemini Pro)
-                const { chatAIService } = await import('../services/chatAIService');
-                const prompt = `Bạn là trợ lý AI chuyên về nội dung giáo dục. Hãy thực hiện yêu cầu sau: ${userText}. Trả lời ngắn gọn, chuyên nghiệp, không vơi 150 tokens.`;
-                response = await chatAIService.generateContent(prompt, config, false); // false = use Pro
             } else {
-                // Nhánh 3: Trò chuyện tự nhiên (Gemini Flash)
+                // Bước 2: Trò chuyện hoặc Tác vụ AI (Chỉ 1 AI Call thay vì 2)
                 const { chatAIService } = await import('../services/chatAIService');
-                const systemPrompt = `BẠN LÀ: Alla - Quản lý hệ thống của anh Thưởng.
-YÊU CẦU PHONG CÁCH:
-- Tuyệt đối không vòng vo.
-- Xưng hô: Với học sinh Bảo, hãy gọi là "Bảo", "em Bảo", hoặc "bạn Bảo" để gần gũi.
-- Mở đầu câu trả lời: Luôn bắt đầu bằng "Vâng anh", "Dạ", hoặc các từ tương tự lễ phép. TUYỆT ĐỐI KHÔNG mở đầu bằng "Anh Thưởng".
-- Định dạng: Khi liệt kê các ý sai kiến thức hoặc danh sách, hãy sử dụng xuống dòng (newline) cho mỗi ý để dễ nhìn.
-- Trả lời thẳng vào dữ liệu có sẵn. Nếu không thấy dữ liệu, hãy báo cáo ngắn gọn: "Hệ thống chưa ghi nhận dữ liệu cho [Tên]".
-- Ngôn ngữ: Chuyên nghiệp, gọn gàng, vẫn xưng em/anh nhưng phải tập trung vào kết quả.
-CÂU HỎI: ${userText}`;
-                response = await chatAIService.generateContent(systemPrompt, config, true); // true = use Flash
+                const systemPrompt = `BẠN LÀ: Alla - Trợ lý của anh Thưởng.
+YÊU CẦU:
+- Luôn mở đầu bằng "Vâng anh", "Dạ anh" hoặc "Dạ". TUYỆT ĐỐI không gọi "Anh Thưởng".
+- Xưng "em", gọi "anh".
+- Với học sinh Bảo, gọi là "Bảo", "em Bảo", "bạn Bảo".
+- Trả lời thẳng vào vấn đề, xuống dòng rõ ràng cho từng ý.
+NỘI DUNG GỐC: ${userText}`;
+                response = await chatAIService.generateContent(systemPrompt, config, analysis.type !== "ai_task");
             }
             
             setMessages(prev => [...prev, { role: 'alla', text: response }]);
