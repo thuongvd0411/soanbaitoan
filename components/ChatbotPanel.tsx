@@ -4,6 +4,8 @@ import { X, Send, Bot, User, Loader2, Sparkles, MessageSquare, Trash2, Mic, MicO
 import { chatIntentService } from '../services/chatIntentService';
 import { chatRouterService } from '../services/chatRouterService';
 import { chatResponseService } from '../services/chatResponseService';
+import { db } from '../services/firebaseService';
+import { collection, query, where, orderBy, onSnapshot, limit } from 'firebase/firestore';
 import { AppState } from '../types';
 
 interface Message {
@@ -43,6 +45,58 @@ const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen, onClose, config, ow
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
     }, [messages]);
+
+    // Listener thông báo chủ động khi có học sinh nộp bài
+    useEffect(() => {
+        if (!ownerId || !isOpen) return;
+
+        const resultsRef = collection(db, "global_results");
+        const q = query(
+            resultsRef,
+            where("ownerId", "==", ownerId),
+            orderBy("submittedAt", "desc"),
+            limit(1)
+        );
+
+        // Lưu mốc thời gian bắt đầu mở chat để tránh báo bài cũ
+        const startTime = new Date().toISOString();
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            snapshot.docChanges().forEach((change) => {
+                if (change.type === "added") {
+                    const data = change.doc.data();
+                    
+                    // Chỉ báo nếu nộp SAU khi đã mở chat
+                    if (data.submittedAt > startTime) {
+                        const score = data.score;
+                        const studentName = data.studentName;
+                        const lessonName = data.lessonName || "Bài tập";
+                        const submittedDate = new Date(data.submittedAt).toLocaleDateString('vi-VN');
+                        
+                        let praise = "";
+                        if (score >= 9) {
+                            const praises = [
+                                "Thật tuyệt vời, em ấy học rất chắc kiến thức anh ạ!",
+                                "Kết quả rất xứng đáng với nỗ lực của em ấy ạ.",
+                                "Em ấy làm bài rất chỉn chu và chính xác, anh khen em ấy giúp em nhé!"
+                            ];
+                            praise = " " + praises[Math.floor(Math.random() * praises.length)];
+                        }
+
+                        const reportMsg = `Dạ anh, ${studentName} đã hoàn thành bài tập. Điểm: ${score}${praise}\n-Bài: ${lessonName}\n-Ngày nộp bài: ${submittedDate}`;
+                        
+                        setMessages(prev => {
+                            // Tránh trùng lặp do listener trigger nhiều lần
+                            if (prev.some(m => m.text === reportMsg)) return prev;
+                            return [...prev, { role: 'alla', text: reportMsg }];
+                        });
+                    }
+                }
+            });
+        });
+
+        return () => unsubscribe();
+    }, [ownerId, isOpen]);
 
     const clearHistory = () => {
         if (window.confirm("Anh muốn xóa toàn bộ lịch sử trò chuyện này ư?")) {

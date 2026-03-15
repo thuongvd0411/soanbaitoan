@@ -2045,7 +2045,8 @@ export default function App() {
                               studentName: finalName,
                               studentClass: finalClass,
                               score: finalScore,
-                              answers: studentAnswers
+                              answers: studentAnswers,
+                              lessonName: shareConfig?.customLesson || `Bài tập Lớp ${shareConfig?.grade || ''}`
                             });
                           } catch (globalErr: any) {
                             console.warn("Lưu vào globalResults failed (không ảnh hưởng):", globalErr?.message);

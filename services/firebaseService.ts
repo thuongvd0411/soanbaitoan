@@ -10,6 +10,7 @@ import {
     deleteDoc,
     query,
     orderBy,
+    where,
     onSnapshot
 } from "firebase/firestore";
 import { Question, HistoryItem } from "../types";
@@ -24,18 +25,6 @@ const firebaseConfig = {
     messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID,
     appId: env.VITE_FIREBASE_APP_ID
 };
-
-// Debug log chi tiết từng biến Firebase
-console.log("Alla Firebase Config Status:", {
-    apiKey: !!firebaseConfig.apiKey,
-    authDomain: !!firebaseConfig.authDomain,
-    projectId: !!firebaseConfig.projectId,
-    storageBucket: !!firebaseConfig.storageBucket,
-    messagingSenderId: !!firebaseConfig.messagingSenderId,
-    appId: !!firebaseConfig.appId,
-    // Log giá trị projectId (không nhạy cảm) để kiểm tra
-    projectIdValue: firebaseConfig.projectId || "MISSING!"
-});
 
 // Khởi tạo Firebase
 const app = initializeApp(firebaseConfig);
@@ -217,6 +206,7 @@ export const firebaseService = {
             const globalRef = doc(collection(db, "global_results"));
             await setDoc(globalRef, {
                 id: globalRef.id,
+                ownerId, // Thêm ownerId để lọc
                 ...result,
                 submittedAt: timestamp
             });
@@ -250,7 +240,11 @@ export const firebaseService = {
     async getGlobalResults(ownerId: string): Promise<any[]> {
         try {
             const resultsRef = collection(db, "global_results");
-            const q = query(resultsRef, orderBy("submittedAt", "desc"));
+            const q = query(
+                resultsRef, 
+                where("ownerId", "==", ownerId),
+                orderBy("submittedAt", "desc")
+            );
             const snapshot = await getDocs(q);
             const results: any[] = [];
             snapshot.forEach(doc => results.push(doc.data()));
