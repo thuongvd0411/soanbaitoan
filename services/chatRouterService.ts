@@ -227,10 +227,21 @@ export const chatRouterService = {
                                 examData.questions.forEach((q: any) => {
                                     const studentAns = latestResult.answers[q.id];
                                     const correctAns = q.correctAnswer;
+                                    const getChoiceText = (letter: string) => {
+                                        if (!letter || letter === 'Bỏ trống' || !q.choices) return letter || 'Bỏ trống';
+                                        const idx = letter.charCodeAt(0) - 65;
+                                        if (idx >= 0 && idx < q.choices.length) {
+                                            // Lấy nội dung nhưng bỏ bớt thẻ HTML phức tạp
+                                            return `${letter}. ${q.choices[idx].replace(/<[^>]*>?/gm, '').trim()}`;
+                                        }
+                                        return letter;
+                                    };
+
                                     if (studentAns !== correctAns) {
                                         wrongList.push({
-                                            cauHoi: q.content,
-                                            saiO: `Chon: ${studentAns || 'Bỏ trống'} - DapAnDung: ${correctAns}`
+                                            cauHoi: q.content.replace(/<[^>]*>?/gm, '').trim(),
+                                            hocSinhChon: getChoiceText(studentAns),
+                                            dapAnDung: getChoiceText(correctAns)
                                         });
                                     }
                                 });
@@ -251,6 +262,7 @@ export const chatRouterService = {
                     soBuoiHoc: relevantHistory.length,
                     thang: month === "current" ? (currentMonth + 1) : "tất cả",
                     diemGanNhat: matchedGlobalResults.length > 0 ? matchedGlobalResults[0].score : (student?.history?.[0]?.testScore ?? "N/A"),
+                    ngayNopBaiGanNhat: matchedGlobalResults.length > 0 ? (matchedGlobalResults[0].submittedAt?.split("T")[0] || "N/A") : (student?.history?.[0]?.date || "N/A"),
                     nhanXetGanNhat: student?.history?.[0]?.absentReason ?? (matchedGlobalResults.length > 0 ? "Vừa hoàn thành bài tập trực tuyến" : "Chưa có nhận xét"),
                     phanTichBaiSaiGanNhat: wrongQuestionsAnalysis
                 };
