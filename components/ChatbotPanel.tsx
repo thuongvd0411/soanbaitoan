@@ -53,9 +53,8 @@ const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen, onClose, config, ow
         const resultsRef = collection(db, "global_results");
         const q = query(
             resultsRef,
-            where("ownerId", "==", ownerId),
             orderBy("submittedAt", "desc"),
-            limit(1)
+            limit(5) // Lấy 5 kết quả gần nhất để tránh miss
         );
 
         // Lưu mốc thời gian bắt đầu mở chat để tránh báo bài cũ
@@ -66,8 +65,11 @@ const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen, onClose, config, ow
                 if (change.type === "added") {
                     const data = change.doc.data();
                     
-                    // Chỉ báo nếu nộp SAU khi đã mở chat
-                    if (data.submittedAt > startTime) {
+                    // Lọc in-memory: Dữ liệu thuộc về ownerId này, HOẶC dữ liệu cũ không có ownerId
+                    const isOwner = !data.ownerId || data.ownerId === ownerId;
+
+                    // Chỉ báo nếu nộp SAU khi đã mở chat và thuộc về owner hiện tại
+                    if (data.submittedAt > startTime && isOwner) {
                         const score = data.score;
                         const studentName = data.studentName;
                         const lessonName = data.lessonName || "Bài tập";

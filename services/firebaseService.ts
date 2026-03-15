@@ -242,12 +242,17 @@ export const firebaseService = {
             const resultsRef = collection(db, "global_results");
             const q = query(
                 resultsRef, 
-                where("ownerId", "==", ownerId),
                 orderBy("submittedAt", "desc")
             );
             const snapshot = await getDocs(q);
             const results: any[] = [];
-            snapshot.forEach(doc => results.push(doc.data()));
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                // Lọc in-memory: Dữ liệu thuộc về owner này HOẶC dữ liệu cũ chưa có ownerId (legacy data)
+                if (!data.ownerId || data.ownerId === ownerId) {
+                    results.push(data);
+                }
+            });
             return results;
         } catch (error) {
             console.error("Firebase getGlobalResults error:", error);
