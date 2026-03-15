@@ -118,13 +118,18 @@ export const generateQuestions = async (
 ): Promise<Question[]> => {
   const env = (import.meta as any).env || {};
   const sysKey = env.VITE_GEMINI_API_KEY;
-  const userKey = config.customApiKey;
-  const apiKey = (userKey || sysKey)?.trim();
+  const pKey = config.primaryApiKey?.trim();
+  const sKey = config.secondaryApiKey?.trim();
+  
+  // Ưu tiên: Primary -> Secondary -> System Key
+  const apiKey = pKey || sKey || sysKey;
 
   if (!apiKey) {
-    throw new Error("Lỗi: Không tìm thấy API Key. Anh vui lòng nhập Key ở Sidebar.");
+    throw new Error("Lỗi: Không tìm thấy API Key. Anh vui lòng nhập ít nhất một Key ở Sidebar.");
   }
 
+  // Logic retry với nhiều key nếu cần có thể tích hợp vào retryWithFallback
+  // Hiện tại đơn giản là lấy key khả dụng nhất
   const ai = new GoogleGenAI({ apiKey });
 
   const lessonContext = config.customLesson ? config.customLesson : (config.lessons.length > 0 ? config.lessons.join(", ") : "Tổng hợp");
@@ -175,7 +180,7 @@ export const generateMillionaireQuestions = async (
   config: AppState
 ): Promise<Question[]> => {
   const env = (import.meta as any).env || {};
-  const apiKey = (config.customApiKey || env.VITE_GEMINI_API_KEY)?.trim();
+  const apiKey = (config.primaryApiKey || config.secondaryApiKey || env.VITE_GEMINI_API_KEY)?.trim();
   if (!apiKey) throw new Error("API Key chưa sẵn sàng.");
 
   const ai = new GoogleGenAI({ apiKey });
@@ -206,7 +211,7 @@ export const parseVoiceCommand = async (
   currentConfig: AppState
 ): Promise<Partial<AppState>> => {
   const env = (import.meta as any).env || {};
-  const apiKey = (currentConfig.customApiKey || env.VITE_GEMINI_API_KEY)?.trim();
+  const apiKey = (currentConfig.primaryApiKey || currentConfig.secondaryApiKey || env.VITE_GEMINI_API_KEY)?.trim();
   if (!apiKey) throw new Error("API Key chưa sẵn sàng.");
 
   const ai = new GoogleGenAI({ apiKey });

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, Bot, User, Loader2, Sparkles, MessageSquare, Trash2 } from 'lucide-react';
+import { X, Send, Bot, User, Loader2, Sparkles, MessageSquare, Trash2, Mic, MicOff } from 'lucide-react';
 import { chatIntentService } from '../services/chatIntentService';
 import { chatRouterService } from '../services/chatRouterService';
 import { chatResponseService } from '../services/chatResponseService';
@@ -30,6 +30,7 @@ const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen, onClose, config, ow
     });
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [isListening, setIsListening] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
 
     // Lưu history mỗi khi messages thay đổi
@@ -45,12 +46,42 @@ const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen, onClose, config, ow
 
     const clearHistory = () => {
         if (window.confirm("Anh muốn xóa toàn bộ lịch sử trò chuyện này ư?")) {
-            const initialMessage: Message = { role: 'alla', text: 'Chào anh Thưởng ạ! Em đã sẵn sàng hỗ trợ anh quản lý lớp học rồi đây.' };
+            const initialMessage: Message = { role: 'alla', text: 'Vâng anh, em đã sẵn sàng hỗ trợ anh rồi đây ạ.' };
             setMessages([initialMessage]);
             localStorage.setItem(STORAGE_KEY, JSON.stringify([initialMessage]));
         }
     };
 
+    const toggleVoiceCapture = () => {
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            alert("Trình duyệt này không hỗ trợ nhận diện giọng nói.");
+            return;
+        }
+
+        if (isListening) {
+            setIsListening(false);
+            return;
+        }
+
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'vi-VN';
+        recognition.continuous = false;
+        recognition.interimResults = false;
+
+        recognition.onstart = () => setIsListening(true);
+        recognition.onend = () => setIsListening(false);
+        recognition.onresult = (event: any) => {
+            const transcript = event.results[0][0].transcript;
+            setInput(prev => (prev ? prev + ' ' : '') + transcript);
+        };
+        recognition.onerror = (event: any) => {
+            console.error("Speech Recognition Error:", event.error);
+            setIsListening(false);
+        };
+
+        recognition.start();
+    };
 
     const handleSend = async () => {
         if (!input.trim() || isLoading) return;
@@ -81,7 +112,10 @@ const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen, onClose, config, ow
                 const { chatAIService } = await import('../services/chatAIService');
                 const systemPrompt = `BẠN LÀ: Alla - Quản lý hệ thống của anh Thưởng.
 YÊU CẦU PHONG CÁCH:
-- Tuyệt đối không vòng vo, không an ủi "anh đừng lo", không hứa hẹn "em sẽ nhắc nhở".
+- Tuyệt đối không vòng vo.
+- Xưng hô: Với học sinh Bảo, hãy gọi là "Bảo", "em Bảo", hoặc "bạn Bảo" để gần gũi.
+- Mở đầu câu trả lời: Luôn bắt đầu bằng "Vâng anh", "Dạ", hoặc các từ tương tự lễ phép. TUYỆT ĐỐI KHÔNG mở đầu bằng "Anh Thưởng".
+- Định dạng: Khi liệt kê các ý sai kiến thức hoặc danh sách, hãy sử dụng xuống dòng (newline) cho mỗi ý để dễ nhìn.
 - Trả lời thẳng vào dữ liệu có sẵn. Nếu không thấy dữ liệu, hãy báo cáo ngắn gọn: "Hệ thống chưa ghi nhận dữ liệu cho [Tên]".
 - Ngôn ngữ: Chuyên nghiệp, gọn gàng, vẫn xưng em/anh nhưng phải tập trung vào kết quả.
 CÂU HỎI: ${userText}`;
@@ -170,7 +204,7 @@ CÂU HỎI: ${userText}`;
                                     {msg.role === 'user' ? 'Anh Thưởng' : 'Alla'}
                                 </span>
                             </div>
-                            <p className="leading-relaxed font-medium">{msg.text}</p>
+                            <p className="leading-relaxed font-medium whitespace-pre-wrap">{msg.text}</p>
                         </div>
                     </div>
                 ))}
@@ -187,12 +221,21 @@ CÂU HỎI: ${userText}`;
             {/* Input */}
             <div className="p-4 bg-white border-t border-gray-100">
                 <div className="relative flex items-center gap-2">
+                    <button 
+                        onClick={toggleVoiceCapture}
+                        className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all shrink-0 ${
+                            isListening ? 'bg-red-500 text-white animate-pulse shadow-lg' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                        }`}
+                        title={isListening ? "Đang nghe..." : "Nhập bằng giọng nói"}
+                    >
+                        {isListening ? <MicOff size={18} /> : <Mic size={18} />}
+                    </button>
                     <input
                         type="text"
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                        placeholder="Hỏi em về học sinh, tài chính hoặc bài tập..."
+                        placeholder={isListening ? "Alla đang nghe..." : "Hỏi em về học sinh, tài chính hoặc bài tập..."}
                         className="w-full bg-gray-100 border-none rounded-2xl py-4 pl-5 pr-12 text-sm focus:ring-2 ring-blue-500/20 outline-none font-medium placeholder:text-gray-400"
                     />
                     <button 

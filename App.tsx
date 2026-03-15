@@ -503,50 +503,102 @@ const Sidebar = ({
   activeTab, setActiveTab, hideValues, setHideValues, setSelectedStudentId,
   isViewerMode
 }: SidebarProps) => {
-  const [isExamConfigOpen, setIsExamConfigOpen] = useState(false);
+  const [isKeyConfigCollapsed, setIsKeyConfigCollapsed] = useState(() => {
+    return localStorage.getItem('alla_key_config_collapsed') === 'true';
+  });
+
+  const saveKeyCollapsed = (collapsed: boolean) => {
+    setIsKeyConfigCollapsed(collapsed);
+    localStorage.setItem('alla_key_config_collapsed', String(collapsed));
+  };
+
   const handleDifficultyChange = (diff: Difficulty) => { setConfig((prev: AppState) => { const exists = prev.selectedDifficulties.includes(diff); if (exists) return { ...prev, selectedDifficulties: prev.selectedDifficulties.filter(d => d !== diff) }; return { ...prev, selectedDifficulties: [...prev.selectedDifficulties, diff] }; }); };
   const handleTypeChange = (type: QuestionType) => { setConfig((prev: AppState) => { const exists = prev.questionTypes.includes(type); if (exists) { if (prev.questionTypes.length === 1) return prev; return { ...prev, questionTypes: prev.questionTypes.filter(t => t !== type) }; } return { ...prev, questionTypes: [...prev.questionTypes, type] }; }); };
+
   return (
     <>
       {isOpen && <div className="fixed inset-0 bg-black/60 z-40 md:hidden animate-in fade-in" onClick={onClose} />}
       <div className={`fixed md:relative inset-y-0 left-0 w-80 bg-white border-r border-gray-200 h-screen overflow-y-auto p-4 flex flex-col no-print z-50 transition-transform duration-300 ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className="flex items-center justify-between mb-6 text-primary"> <div className="flex items-center gap-2"><BookOpen size={28} /><h1 className="text-xl font-black uppercase tracking-tighter text-blue-900">Quản Lý Học</h1></div> <button onClick={onClose} className="md:hidden p-2"><X size={24} /></button> </div>
         <div className="space-y-6 flex-1">
-          <div className="p-4 bg-orange-50 rounded-2xl border border-orange-100 shadow-sm mb-4">
-            <div className="flex justify-between items-center mb-2">
-              <label className="text-[10px] font-black text-orange-600 uppercase tracking-widest flex items-center gap-2">
+          <div className="bg-orange-50 rounded-2xl border border-orange-100 shadow-sm mb-4 overflow-hidden transition-all">
+            <div 
+              className="p-4 flex justify-between items-center cursor-pointer hover:bg-orange-100/50 transition-colors"
+              onClick={() => saveKeyCollapsed(!isKeyConfigCollapsed)}
+            >
+              <label className="text-[10px] font-black text-orange-600 uppercase tracking-widest flex items-center gap-2 pointer-events-none">
                 <ShieldAlert size={14} /> Cấu hình Gemini API Key
               </label>
-              <span className="text-[9px] font-black text-gray-400 opacity-50">{APP_VERSION}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-[9px] font-black text-gray-400 opacity-50">{APP_VERSION}</span>
+                {isKeyConfigCollapsed ? <ChevronDown size={14} className="text-orange-400" /> : <ChevronUp size={14} className="text-orange-400" />}
+              </div>
             </div>
-            <div className="relative">
-              <input
-                type="password"
-                placeholder="Dán API Key của anh vào đây..."
-                className="w-full border border-orange-200 rounded-xl p-3 pr-10 text-xs focus:ring-2 ring-orange-500/20 outline-none bg-white shadow-inner"
-                value={config.customApiKey || ''}
-                onChange={(e) => {
-                  const newKey = e.target.value;
-                  setConfig((prev: AppState) => ({ ...prev, customApiKey: newKey }));
-                  localStorage.setItem('math_app_custom_api_key', newKey);
-                }}
-              />
-              {config.customApiKey && (
-                <button
-                  onClick={() => {
-                    setConfig((prev: AppState) => ({ ...prev, customApiKey: '' }));
-                    localStorage.removeItem('math_app_custom_api_key');
-                  }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-orange-400 hover:text-orange-600 transition-colors"
-                  title="Xóa Key để dùng mặc định"
-                >
-                  <X size={16} />
-                </button>
-              )}
-            </div>
-            <p className="text-[9px] text-orange-400 mt-2 leading-relaxed">
-              Nhập Key cá nhân để không bị phụ thuộc vào hệ thống. Alla sẽ ưu tiên dùng Key này của anh.
-            </p>
+            
+            {!isKeyConfigCollapsed && (
+              <div className="px-4 pb-4 animate-in slide-in-from-top-2 duration-200">
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-[9px] font-black text-orange-400 uppercase mb-1 block">Key Chính (Primary)</label>
+                    <div className="relative">
+                      <input
+                        type="password"
+                        placeholder="Dán API Key chính..."
+                        className="w-full border border-orange-200 rounded-xl p-3 pr-10 text-xs focus:ring-2 ring-orange-500/20 outline-none bg-white shadow-inner"
+                        value={config.primaryApiKey || ''}
+                        onChange={(e) => {
+                          const newKey = e.target.value;
+                          setConfig((prev: AppState) => ({ ...prev, primaryApiKey: newKey }));
+                          localStorage.setItem('math_app_primary_api_key', newKey);
+                        }}
+                      />
+                      {config.primaryApiKey && (
+                        <button
+                          onClick={() => {
+                            setConfig((prev: AppState) => ({ ...prev, primaryApiKey: '' }));
+                            localStorage.removeItem('math_app_primary_api_key');
+                          }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-orange-300 hover:text-orange-500 transition-colors"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="text-[9px] font-black text-orange-400 uppercase mb-1 block">Key Phụ (Secondary)</label>
+                    <div className="relative">
+                      <input
+                        type="password"
+                        placeholder="Dán API Key dự phòng..."
+                        className="w-full border border-orange-200 rounded-xl p-3 pr-10 text-xs focus:ring-2 ring-orange-500/20 outline-none bg-white shadow-inner"
+                        value={config.secondaryApiKey || ''}
+                        onChange={(e) => {
+                          const newKey = e.target.value;
+                          setConfig((prev: AppState) => ({ ...prev, secondaryApiKey: newKey }));
+                          localStorage.setItem('math_app_secondary_api_key', newKey);
+                        }}
+                      />
+                      {config.secondaryApiKey && (
+                        <button
+                          onClick={() => {
+                            setConfig((prev: AppState) => ({ ...prev, secondaryApiKey: '' }));
+                            localStorage.removeItem('math_app_secondary_api_key');
+                          }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-orange-300 hover:text-orange-500 transition-colors"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <p className="text-[9px] text-orange-400 mt-2 leading-relaxed italic">
+                  Alla sẽ ưu tiên dùng Key Chính. Nếu lỗi, em sẽ tự chuyển sang Key Phụ giúp anh.
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="mb-6 flex bg-gray-100 p-1 rounded-2xl border border-gray-200 shadow-inner">
