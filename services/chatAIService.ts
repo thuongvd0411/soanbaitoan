@@ -7,13 +7,21 @@ export const chatAIService = {
         const env = (import.meta as any).env || {};
         const sysKey = env.VITE_GEMINI_API_KEY;
         
-        // Ưu tiên: Primary -> Secondary -> System Key, đồng thời loại bỏ các Key trùng lặp
-        const rawKeys = [
-            config.primaryApiKey?.trim(),
-            config.secondaryApiKey?.trim(),
-            sysKey?.trim()
-        ].filter(Boolean) as string[];
-        const keys = Array.from(new Set(rawKeys));
+        // Chỉ sử dụng duy nhất Key được chọn từ cấu hình
+        let selectedKey = "";
+        if (config.selectedKeyMode === 'primary') {
+            selectedKey = config.primaryApiKey?.trim() || "";
+        } else if (config.selectedKeyMode === 'secondary') {
+            selectedKey = config.secondaryApiKey?.trim() || "";
+        } else {
+            selectedKey = sysKey?.trim() || "";
+        }
+
+        if (!selectedKey) {
+            throw new Error(`Anh chọn chế độ dùng Key ${config.selectedKeyMode === 'system' ? 'Mặc định' : config.selectedKeyMode === 'primary' ? 'Chính' : 'Phụ'}, nhưng Key này đang trống. Anh nhập Key hoặc chọn chế độ khác nhé!`);
+        }
+        
+        const keys = [selectedKey];
 
         if (keys.length === 0) throw new Error("API Key chưa sẵn sàng. Anh vui lòng nhập ít nhất một Key ở Sidebar.");
         

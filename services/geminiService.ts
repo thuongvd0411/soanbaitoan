@@ -121,11 +121,18 @@ export const generateQuestions = async (
   const pKey = config.primaryApiKey?.trim();
   const sKey = config.secondaryApiKey?.trim();
   
-  // Ưu tiên: Primary -> Secondary -> System Key
-  const apiKey = pKey || sKey || sysKey;
+  // Chỉ sử dụng duy nhất Key được chọn từ cấu hình
+  let apiKey = "";
+  if (config.selectedKeyMode === 'primary') {
+      apiKey = pKey || "";
+  } else if (config.selectedKeyMode === 'secondary') {
+      apiKey = sKey || "";
+  } else {
+      apiKey = sysKey?.trim() || "";
+  }
 
   if (!apiKey) {
-    throw new Error("Lỗi: Không tìm thấy API Key. Anh vui lòng nhập ít nhất một Key ở Sidebar.");
+    throw new Error(`Lỗi: Anh chọn chế độ dùng Key ${config.selectedKeyMode === 'system' ? 'Mặc định' : config.selectedKeyMode === 'primary' ? 'Chính' : 'Phụ'}, nhưng Key này đang trống.`);
   }
 
   // Logic retry với nhiều key nếu cần có thể tích hợp vào retryWithFallback
@@ -180,8 +187,12 @@ export const generateMillionaireQuestions = async (
   config: AppState
 ): Promise<Question[]> => {
   const env = (import.meta as any).env || {};
-  const apiKey = (config.primaryApiKey || config.secondaryApiKey || env.VITE_GEMINI_API_KEY)?.trim();
-  if (!apiKey) throw new Error("API Key chưa sẵn sàng.");
+  let apiKey = "";
+  if (config.selectedKeyMode === 'primary') apiKey = config.primaryApiKey?.trim() || "";
+  else if (config.selectedKeyMode === 'secondary') apiKey = config.secondaryApiKey?.trim() || "";
+  else apiKey = env.VITE_GEMINI_API_KEY?.trim() || "";
+  
+  if (!apiKey) throw new Error("API Key chưa sẵn sàng cho chế độ đang chọn.");
 
   const ai = new GoogleGenAI({ apiKey });
   const lessonContext = lessons.length > 0 ? lessons.join(", ") : "Kiến thức tổng hợp";
@@ -211,8 +222,12 @@ export const parseVoiceCommand = async (
   currentConfig: AppState
 ): Promise<Partial<AppState>> => {
   const env = (import.meta as any).env || {};
-  const apiKey = (currentConfig.primaryApiKey || currentConfig.secondaryApiKey || env.VITE_GEMINI_API_KEY)?.trim();
-  if (!apiKey) throw new Error("API Key chưa sẵn sàng.");
+  let apiKey = "";
+  if (currentConfig.selectedKeyMode === 'primary') apiKey = currentConfig.primaryApiKey?.trim() || "";
+  else if (currentConfig.selectedKeyMode === 'secondary') apiKey = currentConfig.secondaryApiKey?.trim() || "";
+  else apiKey = env.VITE_GEMINI_API_KEY?.trim() || "";
+  
+  if (!apiKey) throw new Error("API Key chưa sẵn sàng cho chế độ đang chọn.");
 
   const ai = new GoogleGenAI({ apiKey });
 

@@ -594,8 +594,46 @@ const Sidebar = ({
                     </div>
                   </div>
                 </div>
-                <p className="text-[9px] text-orange-400 mt-2 leading-relaxed italic">
-                  Alla sẽ ưu tiên dùng Key Chính. Nếu lỗi, em sẽ tự chuyển sang Key Phụ giúp anh.
+                
+                {/* Lựa chọn chế độ Key */}
+                <div className="mt-4 pt-3 border-t border-orange-100">
+                  <label className="text-[9px] font-black text-orange-400 uppercase mb-2 block">Chế độ sử dụng Key</label>
+                  <div className="flex flex-col gap-2">
+                    <label className={`flex items-center gap-2 text-xs p-2 rounded-lg cursor-pointer transition-colors ${config.selectedKeyMode === 'system' ? 'bg-orange-100/50 font-bold text-orange-700' : 'text-gray-500 hover:bg-orange-50'}`}>
+                      <input type="radio" value="system" name="keyMode" 
+                        checked={config.selectedKeyMode === 'system'} 
+                        onChange={() => {
+                          setConfig((prev: AppState) => ({...prev, selectedKeyMode: 'system'}));
+                          localStorage.setItem('math_app_selected_key_mode', 'system');
+                        }}
+                        className="accent-orange-500 w-4 h-4" /> 
+                      Sử dụng Key Mặc định (Hệ thống)
+                    </label>
+                    <label className={`flex items-center gap-2 text-xs p-2 rounded-lg cursor-pointer transition-colors ${config.selectedKeyMode === 'primary' ? 'bg-orange-100/50 font-bold text-orange-700' : 'text-gray-500 hover:bg-orange-50'}`}>
+                      <input type="radio" value="primary" name="keyMode" 
+                        checked={config.selectedKeyMode === 'primary'} 
+                        onChange={() => {
+                          setConfig((prev: AppState) => ({...prev, selectedKeyMode: 'primary'}));
+                          localStorage.setItem('math_app_selected_key_mode', 'primary');
+                        }}
+                        className="accent-orange-500 w-4 h-4" /> 
+                      Sử dụng Key Chính
+                    </label>
+                    <label className={`flex items-center gap-2 text-xs p-2 rounded-lg cursor-pointer transition-colors ${config.selectedKeyMode === 'secondary' ? 'bg-orange-100/50 font-bold text-orange-700' : 'text-gray-500 hover:bg-orange-50'}`}>
+                      <input type="radio" value="secondary" name="keyMode" 
+                        checked={config.selectedKeyMode === 'secondary'} 
+                        onChange={() => {
+                          setConfig((prev: AppState) => ({...prev, selectedKeyMode: 'secondary'}));
+                          localStorage.setItem('math_app_selected_key_mode', 'secondary');
+                        }}
+                        className="accent-orange-500 w-4 h-4" /> 
+                      Sử dụng Key Phụ (Dự phòng)
+                    </label>
+                  </div>
+                </div>
+
+                <p className="text-[9px] text-orange-400 mt-3 leading-relaxed italic">
+                  Alla sẽ tôn trọng tùy chọn trên và chỉ sử dụng đúng Key anh đã chọn.
                 </p>
               </div>
             )}
@@ -856,7 +894,10 @@ export default function App() {
     imageRatio: 0,
     examType: ExamType.None,
     imageMode: ImageMode.None,
-    gameStatus: GameStatus.Idle
+    gameStatus: GameStatus.Idle,
+    primaryApiKey: localStorage.getItem('math_app_primary_api_key') || '',
+    secondaryApiKey: localStorage.getItem('math_app_secondary_api_key') || '',
+    selectedKeyMode: (localStorage.getItem('math_app_selected_key_mode') as 'system' | 'primary' | 'secondary') || 'system'
   });
   const [questions, setQuestions] = useState<Question[]>([]);
   const [gameQuestions, setGameQuestions] = useState<Question[]>([]);

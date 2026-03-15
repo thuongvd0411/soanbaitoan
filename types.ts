@@ -91,9 +91,10 @@ export interface AppState {
   imageMode: ImageMode;
   answerMode: AnswerMode;
   imageRatio: number;
-  // API Key tùy chỉnh (Chính & Phụ)
+  // API Key tùy chỉnh
   primaryApiKey?: string;
   secondaryApiKey?: string;
+  selectedKeyMode: 'system' | 'primary' | 'secondary';
   // Game state
   gameStatus: GameStatus;
 }
