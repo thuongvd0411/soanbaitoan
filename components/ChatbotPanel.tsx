@@ -92,11 +92,6 @@ const ChatbotPanel: React.FC<ChatbotPanelProps> = ({ isOpen, onClose, config, ow
         setIsLoading(true);
 
         try {
-            // 1. Phân loại Intent (Gemini Flash)
-            const intentResult = await chatIntentService.detectIntent(userText, config);
-            let response = "";
-
-            if (intentResult.intent === "system_query") {
             // BƯỚC 1: Phân tích ý định & Lập kế hoạch (Chỉ 1 AI Call thay vì 2)
             const { chatAnalyzerService } = await import('../services/chatAnalyzerService');
             const analysis = await chatAnalyzerService.analyze(userText, config);
@@ -127,14 +122,12 @@ NỘI DUNG GỐC: ${userText}`;
 
             // Ghi log vào Firebase
             try {
-                const { firebaseService } = await import('../services/firebaseService');
                 const { db } = await import('../services/firebaseService');
                 const { collection, addDoc, serverTimestamp } = await import('firebase/firestore');
-                console.log("Logging chat to Firebase...");
                 await addDoc(collection(db, "chat_logs"), {
                     ownerId,
                     question: userText,
-                    intent: intentResult.intent,
+                    type: analysis.type,
                     timestamp: serverTimestamp()
                 });
             } catch (e) { 
