@@ -22,7 +22,7 @@ YÊU CẦU JSON (KHÔNG MÃ MARKDOWN):
 {
   "type": "system_query" | "ai_task" | "general_chat",
   "plan": {
-    "intent": "student_progress" | "assignment_status" | "class_summary" | "tuition_status" | "teacher_salary" | "schedule_query" | "self_info",
+    "intent": "student_progress" | "assignment_status" | "pending_assignments" | "class_summary" | "tuition_status" | "teacher_salary" | "schedule_query" | "self_info",
     "students": ["Tên học sinh"],
     "month": "current" | "last" | null
   },
@@ -31,6 +31,7 @@ YÊU CẦU JSON (KHÔNG MÃ MARKDOWN):
 
 LƯU Ý RIÊNG:
 - Nếu hỏi "Bảo sai kiến thức gì", "Làm bài chưa": type là "system_query", intent là "student_progress".
+- Nếu hỏi "ai chưa làm bài", "còn bạn nào chưa nộp bài", "ai chưa hoàn thành", "bạn nào chưa làm xong": type là "system_query", intent là "pending_assignments".
 - Nếu xưng hô: Gọi học sinh là "Bảo", "em Bảo", "bạn Bảo".
 
 CÂU HỎI: "{query}"

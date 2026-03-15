@@ -43,6 +43,8 @@ export const chatRouterService = {
                 case "assignment_status":
                     console.log("Alla Routing:", plan.intent, plan.students);
                     return await this.handleStudentData(plan, ownerId);
+                case "pending_assignments":
+                    return await this.handlePendingAssignments(ownerId);
                 case "class_summary":
                     return await this.handleClassSummary(plan.className);
                 case "tuition_status":
@@ -355,6 +357,68 @@ export const chatRouterService = {
             soHocSinh: students.length,
             soLop: classes.length,
             danhSachLop: classes
+        });
+    },
+
+    async handlePendingAssignments(ownerId: string): Promise<string> {
+        const allStudents = await firebaseService.getManagementStudents();
+        const globalResults = await firebaseService.getGlobalResults(ownerId);
+
+        // Liệt kê học sinh còn bài chưa làm
+        const chuaNop: any[] = [];
+
+        for (const student of allStudents) {
+            const assignedExams = student.assignedExams || [];
+            if (assignedExams.length === 0) continue;
+
+            const normalizedName = nameResolver.normalizeName(student.fullName || "");
+
+            for (const exam of assignedExams) {
+                // Coi bài đã hoàn thành nếu:
+                // - exam.status === 'completed'
+                // - Có record trong examHistory với cùng shareId
+                // - Có bản ghi trong globalResults với cùng shareId và tên học sinh
+                const inExamHistory = (student.examHistory || []).some((e: any) => e.id === exam.id);
+                const inGlobalResults = globalResults.some((r: any) => {
+                    const rNorm = nameResolver.normalizeName(r.studentName || "");
+                    return r.shareId === exam.id && (
+                        rNorm === normalizedName ||
+                        normalizedName.includes(rNorm) ||
+                        rNorm.includes(normalizedName)
+                    );
+                });
+
+                const isDone = exam.status === 'completed' || inExamHistory || inGlobalResults;
+
+                if (!isDone) {
+                    // Format ngày giao
+                    const rawDate = exam.assignedAt || exam.createdAt || "";
+                    let ngayGiao = "N/A";
+                    if (rawDate) {
+                        const d = new Date(rawDate);
+                        if (!isNaN(d.getTime())) {
+                            ngayGiao = d.toLocaleDateString('vi-VN');
+                        } else {
+                            ngayGiao = rawDate.split("T")[0];
+                        }
+                    }
+
+                    chuaNop.push({
+                        hocSinh: student.fullName,
+                        baiTap: exam.title || "Bài tập",
+                        ngayGiao
+                    });
+                }
+            }
+        }
+
+        if (chuaNop.length === 0) {
+            return JSON.stringify({ thongBao: "Tất cả học sinh đã hoàn thành bài tập.", chuaNop: [] });
+        }
+
+        return JSON.stringify({
+            thongBao: `Còn ${chuaNop.length} bài tập chưa được nộp.`,
+            chuaNop
         });
     }
 };

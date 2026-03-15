@@ -3,7 +3,7 @@ import { chatAIService } from "./chatAIService";
 import { AppState } from "../types";
 
 export interface QueryPlan {
-    intent: "student_progress" | "assignment_status" | "class_summary" | "tuition_status" | "teacher_salary" | "schedule_query" | "task_reminder" | "self_info" | "unknown";
+    intent: "student_progress" | "assignment_status" | "pending_assignments" | "class_summary" | "tuition_status" | "teacher_salary" | "schedule_query" | "task_reminder" | "self_info" | "unknown";
     students?: string[];
     className?: string;
     filter?: string;
@@ -28,7 +28,8 @@ Dựa vào câu hỏi của giáo viên, hãy tạo JSON Query Plan.
 
 INTENTS:
 - student_progress: hỏi về sức học, lỗi sai, điểm của học sinh.
-- assignment_status: hỏi học sinh làm bài chưa, nộp chưa.
+- assignment_status: hỏi học sinh cụ thể làm bài chưa, nộp chưa.
+- pending_assignments: hỏi "ai chưa làm bài", "còn bạn nào chưa nộp", "bạn nào chưa hoàn thành" (không đề cập tên cụ thể).
 - class_summary: hỏi tình hình chung cả lớp.
 - tuition_status: hỏi về đóng học phí.
 - teacher_salary: hỏi về lương giáo viên, thu nhập.
@@ -43,6 +44,7 @@ YÊU CẦU JSON TUYỆT ĐỐI:
 
 VÍ DỤ OUTPUT:
 {"intent": "assignment_status", "students": ["Bảo"], "month": "current"}
+{"intent": "pending_assignments", "students": [], "month": null}
 {"intent": "teacher_salary", "students": [], "month": "current"}
 
 TUYỆT ĐỐI KHÔNG dùng markdown, KHÔNG bọc trong code block.
