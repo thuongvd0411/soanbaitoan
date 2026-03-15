@@ -135,10 +135,8 @@ NỘI DUNG GỐC: ${userText}`;
             }
 
         } catch (error: any) {
-            console.error("Chatbot Error Detail:", error);
-            // Log chi tiết lỗi ra console để debug
-            if (error.stack) console.error(error.stack);
-            setMessages(prev => [...prev, { role: 'alla', text: "Em siu cute đang bận xíu (lỗi: " + (error.message || "kết nối") + "), anh thử lại sau nhé!" }]);
+            console.error("Chatbot:", error);
+            setMessages(prev => [...prev, { role: 'alla', text: "Dạ anh, " + (error.message || "kết nối hiện đang gián đoạn, anh thử lại xíu nữa nhé!") }]);
         } finally {
             setIsLoading(false);
         }

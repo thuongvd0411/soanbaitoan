@@ -7,18 +7,19 @@ export const chatAIService = {
         const env = (import.meta as any).env || {};
         const sysKey = env.VITE_GEMINI_API_KEY;
         
-        // Ưu tiên: Primary -> Secondary -> System Key
-        const keys = [
+        // Ưu tiên: Primary -> Secondary -> System Key, đồng thời loại bỏ các Key trùng lặp
+        const rawKeys = [
             config.primaryApiKey?.trim(),
             config.secondaryApiKey?.trim(),
             sysKey?.trim()
         ].filter(Boolean) as string[];
+        const keys = Array.from(new Set(rawKeys));
 
         if (keys.length === 0) throw new Error("API Key chưa sẵn sàng. Anh vui lòng nhập ít nhất một Key ở Sidebar.");
         
         const modelNames = isFlash 
-            ? ['gemini-2.0-flash', 'gemini-2.0-flash-lite'] 
-            : ['gemini-2.0-pro-exp-02-05'];
+            ? ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'] 
+            : ['gemini-2.5-pro', 'gemini-2.0-pro-exp-02-05'];
         
         let lastError = "";
 
@@ -55,7 +56,15 @@ export const chatAIService = {
                 }
             }
         }
-
-        throw new Error(lastError || "Dạ anh, hiện tại cả 2 Key đều đang bận hoặc quá tải, anh vui lòng đợi lát rồi thử lại giúp em nhé!");
+        // Phân tích lỗi cuối cùng để báo cáo chuyên nghiệp hơn (tránh in ra 1 cục JSON)
+        if (lastError.includes("429") || lastError.includes("quota") || lastError.includes("RESOURCE_EXHAUSTED")) {
+            throw new Error("Tất cả API Key hiện tại đều bận hoặc hết hạn mức (429). Anh nhắn nhỏ nhắn hoặc đợi 1 phút rồi thử lại nhé!");
+        } else if (lastError.includes("404")) {
+            throw new Error("API Key của anh hiện không hỗ trợ Model này. Anh hãy kiểm tra lại cấu hình Key nhé!");
+        } else if (lastError.includes("403")) {
+            throw new Error("API Key của anh bị chặn truy cập (403). Anh kiểm tra lại xem Key còn hiệu lực không nhé.");
+        }
+        
+        throw new Error("Lỗi kết nối AI (" + lastError.substring(0, 50) + "...). Anh kiểm tra mạng hoặc thử lại sau giúp em.");
     }
 };

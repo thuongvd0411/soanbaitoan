@@ -52,8 +52,8 @@ async function retryWithFallback(
   config: { temperature: number },
   maxRetries: number = 3
 ): Promise<string> {
-  // Chỉ sử dụng dòng Gemini 2 theo yêu cầu của anh Thưởng (tránh lỗi 404 với model 1.5)
-  const models = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-2.0-pro-exp-02-05'];
+  // Sử dụng toàn bộ dòng Gemini 2 (2.5 & 2.0) để đảm bảo luôn có model mạnh nhất và model fallback tốt nhất
+  const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro', 'gemini-2.0-pro-exp-02-05'];
   let lastError = "";
 
   for (const modelName of models) {
