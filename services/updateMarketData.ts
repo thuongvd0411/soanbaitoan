@@ -50,25 +50,26 @@ export async function syncStockToFirebase(symbol: string): Promise<boolean> {
 }
 
 /**
- * Đồng bộ toàn bộ Stock Universe vào Firestore (Optimized with Delays)
+ * Đồng bộ toàn bộ Stock Universe vào Firestore (Optimized with Safe Delays)
  */
 export async function syncMarketToFirebase(onProgress?: (msg: string) => void): Promise<void> {
-  const batchSize = 3; // Giảm xuống 3 để cực kỳ an toàn với Proxy và CORS
+  const batchSize = 2; // Rất nhỏ để cực kỳ an toàn
   const tickers = STOCK_UNIVERSE;
   
-  if (onProgress) onProgress(`Bắt đầu đồng bộ ${tickers.length} mã (Cơ chế an toàn Proxy)...`);
+  if (onProgress) onProgress(`Bắt đầu đồng bộ ${tickers.length} mã (Chế độ siêu an toàn)...`);
 
   for (let i = 0; i < tickers.length; i += batchSize) {
     const batch = tickers.slice(i, i + batchSize);
     if (onProgress) onProgress(`Batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(tickers.length / batchSize)}...`);
     
-    // Xử lý song song trong batch nhỏ
+    // Xử lý song song trong batch cực nhỏ
     await Promise.all(batch.map(ticker => syncStockToFirebase(ticker)));
     
-    // Nghỉ 500ms giữa các batch để Proxy không bị "ngộp"
-    await new Promise(r => setTimeout(r, 500));
+    // Nghỉ 1 giây giữa các batch để Proxy và TCBS được xả tải
+    await new Promise(r => setTimeout(r, 1000));
   }
   
-  if (onProgress) onProgress(`✅ Hoàn tất đồng bộ an toàn vào Firestore.`);
+  if (onProgress) onProgress(`✅ Hoàn tất đồng bộ an toàn tuyệt đối vào Firestore.`);
 }
+
 

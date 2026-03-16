@@ -1,4 +1,4 @@
-// services/marketDataService.ts — Dịch vụ lấy dữ liệu thị trường OHLC (Optimized with Proxy Failover)
+// services/marketDataService.ts — Dịch vụ lấy dữ liệu thị trường OHLC (Optimized with Advanced Proxy Failover)
 const TCBS_API = 'https://apipubaws.tcbs.com.vn';
 
 export interface MarketData {
@@ -11,47 +11,62 @@ export interface MarketData {
   date: string;
 }
 
-// Danh sách các proxy CORS công cộng để luân phiên (Failover)
-const PROXIES = [
+// Danh sách các proxy CORS công cộng ổn định
+const PROXY_TEMPLATES = [
   (url: string) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
-  (url: string) => `https://thingproxy.freeboard.io/fetch/${url}`,
+  (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
   (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  (url: string) => `https://api.allorigins.allorigins.win/get?url=${encodeURIComponent(url)}`
 ];
 
 /**
- * Lấy dữ liệu lịch sử OHLC cho 1 mã cổ phiếu với cơ chế Retry và Proxy Failover
+ * Lấy dữ liệu lịch sử OHLC cho 1 mã cổ phiếu với cơ chế Retry nâng cao
  */
 export async function getStockData(symbol: string, retryCount = 1): Promise<MarketData[] | null> {
   const ticker = symbol.toUpperCase();
-  const countBack = 260;
-  const tcbsUrl = `${TCBS_API}/stock-insight/v2/stock/bars-long-term?ticker=${ticker}&type=stock&resolution=D&countBack=${countBack}`;
+  // Chuyển sang v1 theo đúng lệnh curl của anh giúp ổn định hơn
+  const countBack = 250; 
+  const tcbsUrl = `${TCBS_API}/stock-insight/v1/stock/bars-long-term?ticker=${ticker}&type=stock&resolution=D&countBack=${countBack}`;
 
-  // Thử lần lượt qua các proxy
-  for (let i = 0; i < PROXIES.length; i++) {
+
+  // Xáo trộn danh sách proxy để tránh tập trung vào 1 proxy duy nhất cho 250 mã
+  const shuffledProxies = [...PROXY_TEMPLATES].sort(() => Math.random() - 0.5);
+
+  for (let i = 0; i < shuffledProxies.length; i++) {
     try {
-      const proxyUrl = PROXIES[i](tcbsUrl);
+      const proxyUrl = shuffledProxies[i](tcbsUrl);
+      
       const res = await fetch(proxyUrl, { 
-        signal: AbortSignal.timeout(10000) // Timeout 10s để không treo lâu
+        // Tăng timeout lên 15s vì Proxy công cộng đôi khi phản hồi chậm
+        signal: (AbortSignal as any).timeout ? (AbortSignal as any).timeout(15000) : undefined 
       });
 
-      if (!res.ok) continue; // Thử proxy tiếp theo
+      if (!res.ok) {
+        console.warn(`[MarketDataService] Proxy ${i} returned status ${res.status} for ${ticker}`);
+        continue;
+      }
 
       const data = await res.json();
       
-      // Xử lý dữ liệu tùy theo cấu trúc của từng Proxy
+      // Xử lý dữ liệu linh hoạt theo từng loại Proxy
       let contents = data;
       
-      // AllOrigins bọc trong contents
-      if (data.contents) {
+      // AllOrigins bọc trong contents (dạng string)
+      if (data && data.contents) {
         try {
-          contents = JSON.parse(data.contents);
+          contents = typeof data.contents === 'string' ? JSON.parse(data.contents) : data.contents;
         } catch (e) {
+          console.error(`[MarketDataService] Parse error for AllOrigins on ${ticker}`);
           continue; 
         }
       }
 
+      // Kiểm tra cấu trúc dữ liệu TCBS
       const bars = contents.data || [];
-      if (bars.length === 0) return null;
+      if (!bars || bars.length === 0) {
+        // Nếu Proxy trả về 200 nhưng không có data, có thể Proxy đó bị rate-limit nhưng ko báo lỗi
+        continue;
+      }
 
       return bars.map((b: any) => ({
         symbol: ticker,
@@ -64,16 +79,15 @@ export async function getStockData(symbol: string, retryCount = 1): Promise<Mark
       }));
 
     } catch (error) {
-      console.warn(`[MarketDataService] Proxy ${i} failed for ${ticker}, trying next...`);
-      // Nếu là proxy cuối cùng và vẫn lỗi, thì mới thực sự thất bại cho lần này
-      if (i === PROXIES.length - 1 && retryCount > 0) {
-        // Đợi 1 lát rồi thử lại toàn bộ quy trình nếu còn lượt retry
-        await new Promise(r => setTimeout(r, 1000));
+      // console.warn(`[MarketDataService] Proxy ${i} error for ${ticker}:`, error);
+      if (i === shuffledProxies.length - 1 && retryCount > 0) {
+        // Nghỉ 2s trước khi thử lại đợt cuối
+        await new Promise(r => setTimeout(r, 2000));
         return getStockData(symbol, retryCount - 1);
       }
     }
   }
 
-  console.error(`[MarketDataService] All proxies failed for ${ticker}`);
+  console.error(`[MarketDataService] All proxies failed for ${ticker} after retries.`);
   return null;
 }
