@@ -94,6 +94,7 @@ export interface AppState {
   // API Key tùy chỉnh
   primaryApiKey?: string;
   secondaryApiKey?: string;
+  openaiApiKey?: string;
   selectedKeyMode: 'system' | 'primary' | 'secondary';
   // Game state
   gameStatus: GameStatus;

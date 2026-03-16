@@ -12,7 +12,7 @@ import {
   Cloud,
   CheckSquare,
   Save, ChevronRight, ListChecks, BrainCircuit, Star, Award, FileCode, Printer, RefreshCw, LogOut, PenLine, PenTool, ChevronDown, ChevronUp, Play, Gift, ImageIcon, CloudLightning, Trash2,
-  Users, Calendar, BarChart3, Settings, DollarSign, Bell, MessageSquare
+  Users, Calendar, BarChart3, Settings, DollarSign, Bell, MessageSquare, TrendingUp, Zap
 } from 'lucide-react';
 import StudentList from './components/StudentList';
 import StudentDetails from './components/StudentDetails';
@@ -20,6 +20,7 @@ import DailyEntryForm from './components/DailyEntryForm';
 import DailyReminders from './components/DailyReminders';
 import MissingReminders from './components/MissingReminders';
 import RevenueBreakdown from './components/RevenueBreakdown';
+import InvestmentPanel from './components/InvestmentPanel';
 import { calculateMonthlyStats, formatCurrency } from './utils/helpers';
 import { onSnapshot, doc } from 'firebase/firestore';
 import { db } from './services/firebaseService';
@@ -489,8 +490,8 @@ interface SidebarProps {
   isSyncing: boolean;
   isOpen: boolean;
   onClose: () => void;
-  activeTab: 'main' | 'edu';
-  setActiveTab: (tab: 'main' | 'edu') => void;
+  activeTab: 'main' | 'edu' | 'invest';
+  setActiveTab: (tab: 'main' | 'edu' | 'invest') => void;
   hideValues: boolean;
   setHideValues: (v: boolean) => void;
   setSelectedStudentId: (id: string | null) => void;
@@ -593,8 +594,36 @@ const Sidebar = ({
                       )}
                     </div>
                   </div>
+                  
+                  <div>
+                    <label className="text-[9px] font-black text-cyan-500 uppercase mb-1 block">OpenAI (GPT-4.1 mini) Key</label>
+                    <div className="relative">
+                      <input
+                        type="password"
+                        placeholder="Dán OpenAI API Key..."
+                        className="w-full border border-cyan-200 rounded-xl p-3 pr-10 text-xs focus:ring-2 ring-cyan-500/20 outline-none bg-white shadow-inner"
+                        value={config.openaiApiKey || ''}
+                        onChange={(e) => {
+                          const newKey = e.target.value;
+                          setConfig((prev: AppState) => ({ ...prev, openaiApiKey: newKey }));
+                          localStorage.setItem('math_app_openai_api_key', newKey);
+                        }}
+                      />
+                      {config.openaiApiKey && (
+                        <button
+                          onClick={() => {
+                            setConfig((prev: AppState) => ({ ...prev, openaiApiKey: '' }));
+                            localStorage.removeItem('math_app_openai_api_key');
+                          }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-cyan-300 hover:text-cyan-500 transition-colors"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                
+
                 {/* Lựa chọn chế độ Key */}
                 <div className="mt-4 pt-3 border-t border-orange-100">
                   <label className="text-[9px] font-black text-orange-400 uppercase mb-2 block">Chế độ sử dụng Key</label>
@@ -642,19 +671,25 @@ const Sidebar = ({
           <div className="mb-6 flex bg-gray-100 p-1 rounded-2xl border border-gray-200 shadow-inner">
             <button
               onClick={() => setActiveTab('main')}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'main' ? 'bg-white text-primary shadow-lg border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'main' ? 'bg-white text-primary shadow-lg border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
             >
-              <PlusCircle size={16} /> Soạn đề
+              <PlusCircle size={14} /> Soạn bài
             </button>
             <button
               onClick={() => setActiveTab('edu')}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'edu' ? 'bg-white text-indigo-600 shadow-lg border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'edu' ? 'bg-white text-indigo-600 shadow-lg border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
             >
-              <Users size={16} /> Lớp học
+              <Users size={14} /> Lớp học
+            </button>
+            <button
+              onClick={() => setActiveTab('invest')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'invest' ? 'bg-[#0a0f19] text-cyan-400 shadow-[0_0_10px_rgba(0,240,255,0.3)] border border-cyan-500/30' : 'text-gray-400 hover:text-gray-600'}`}
+            >
+              <TrendingUp size={14} /> AI Đầu tư
             </button>
           </div>
 
-          <div className={activeTab === 'edu' ? 'hidden' : 'block space-y-6'}>
+          <div className={activeTab === 'main' ? 'block space-y-6' : 'hidden'}>
             {config.examType === ExamType.None && (
               <div>
                 <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-widest">Khối lớp</label>
@@ -897,6 +932,7 @@ export default function App() {
     gameStatus: GameStatus.Idle,
     primaryApiKey: localStorage.getItem('math_app_primary_api_key') || '',
     secondaryApiKey: localStorage.getItem('math_app_secondary_api_key') || '',
+    openaiApiKey: localStorage.getItem('math_app_openai_api_key') || '',
     selectedKeyMode: (localStorage.getItem('math_app_selected_key_mode') as 'system' | 'primary' | 'secondary') || 'system'
   });
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -927,7 +963,7 @@ export default function App() {
 
   // States cho Học sinh làm bài
   // --- QUẢN LÝ HỌC TẬP STATE ---
-  const [activeTab, setActiveTab] = useState<'main' | 'edu'>('main');
+  const [activeTab, setActiveTab] = useState<'main' | 'edu' | 'invest'>('main');
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [editingRecord, setEditingRecord] = useState<StudyRecord | null>(null);
@@ -1854,15 +1890,21 @@ export default function App() {
           <div className="flex bg-white/10 p-1 rounded-xl">
             <button
               onClick={() => setActiveTab('main')}
-              className={`flex-1 py-2 rounded-lg text-xs font-black uppercase transition-all ${activeTab === 'main' ? 'bg-white text-primary shadow-sm' : 'text-white/70'}`}
+              className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'main' ? 'bg-white text-primary shadow-sm' : 'text-white/70'}`}
             >
               Soạn bài
             </button>
             <button
               onClick={() => setActiveTab('edu')}
-              className={`flex-1 py-2 rounded-lg text-xs font-black uppercase transition-all ${activeTab === 'edu' ? 'bg-white text-primary shadow-sm' : 'text-white/70'}`}
+              className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'edu' ? 'bg-white text-primary shadow-sm' : 'text-white/70'}`}
             >
               Lớp học
+            </button>
+            <button
+              onClick={() => setActiveTab('invest')}
+              className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'invest' ? 'bg-[#0a0f19] text-cyan-400 shadow-[0_0_8px_rgba(0,240,255,0.3)]' : 'text-white/70'}`}
+            >
+              AI Đầu Tư
             </button>
           </div>
         )}
@@ -1891,8 +1933,10 @@ export default function App() {
           isViewerMode={isViewerMode}
         />
       ) : null}
-      <main className="flex-1 p-3 md:p-10 overflow-y-auto h-screen relative bg-gray-200/40 no-print">
-        {activeTab === 'edu' ? (
+      <main className={`flex-1 overflow-y-auto h-screen relative no-print ${activeTab === 'invest' ? 'bg-[#05070a] p-0' : 'bg-gray-200/40 p-3 md:p-10'}`}>
+        {activeTab === 'invest' ? (
+          <InvestmentPanel geminiApiKey={config.selectedKeyMode === 'secondary' ? (config.secondaryApiKey || '') : (config.primaryApiKey || '')} openaiApiKey={config.openaiApiKey || ''} />
+        ) : activeTab === 'edu' ? (
           <div className="max-w-7xl mx-auto w-full flex flex-col gap-8 animate-in fade-in duration-500">
             {/* PHẦN QUẢN LÝ HỌC TẬP - PORTED FROM quanlyhoc */}
             {!selectedStudentId ? (
