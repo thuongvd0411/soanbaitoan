@@ -4,22 +4,28 @@ import { UNIQUE_STOCK_UNIVERSE as STOCK_UNIVERSE } from '../data/stockUniverse';
 
 /**
  * Đồng bộ dữ liệu của một mã cổ phiếu vào Firestore (Snapshot + Array History)
+ * Ưu điểm: Smart Sync - Chỉ tải nếu dữ liệu hôm nay chưa có.
  */
-export async function syncStockToFirebase(symbol: string): Promise<boolean> {
+export async function syncStockToFirebase(symbol: string): Promise<'success' | 'skipped' | 'failed'> {
   try {
-    // Thêm một khoảng nghỉ ngẫu nhiên cực nhỏ (0-200ms) để không gửi Req cùng 1 mili giây
-    await new Promise(r => setTimeout(r, Math.random() * 200));
+    const today = new Date().toISOString().split('T')[0];
+    
+    // 1. Kiểm tra xem mã này hôm nay đã được sync chưa?
+    const existingData = await firebaseService.getMarketData(symbol);
+    if (existingData && existingData.date && existingData.date.startsWith(today)) {
+      // console.log(`[SmartSync] Skipping ${symbol} - Already updated today.`);
+      return 'skipped';
+    }
+
+    // Nếu chưa có, tiến hành nạp dữ liệu (có delay nhỏ để an toàn)
+    await new Promise(r => setTimeout(r, Math.random() * 300));
 
     const bars = await getStockData(symbol);
-    
-    if (!bars || bars.length === 0) {
-      console.warn(`[UpdateMarketData] No data from API for ${symbol}`);
-      return false;
-    }
+    if (!bars || bars.length === 0) return 'failed';
 
     const latest = bars[bars.length - 1];
     
-    // 1. Cập nhật market_data snapshot
+    // Cập nhật market_data snapshot
     const marketDataSnapshot = {
       symbol: symbol.toUpperCase(),
       price: latest.close || 0,
@@ -31,7 +37,7 @@ export async function syncStockToFirebase(symbol: string): Promise<boolean> {
     };
     await firebaseService.updateMarketData(symbol, marketDataSnapshot);
 
-    // 2. Cập nhật market_history DẠNG MẢNG (Array) - Tối đa 250 phiên
+    // Cập nhật market_history mảng - Tối đa 250 phiên
     const historyArray = bars.slice(-250).map(bar => ({
       open: bar.open,
       high: bar.high,
@@ -42,34 +48,44 @@ export async function syncStockToFirebase(symbol: string): Promise<boolean> {
     }));
 
     await firebaseService.updateMarketHistoryArray(symbol, historyArray);
-    return true;
+    return 'success';
   } catch (error) {
     console.error(`[UpdateMarketData] Error syncing ${symbol}:`, error);
-    return false;
+    return 'failed';
   }
 }
 
 /**
- * Đồng bộ toàn bộ Stock Universe vào Firestore (Optimized with Safe Delays)
+ * Đồng bộ toàn bộ Stock Universe vào Firestore (Smart Sync Mode)
  */
 export async function syncMarketToFirebase(onProgress?: (msg: string) => void): Promise<void> {
-  const batchSize = 2; // Rất nhỏ để cực kỳ an toàn
+  const batchSize = 2; 
   const tickers = STOCK_UNIVERSE;
+  let successCount = 0;
+  let skippedCount = 0;
+  let failedCount = 0;
   
-  if (onProgress) onProgress(`Bắt đầu đồng bộ ${tickers.length} mã (Chế độ siêu an toàn)...`);
+  if (onProgress) onProgress(`Bắt đầu SMART SYNC ${tickers.length} mã...`);
 
   for (let i = 0; i < tickers.length; i += batchSize) {
     const batch = tickers.slice(i, i + batchSize);
-    if (onProgress) onProgress(`Batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(tickers.length / batchSize)}...`);
+    if (onProgress) onProgress(`Batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(tickers.length / batchSize)} (S:${successCount} Skip:${skippedCount})...`);
     
-    // Xử lý song song trong batch cực nhỏ
-    await Promise.all(batch.map(ticker => syncStockToFirebase(ticker)));
+    const results = await Promise.all(batch.map(ticker => syncStockToFirebase(ticker)));
     
-    // Nghỉ 1 giây giữa các batch để Proxy và TCBS được xả tải
-    await new Promise(r => setTimeout(r, 1000));
+    results.forEach(res => {
+      if (res === 'success') successCount++;
+      else if (res === 'skipped') skippedCount++;
+      else failedCount++;
+    });
+
+    // Nếu có ít nhất 1 mã phải fetch thực tế, mới dừng nghỉ 1 giây
+    if (results.includes('success')) {
+      await new Promise(r => setTimeout(r, 1000));
+    }
   }
   
-  if (onProgress) onProgress(`✅ Hoàn tất đồng bộ an toàn tuyệt đối vào Firestore.`);
+  if (onProgress) onProgress(`✅ Hoàn tất Smart Sync. Thành công: ${successCount}, Bỏ qua: ${skippedCount}, Lỗi: ${failedCount}.`);
 }
 
 
