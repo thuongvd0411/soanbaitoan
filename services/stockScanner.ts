@@ -1,116 +1,145 @@
-// services/stockScanner.ts — Lấy dữ liệu cổ phiếu từ API công khai
+// services/stockScanner.ts — Bộ não quét cổ phiếu bằng thuật toán (Data-Driven)
+import { firebaseService } from './firebaseService';
+import { STOCK_UNIVERSE } from '../data/stockUniverse';
+import * as indicators from './indicatorService';
 
-export interface StockData {
+export interface ScanResult {
   symbol: string;
+  score: number;
+  rsi: number;
+  volumeTrend: string;
+  pivotPrice: number;
+  patterns: string[];
   price: number;
   changePercent: number;
-  volume: number;
-  avgVolume20d: number;
-  foreignBuySell: number;
-  marketCap: number;
-  volumeRatio: number;
-  historical: {
-    close: number[];
-    volume: number[];
-    high: number[];
-    low: number[];
-  };
-}
-
-// API TCBS cho dữ liệu cổ phiếu
-const TCBS_API = 'https://apipubaws.tcbs.com.vn';
-
-export async function fetchStockData(symbol: string): Promise<StockData | null> {
-  try {
-    // Lấy giá hiện tại từ TCBS (Lấy đủ 260 phiên để dự phòng tính MA252 và MA200)
-    const priceRes = await fetch(`${TCBS_API}/stock-insight/v2/stock/bars-long-term?ticker=${symbol}&type=stock&resolution=D&countBack=260`);
-    
-    if (!priceRes.ok) throw new Error('API Error');
-    
-    const priceData = await priceRes.json();
-    const bars = priceData.data || [];
-    
-    if (bars.length === 0) return null;
-
-    const latest = bars[bars.length - 1];
-    const previous = bars.length > 1 ? bars[bars.length - 2] : latest;
-    
-    // Tính volume trung bình 20 ngày
-    const volumes20 = bars.slice(-20).map((b: any) => b.volume || 0);
-    const avgVolume20d = volumes20.length > 0 ? volumes20.reduce((a: number, b: number) => a + b, 0) / volumes20.length : 1;
-    
-    const price = latest.close || 0;
-    const prevClose = previous.close || price;
-    const changePercent = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
-    const volume = latest.volume || 0;
-    const volumeRatio = avgVolume20d > 0 ? volume / avgVolume20d : 0;
-
-    // Lọc mảng historical theo thứ tự cũ -> mới
-    const historical = {
-      close: bars.map((b: any) => b.close || 0),
-      volume: bars.map((b: any) => b.volume || 0),
-      high: bars.map((b: any) => b.high || 0),
-      low: bars.map((b: any) => b.low || 0),
-    };
-
-    return {
-      symbol: symbol.toUpperCase(),
-      price,
-      changePercent: Math.round(changePercent * 100) / 100,
-      volume,
-      avgVolume20d: Math.round(avgVolume20d),
-      foreignBuySell: 0, // TCBS public API không cung cấp trực tiếp
-      marketCap: 0,
-      volumeRatio: Math.round(volumeRatio * 100) / 100,
-      historical
-    };
-  } catch (error) {
-    console.error(`Lỗi lấy dữ liệu ${symbol}:`, error);
-    return null;
-  }
-}
-
-export function formatStockDataForAI(data: StockData): string {
-  return `Mã: ${data.symbol}
-Giá: ${data.price.toLocaleString('vi-VN')} VNĐ
-Thay đổi: ${data.changePercent > 0 ? '+' : ''}${data.changePercent}%
-Khối lượng: ${data.volume.toLocaleString('vi-VN')}
-KL TB 20 phiên: ${data.avgVolume20d.toLocaleString('vi-VN')}
-Volume Ratio: ${data.volumeRatio}x`;
-}
-
-export interface IndexData {
-  index: string;
-  value: number;
-  change: number;
-  percentChange: number;
-  volume: number;
 }
 
 /**
- * Lấy dữ liệu chỉ số thị trường (VNINDEX, HNX...)
+ * Luồng quét cổ phiếu chính - Không sử dụng AI để tính toán
  */
-export async function fetchIndexData(index: string = 'VNINDEX'): Promise<IndexData | null> {
-  try {
-    const res = await fetch(`${TCBS_API}/stock-insight/v1/intraday/index-indicators?index=${index}`);
-    if (!res.ok) throw new Error('Index API Error');
-    const data = await res.json();
-    // Dữ liệu TCBS trả về mảng các chỉ số hoặc object tùy endpoint. 
-    // Giả định cấu trúc quen thuộc: { data: [{ index: 'VNINDEX', value: 1280, ... }] }
-    // Nếu là endpoint indicator trực tiếp: [{ "index": "VNINDEX", "value": 1280.5, "changedMsg": "-2.5", "percentChange": "-0.2" }]
-    const item = Array.isArray(data) ? data.find((i: any) => i.index === index) : data;
-    
-    if (!item) return null;
+export async function runFullMarketScan(command: string = 'SCAN'): Promise<ScanResult[]> {
+  const allResults: ScanResult[] = [];
+  
+  // Quét theo từng mã trong Universe
+  for (const symbol of STOCK_UNIVERSE) {
+    try {
+      // 1. Fetch historical data từ Firestore (250 phiên)
+      const bars = await firebaseService.getMarketHistory(symbol, 250);
+      if (!bars || bars.length < 50) continue; // Cần ít nhất 50 phiên để tính toán cơ bản
 
-    return {
-      index: item.index,
-      value: parseFloat(item.value || 0),
-      change: parseFloat(item.changedMsg || 0),
-      percentChange: parseFloat(item.percentChange || 0),
-      volume: 0 // Endpoint này có thể không trả volume, ta sẽ lấy từ market-watch nếu cần
-    };
-  } catch (error) {
-    console.error(`Lỗi lấy dữ liệu Index ${index}:`, error);
-    return null;
+      const closes = bars.map(b => b.close);
+      const volumes = bars.map(b => b.volume);
+      const highs = bars.map(b => b.high);
+      const lows = bars.map(b => b.low);
+
+      const latestPrice = closes[closes.length - 1];
+      const prevPrice = closes[closes.length - 2];
+      const changePercent = ((latestPrice - prevPrice) / prevPrice) * 100;
+      
+      // 2. Tính toán Indicators
+      const rsi = indicators.calculateRSI(closes, 14) || 50;
+      const ma50 = indicators.calculateSMA(closes, 50) || 0;
+      const ma150 = indicators.calculateSMA(closes, 150) || 0;
+      const ma200 = indicators.calculateSMA(closes, 200) || 0;
+      const avgVol50 = indicators.calculateSMA(volumes, 50) || 1;
+      const avgVol20 = indicators.calculateSMA(volumes, 20) || 1;
+      
+      const currentVol = volumes[volumes.length - 1];
+      const highest20 = indicators.highestHigh(highs, 20) || 0;
+      const highest5 = indicators.highestHigh(highs, 5) || 0;
+      const lowest5 = indicators.lowestLow(lows, 5) || 0;
+
+      // 3. Áp dụng các Rules (VCP, Breakout, Dry Volume...)
+      const patterns: string[] = [];
+      let score = 0;
+
+      // Rule: VCP / Xu hướng tăng (Stage 2)
+      if (latestPrice > ma150 && latestPrice > ma200 && ma150 > ma200 && rsi > 40) {
+        patterns.push('VCP/Uptrend');
+        score += 40;
+      }
+
+      // Rule: Volume Dry Up (Cạn kiệt khối lượng)
+      if (currentVol < 0.6 * avgVol50) {
+        patterns.push('Vol Dry-up');
+        score += 20;
+      }
+
+      // Rule: Pivot Contraction (Nâng nền siết chặt)
+      const contraction = (highest5 - lowest5) / latestPrice;
+      if (contraction < 0.08) {
+        patterns.push('Tight Pivot');
+        score += 30;
+      }
+
+      // Rule: Breakout detection
+      if (latestPrice >= highest20 && currentVol > 2.0 * avgVol20) {
+        patterns.push('Breakout');
+        score += 50;
+      }
+
+      // Lọc theo lệnh cụ thể nếu cần
+      if (command === 'VCP' && !patterns.includes('VCP/Uptrend')) continue;
+      if (command === 'BREAK' && !patterns.includes('Breakout')) continue;
+
+      if (score > 30) {
+        allResults.push({
+          symbol,
+          score,
+          rsi: Math.round(rsi),
+          volumeTrend: currentVol > avgVol20 ? 'Tăng' : 'Giảm',
+          pivotPrice: Math.round(latestPrice),
+          patterns,
+          price: latestPrice,
+          changePercent: Math.round(changePercent * 100) / 100
+        });
+      }
+
+    } catch (e) {
+      console.error(`Error scanning ${symbol}:`, e);
+    }
   }
+
+  // 4. Trả về top 10 cổ phiếu tốt nhất
+  return allResults.sort((a, b) => b.score - a.score).slice(0, 10);
+}
+
+/**
+ * Các hàm helper lấy dữ liệu đơn lẻ cho Chatbot (Khôi phục cho UI)
+ */
+export async function fetchStockData(symbol: string): Promise<any | null> {
+  const data = await firebaseService.getMarketData(symbol);
+  if (!data) return null;
+  
+  // Trả về cấu trúc tương thích với StockData interface cũ nếu cần
+  return {
+    ...data,
+    historical: data.historical || { close: [], volume: [], high: [], low: [] }
+  };
+}
+
+export async function fetchIndexData(index: string = 'VNINDEX'): Promise<any | null> {
+  // Lấy snapshot Index từ Firestore (Giả định Index cũng được sync vào market_data)
+  return await firebaseService.getMarketData(index);
+}
+
+export function formatStockDataForAI(data: any): string {
+  return `Mã: ${data.symbol}
+Giá: ${data.price?.toLocaleString('vi-VN')} VNĐ
+Khối lượng: ${data.volume?.toLocaleString('vi-VN')}
+Ngày cập nhật: ${data.date || 'N/A'}`;
+}
+
+export function formatScanResultForAI(results: ScanResult[]): string {
+  if (results.length === 0) return "Không tìm thấy cổ phiếu nào thỏa mãn điều kiện lọc kỹ thuật.";
+  
+  let text = "KẾT QUẢ QUÉT KỸ THUẬT (Dữ liệu từ Firestore):\n\n";
+  text += "| Mã | Điểm | RSI | Mẫu hình | Giá | Biến động |\n";
+  text += "|---|---|---|---|---|---|\n";
+  
+  for (const r of results) {
+    text += `| ${r.symbol} | ${r.score} | ${r.rsi} | ${r.patterns.join(', ')} | ${r.price.toLocaleString()} | ${r.changePercent}% |\n`;
+  }
+  
+  return text;
 }

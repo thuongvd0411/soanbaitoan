@@ -11,6 +11,7 @@ import {
     query,
     orderBy,
     where,
+    limit,
     onSnapshot
 } from "firebase/firestore";
 import { Question, HistoryItem } from "../types";
@@ -650,6 +651,46 @@ export const firebaseService = {
         } catch (error) {
             console.error(`Firebase updateMarketData error for ${symbol}:`, error);
             throw error;
+        }
+    },
+
+    /**
+     * Cập nhật dữ liệu lịch sử (OHLC) vào Firestore
+     * Cấu trúc: market_history/{symbol}/daily/{date}
+     */
+    async updateMarketHistory(symbol: string, date: string, data: any): Promise<void> {
+        if (!symbol || !date || !data) return;
+        try {
+            // date format: YYYY-MM-DD
+            const docRef = doc(db, 'market_history', symbol.toUpperCase(), 'daily', date);
+            await setDoc(docRef, {
+                ...data,
+                updatedAt: new Date().toISOString()
+            }, { merge: true });
+        } catch (error) {
+            console.error(`Firebase updateMarketHistory error for ${symbol} on ${date}:`, error);
+            // Không throw để tránh dừng cả quá trình sync hàng loạt
+        }
+    },
+
+    /**
+     * Lấy dữ liệu lịch sử N phiên gần nhất
+     */
+    async getMarketHistory(symbol: string, limitCount: number = 250): Promise<any[]> {
+        if (!symbol) return [];
+        try {
+            const collRef = collection(db, 'market_history', symbol.toUpperCase(), 'daily');
+            const q = query(collRef, orderBy('__name__', 'desc'), limit(limitCount));
+            const querySnapshot = await getDocs(q);
+            const results: any[] = [];
+            querySnapshot.forEach((doc) => {
+                results.push(doc.data());
+            });
+            // Trả về mảng sắp xếp theo thời gian tăng dần (cũ đến mới)
+            return results.reverse();
+        } catch (error) {
+            console.error(`Firebase getMarketHistory error for ${symbol}:`, error);
+            return [];
         }
     }
 };

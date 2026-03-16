@@ -4,9 +4,10 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Send, Trash2, TrendingUp, BarChart3, Newspaper, Globe, ChevronDown, Loader2, Search, Zap, RefreshCcw } from 'lucide-react';
 import { aiRouter } from '../services/ai/aiRouter';
 import { AIModelType, ChatMessage } from '../services/ai/aiProvider';
-import { scanMarket, formatScanResultForAI, TOP_TICKERS } from '../services/marketScanner';
+import { scanMarket, formatScanResultForAI } from '../services/marketScanner';
 import { fetchStockData, formatStockDataForAI, fetchIndexData } from '../services/stockScanner';
 import { syncMarketToFirebase } from '../services/updateMarketData';
+import { STOCK_UNIVERSE as TOP_TICKERS } from '../data/stockUniverse';
 import { firebaseService } from '../services/firebaseService';
 import { AppState } from '../types';
 
@@ -189,7 +190,7 @@ const InvestmentPanel: React.FC<InvestmentPanelProps> = ({ config }) => {
   const isQuickCommand = (text: string): string | null => {
     let cmd = text.trim().toLowerCase();
     if (cmd.startsWith('/')) cmd = cmd.substring(1);
-    if (['scan', 'hot', 'market', 'vdt', 'accum', 'break', 'sync', 'update'].includes(cmd)) return cmd;
+    if (['scan', 'hot', 'market', 'vdt', 'accum', 'break', 'sync', 'update', 'vcp'].includes(cmd)) return cmd;
     return null;
   };
 
@@ -210,7 +211,7 @@ const InvestmentPanel: React.FC<InvestmentPanelProps> = ({ config }) => {
         // Quick command: scan or sync
         if (quickCmd === 'sync' || quickCmd === 'update') {
           setIsLoading(true);
-          await syncMarketToFirebase(TOP_TICKERS, (msg) => setScanProgress(msg));
+          await syncMarketToFirebase((msg) => setScanProgress(msg));
           setIsLoading(false);
           setScanProgress('');
           response = '✅ Dữ liệu thị trường đã được cập nhật vào Firestore thành công. Bây giờ bạn có thể dùng lệnh /SCAN để phân tích.';
@@ -588,7 +589,7 @@ YÊU CẦU: KHÔNG ĐƯỢC TỰ BỊA SỐ LIỆU VNINDEX KHÁC VỚI DỮ LI�
                 <button 
                   onClick={() => {
                     setIsLoading(true);
-                    syncMarketToFirebase(TOP_TICKERS, (msg) => setScanProgress(msg))
+                    syncMarketToFirebase((msg) => setScanProgress(msg))
                       .then(() => { setIsLoading(false); setScanProgress(''); });
                   }}
                   className="flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 transition-colors text-[10px] font-mono uppercase bg-cyan-500/10 px-2 py-1 rounded"
@@ -650,7 +651,7 @@ YÊU CẦU: KHÔNG ĐƯỢC TỰ BỊA SỐ LIỆU VNINDEX KHÁC VỚI DỮ LI�
 
             {/* Quick commands */}
             <div className="px-4 py-2 border-t border-cyan-500/10 flex flex-wrap gap-2 shrink-0">
-              {['SCAN', 'HOT', 'MARKET', 'VDT', 'ACCUM', 'BREAK', 'SYNC'].map(cmd => (
+              {['SCAN', 'HOT', 'MARKET', 'VDT', 'ACCUM', 'BREAK', 'SYNC', 'VCP'].map(cmd => (
                 <button
                   key={cmd}
                   onClick={() => { setInput(`/${cmd}`); handleSend(); }}
@@ -677,7 +678,7 @@ YÊU CẦU: KHÔNG ĐƯỢC TỰ BỊA SỐ LIỆU VNINDEX KHÁC VỚI DỮ LI�
                 <button
                   onClick={() => {
                     setIsLoading(true);
-                    syncMarketToFirebase(TOP_TICKERS, (msg) => setScanProgress(msg))
+                    syncMarketToFirebase((msg) => setScanProgress(msg))
                       .then(() => { setIsLoading(false); setScanProgress(''); });
                   }}
                   className="text-cyan-600 hover:text-cyan-400 transition-colors p-1"
