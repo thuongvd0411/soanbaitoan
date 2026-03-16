@@ -1935,7 +1935,7 @@ export default function App() {
       ) : null}
       <main className={`flex-1 overflow-y-auto h-screen relative no-print ${activeTab === 'invest' ? 'bg-[#05070a] p-0' : 'bg-gray-200/40 p-3 md:p-10'}`}>
         {activeTab === 'invest' ? (
-          <InvestmentPanel geminiApiKey={config.selectedKeyMode === 'secondary' ? (config.secondaryApiKey || '') : (config.primaryApiKey || '')} openaiApiKey={config.openaiApiKey || ''} />
+          <InvestmentPanel config={config} />
         ) : activeTab === 'edu' ? (
           <div className="max-w-7xl mx-auto w-full flex flex-col gap-8 animate-in fade-in duration-500">
             {/* PHẦN QUẢN LÝ HỌC TẬP - PORTED FROM quanlyhoc */}

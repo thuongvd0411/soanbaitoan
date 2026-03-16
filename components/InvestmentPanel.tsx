@@ -78,8 +78,8 @@ const InvestmentPanel: React.FC<InvestmentPanelProps> = ({ config }) => {
   const [showPurgeMenu, setShowPurgeMenu] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   
-  // Use config.uid if available, otherwise fallback
-  const userId = config.uid || 'user_default';
+  // Use deviceId from localStorage if config.uid is missing
+  const userId = (config as any).uid || localStorage.getItem('deviceId') || 'user_default';
 
   // Portfolio tab states
   const [stockInput, setStockInput] = useState('');
