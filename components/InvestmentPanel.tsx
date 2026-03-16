@@ -397,6 +397,7 @@ Viết bằng Markdown, chuyên sâu, khách quan.`;
 
   // Render markdown-like content (basic)
   const renderContent = (text: string) => {
+    if (!text) return '';
     // Convert markdown to basic HTML
     let html = text
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
