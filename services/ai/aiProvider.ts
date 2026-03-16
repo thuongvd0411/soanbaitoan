@@ -9,4 +9,4 @@ export interface AIProvider {
   sendMessage(messages: ChatMessage[], systemPrompt?: string): Promise<string>;
 }
 
-export type AIModelType = 'gemini' | 'gpt';
+export type AIModelType = 'gemini' | 'gpt' | 'gpt-nano';

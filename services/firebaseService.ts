@@ -464,6 +464,123 @@ export const firebaseService = {
             console.error("Firebase getDetailedExamAnalysis error:", error);
             return null;
         }
+    },
+
+    /**
+     * --- TÍCH HỢP AI ĐẦU TƯ ---
+     */
+
+    /**
+     * Tải lịch sử chat Đầu Tư
+     */
+    async getInvestmentChat(userId: string): Promise<any[]> {
+        if (!userId) return [];
+        try {
+            const docRef = doc(db, 'investment_history', userId);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                return data.messages || [];
+            }
+            return [];
+        } catch (error) {
+            console.error("Firebase getInvestmentChat error:", error);
+            return [];
+        }
+    },
+
+    /**
+     * Lưu lịch sử chat Đầu Tư
+     */
+    async saveInvestmentChat(userId: string, messages: any[]): Promise<void> {
+        if (!userId || !messages) return;
+        try {
+            const docRef = doc(db, 'investment_history', userId);
+            
+            // Lọc bỏ message quá dài, hoặc cắt bớt độ dài nếu cần thiết tiết kiệm dung lượng
+            const safeMessages = messages.map(m => ({
+                role: m.role,
+                content: m.content.substring(0, 5000), // Max 5000 ký tự mỗi tin
+                timestamp: m.timestamp || new Date().toISOString()
+            }));
+
+            await setDoc(docRef, { 
+                messages: safeMessages,
+                lastUpdated: new Date().toISOString() 
+            }, { merge: true });
+        } catch (error) {
+            console.error("Firebase saveInvestmentChat error:", error);
+            throw error;
+        }
+    },
+
+    /**
+     * Xóa lịch sử chat dựa vào timeframe (1h, 1d, all)
+     */
+    async deleteInvestmentChat(userId: string, timeframe: '1h' | '1d' | 'all'): Promise<void> {
+        if (!userId) return;
+        try {
+            if (timeframe === 'all') {
+                await deleteDoc(doc(db, 'investment_history', userId));
+                return;
+            }
+
+            const docRef = doc(db, 'investment_history', userId);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                let messages = data.messages || [];
+                const now = Date.now();
+                const timeAgo = timeframe === '1h' ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+
+                // Giữ lại các tin nhắn cũ hơn khoảng thời gian bị xóa
+                messages = messages.filter((m: any) => {
+                    if (!m.timestamp) return false; // Không có timestamp -> coi như mới -> xóa
+                    const msgTime = new Date(m.timestamp).getTime();
+                    return (now - msgTime) > timeAgo;
+                });
+
+                await setDoc(docRef, { messages, lastUpdated: new Date().toISOString() }, { merge: true });
+            }
+        } catch (error) {
+            console.error("Firebase deleteInvestmentChat error:", error);
+            throw error;
+        }
+    },
+
+    /**
+     * Lấy báo cáo vĩ mô trong ngày
+     */
+    async getMacroReport(dateStr: string): Promise<string | null> {
+        if (!dateStr) return null;
+        try {
+            const docRef = doc(db, 'macro_reports', dateStr.replace(/\//g, '-'));
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                return docSnap.data().content || null;
+            }
+            return null;
+        } catch (error) {
+            console.error("Firebase getMacroReport error:", error);
+            return null;
+        }
+    },
+
+    /**
+     * Lưu báo cáo vĩ mô trong ngày
+     */
+    async saveMacroReport(dateStr: string, content: string): Promise<void> {
+        if (!dateStr || !content) return;
+        try {
+            const docRef = doc(db, 'macro_reports', dateStr.replace(/\//g, '-'));
+            await setDoc(docRef, { 
+                content,
+                createdAt: new Date().toISOString()
+            });
+        } catch (error) {
+            console.error("Firebase saveMacroReport error:", error);
+            throw error;
+        }
     }
 };
 

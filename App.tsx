@@ -520,7 +520,7 @@ const Sidebar = ({
     <>
       {isOpen && <div className="fixed inset-0 bg-black/60 z-40 md:hidden animate-in fade-in" onClick={onClose} />}
       <div className={`fixed md:relative inset-y-0 left-0 w-80 bg-white border-r border-gray-200 h-screen overflow-y-auto p-4 flex flex-col no-print z-50 transition-transform duration-300 ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
-        <div className="flex items-center justify-between mb-6 text-primary"> <div className="flex items-center gap-2"><BookOpen size={28} /><h1 className="text-xl font-black uppercase tracking-tighter text-blue-900">Quản Lý Học</h1></div> <button onClick={onClose} className="md:hidden p-2"><X size={24} /></button> </div>
+        <div className="flex items-center justify-between mb-6 text-primary"> <div className="flex items-center gap-2"><BookOpen size={28} /><h1 className="text-xl font-black uppercase tracking-tighter text-blue-900">Quản Lý Công Việc</h1></div> <button onClick={onClose} className="md:hidden p-2"><X size={24} /></button> </div>
         <div className="space-y-6 flex-1">
           <div className="bg-orange-50 rounded-2xl border border-orange-100 shadow-sm mb-4 overflow-hidden transition-all">
             <div 

@@ -4,8 +4,10 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Send, Trash2, TrendingUp, BarChart3, Newspaper, Globe, ChevronDown, Loader2, Search, Zap } from 'lucide-react';
 import { aiRouter } from '../services/ai/aiRouter';
 import { AIModelType, ChatMessage } from '../services/ai/aiProvider';
-import { fetchStockData, formatStockDataForAI } from '../services/stockScanner';
 import { scanMarket, formatScanResultForAI } from '../services/marketScanner';
+import { fetchStockData, formatStockDataForAI } from '../services/stockScanner';
+import { firebaseService } from '../services/firebaseService';
+import { AppState } from '../types';
 
 interface InvestmentMessage {
   role: 'user' | 'assistant';
@@ -13,8 +15,7 @@ interface InvestmentMessage {
 }
 
 interface InvestmentPanelProps {
-  geminiApiKey: string;
-  openaiApiKey: string;
+  config: AppState;
 }
 
 const SYSTEM_PROMPT = `Bạn là Alla – chuyên gia phân tích tài chính và giáo sư kinh tế.
@@ -66,18 +67,19 @@ Kèm nhận xét ngắn cho mỗi mã.`;
 
 const MAX_HISTORY = 8;
 
-const InvestmentPanel: React.FC<InvestmentPanelProps> = ({ geminiApiKey, openaiApiKey }) => {
+const InvestmentPanel: React.FC<InvestmentPanelProps> = ({ config }) => {
   const [activeSubTab, setActiveSubTab] = useState<'terminal' | 'portfolio' | 'news' | 'macro'>('terminal');
   const [model, setModel] = useState<AIModelType>('gemini');
-  const [messages, setMessages] = useState<InvestmentMessage[]>(() => {
-    const saved = localStorage.getItem('invest_chat_history');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [messages, setMessages] = useState<InvestmentMessage[]>([]);
   const [chatSummary, setChatSummary] = useState<string>('');
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [scanProgress, setScanProgress] = useState('');
+  const [showPurgeMenu, setShowPurgeMenu] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  
+  // Use config.uid if available, otherwise fallback
+  const userId = config.uid || 'user_default';
 
   // Portfolio tab states
   const [stockInput, setStockInput] = useState('');
@@ -92,14 +94,34 @@ const InvestmentPanel: React.FC<InvestmentPanelProps> = ({ geminiApiKey, openaiA
 
   // Setup AI keys
   useEffect(() => {
-    if (geminiApiKey) aiRouter.setGeminiKey(geminiApiKey);
-    if (openaiApiKey) aiRouter.setOpenAIKey(openaiApiKey);
-  }, [geminiApiKey, openaiApiKey]);
+    const env = (import.meta as any).env || {};
+    let geminiKey = "";
+    if (config.selectedKeyMode === 'primary') geminiKey = config.primaryApiKey?.trim() || "";
+    else if (config.selectedKeyMode === 'secondary') geminiKey = config.secondaryApiKey?.trim() || "";
+    else geminiKey = env.VITE_GEMINI_API_KEY?.trim() || "";
+    
+    if (geminiKey) aiRouter.setGeminiKey(geminiKey);
+    if (config.openaiApiKey) aiRouter.setOpenAIKey(config.openaiApiKey);
+  }, [config.primaryApiKey, config.secondaryApiKey, config.selectedKeyMode, config.openaiApiKey]);
+
+  // Load chat history from Firebase
+  useEffect(() => {
+    const loadHistory = async () => {
+      const data = await firebaseService.getInvestmentChat(userId);
+      if (data && data.length > 0) {
+        setMessages(data);
+      }
+    };
+    loadHistory();
+  }, [userId]);
 
   // Save chat history
   useEffect(() => {
-    localStorage.setItem('invest_chat_history', JSON.stringify(messages));
-  }, [messages]);
+    if (messages.length > 0) {
+      // Dùng debounce đơn giản hoặc lưu trực tiếp
+      firebaseService.saveInvestmentChat(userId, messages).catch(console.error);
+    }
+  }, [messages, userId]);
 
   // Auto scroll
   useEffect(() => {
@@ -151,7 +173,7 @@ const InvestmentPanel: React.FC<InvestmentPanelProps> = ({ geminiApiKey, openaiA
   // Quick commands
   const isQuickCommand = (text: string): string | null => {
     const cmd = text.trim().toLowerCase();
-    if (['scan', 'hot', 'market'].includes(cmd)) return cmd;
+    if (['scan', 'hot', 'market', 'vdt', 'accum', 'break'].includes(cmd)) return cmd;
     return null;
   };
 
@@ -171,15 +193,18 @@ const InvestmentPanel: React.FC<InvestmentPanelProps> = ({ geminiApiKey, openaiA
       if (quickCmd) {
         // Quick command: scan market
         setScanProgress('Đang quét thị trường...');
-        const result = await scanMarket((current, total) => {
+        const cmdUpper = quickCmd.toUpperCase() as any;
+        const result = await scanMarket(cmdUpper, (current, total) => {
           setScanProgress(`Đang quét ${current}/${total} mã...`);
         });
         setScanProgress('');
 
-        const dataText = formatScanResultForAI(result);
+        const dataText = formatScanResultForAI(result, cmdUpper);
         const history = getOptimizedHistory();
         history.push({ role: 'user', content: `${SCAN_PROMPT}\n\n${dataText}` });
-        response = await sendToAI(history, SYSTEM_PROMPT);
+        
+        // Gọi AI, yêu cầu ngắn gọn cực độ
+        response = await sendToAI(history, SYSTEM_PROMPT + '\nTRẢ LỜI NGẮN GỌN TỐI ĐA 400 TỪ.');
 
       } else if (isStockTicker(userText.toUpperCase())) {
         // Stock ticker analysis
@@ -215,12 +240,19 @@ const InvestmentPanel: React.FC<InvestmentPanelProps> = ({ geminiApiKey, openaiA
     }
   };
 
-  const clearChat = () => {
-    if (window.confirm('Xóa toàn bộ lịch sử chat đầu tư?')) {
-      setMessages([]);
-      setChatSummary('');
-      localStorage.removeItem('invest_chat_history');
+  const clearChat = async (timeframe: '1h' | '1d' | 'all') => {
+    const text = timeframe === '1h' ? '1 tiếng trước' : timeframe === '1d' ? '1 ngày trước' : 'toàn bộ';
+    if (window.confirm(`Xóa lịch sử chat đầu tư (${text})?`)) {
+      try {
+        await firebaseService.deleteInvestmentChat(userId, timeframe);
+        const newData = await firebaseService.getInvestmentChat(userId);
+        setMessages(newData || []);
+        if (timeframe === 'all') setChatSummary('');
+      } catch (e) {
+        console.error('Lỗi khi xóa chat:', e);
+      }
     }
+    setShowPurgeMenu(false);
   };
 
   // Portfolio: Analyze single stock
@@ -328,15 +360,21 @@ FORMAT BẮT BUỘC:
   // Macro dashboard
   const analyzeMacro = async () => {
     if (isLoading) return;
-    const cacheKey = `invest_macro_${new Date().toISOString().split('T')[0]}`;
-    const cached = localStorage.getItem(cacheKey);
-    if (cached) { setMacroResult(cached); return; }
-
+    const dateStr = new Date().toLocaleDateString('vi-VN');
+    
+    // Thử tải từ Firebase trước
     setIsLoading(true);
     setMacroResult('');
+    
     try {
-      const today = new Date().toLocaleDateString('vi-VN');
-      const prompt = `Hôm nay là ${today}. Hãy tạo báo cáo vĩ mô thị trường chứng khoán Việt Nam gồm:
+      const savedReport = await firebaseService.getMacroReport(dateStr);
+      if (savedReport) {
+        setMacroResult(savedReport);
+        setIsLoading(false);
+        return;
+      }
+      
+      const prompt = `Hôm nay là ${dateStr}. Hãy tạo báo cáo vĩ mô thị trường chứng khoán Việt Nam gồm:
 1. Tóm tắt bối cảnh kinh tế
 2. Rủi ro hệ thống (1-5 điểm)
 3. Nhóm ngành tích cực 1-3 tháng tới
@@ -348,7 +386,8 @@ FORMAT BẮT BUỘC:
 Viết bằng Markdown, chuyên sâu, khách quan.`;
       const result = await sendToAI([{ role: 'user', content: prompt }], SYSTEM_PROMPT);
       setMacroResult(result);
-      localStorage.setItem(cacheKey, result);
+      // Lưu lại Firebase
+      firebaseService.saveMacroReport(dateStr, result).catch(console.error);
     } catch (error: any) {
       setMacroResult(`❌ Lỗi: ${error.message}`);
     } finally {
@@ -405,7 +444,7 @@ Viết bằng Markdown, chuyên sâu, khách quan.`;
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <span className="text-cyan-400 font-mono font-bold text-sm tracking-wider" style={{ textShadow: '0 0 10px rgba(0,240,255,0.5)' }}>
-              NEURAL_TRADE_ v2.0
+              ALLA TRỢ LÝ ĐẦU TƯ
             </span>
             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse shadow-[0_0_8px_#39ff14]"></div>
           </div>
@@ -420,6 +459,7 @@ Viết bằng Markdown, chuyên sâu, khách quan.`;
               >
                 <option value="gemini">Gemini</option>
                 <option value="gpt">GPT-4.1 mini</option>
+                <option value="gpt-nano">GPT-4.1 nano</option>
               </select>
               <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 text-cyan-500 pointer-events-none" />
             </div>
@@ -428,10 +468,10 @@ Viết bằng Markdown, chuyên sâu, khách quan.`;
         {/* Sub tabs */}
         <div className="flex gap-1">
           {[
-            { id: 'terminal' as const, label: '[>] TERMINAL', icon: <Zap size={12} /> },
-            { id: 'portfolio' as const, label: '[$] PORTFOLIO', icon: <TrendingUp size={12} /> },
-            { id: 'news' as const, label: '[!] NEWS', icon: <Newspaper size={12} /> },
-            { id: 'macro' as const, label: '[*] MACRO', icon: <Globe size={12} /> },
+            { id: 'terminal' as const, label: '[>] GIAO DỊCH', icon: <Zap size={12} /> },
+            { id: 'portfolio' as const, label: '[$] DANH MỤC', icon: <TrendingUp size={12} /> },
+            { id: 'news' as const, label: '[!] TIN TỨC', icon: <Newspaper size={12} /> },
+            { id: 'macro' as const, label: '[*] VĨ MÔ', icon: <Globe size={12} /> },
           ].map(tab => (
             <button
               key={tab.id}
@@ -458,10 +498,21 @@ Viết bằng Markdown, chuyên sâu, khách quan.`;
               <span>STATUS: <span className="text-green-400">[ONLINE]</span></span>
               <span>ENC: AES-256</span>
               {scanProgress && <span className="text-cyan-400 animate-pulse">{scanProgress}</span>}
-              <div className="ml-auto flex gap-2">
-                <button onClick={clearChat} className="text-gray-600 hover:text-red-400 transition-colors text-[10px] font-mono uppercase">
-                  PURGE
+              <div className="ml-auto flex gap-2 relative">
+                <button 
+                  onClick={() => setShowPurgeMenu(!showPurgeMenu)} 
+                  className="text-gray-600 hover:text-red-400 transition-colors text-[10px] font-mono uppercase focus:outline-none"
+                >
+                  PURGE <ChevronDown size={10} className="inline" />
                 </button>
+                
+                {showPurgeMenu && (
+                  <div className="absolute top-full mt-1 right-0 bg-[#0a0f19] border border-cyan-500/30 rounded shadow-xl z-50 w-32 py-1 flex flex-col">
+                     <button onClick={() => clearChat('1h')} className="px-3 py-1.5 text-left text-[10px] font-mono text-gray-400 hover:text-cyan-400 hover:bg-cyan-500/10">1 GIỜ TRƯỚC</button>
+                     <button onClick={() => clearChat('1d')} className="px-3 py-1.5 text-left text-[10px] font-mono text-gray-400 hover:text-cyan-400 hover:bg-cyan-500/10">1 NGÀY TRƯỚC</button>
+                     <button onClick={() => clearChat('all')} className="px-3 py-1.5 text-left text-[10px] font-mono text-red-500 hover:text-red-400 hover:bg-red-500/10 border-t border-cyan-500/20 mt-1 pt-1">TOÀN BỘ</button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -500,11 +551,11 @@ Viết bằng Markdown, chuyên sâu, khách quan.`;
             </div>
 
             {/* Quick commands */}
-            <div className="px-4 py-2 border-t border-cyan-500/10 flex gap-2 shrink-0">
-              {['scan', 'hot', 'market'].map(cmd => (
+            <div className="px-4 py-2 border-t border-cyan-500/10 flex flex-wrap gap-2 shrink-0">
+              {['SCAN', 'HOT', 'MARKET', 'VDT', 'ACCUM', 'BREAK'].map(cmd => (
                 <button
                   key={cmd}
-                  onClick={() => { setInput(cmd); }}
+                  onClick={() => { setInput(`/${cmd}`); handleSend(); }}
                   className="px-3 py-1 bg-cyan-500/10 border border-cyan-500/20 text-cyan-500 text-[10px] font-mono uppercase hover:bg-cyan-500/20 transition-colors rounded"
                 >
                   /{cmd}
