@@ -78,3 +78,39 @@ Khối lượng: ${data.volume.toLocaleString('vi-VN')}
 KL TB 20 phiên: ${data.avgVolume20d.toLocaleString('vi-VN')}
 Volume Ratio: ${data.volumeRatio}x`;
 }
+
+export interface IndexData {
+  index: string;
+  value: number;
+  change: number;
+  percentChange: number;
+  volume: number;
+}
+
+/**
+ * Lấy dữ liệu chỉ số thị trường (VNINDEX, HNX...)
+ */
+export async function fetchIndexData(index: string = 'VNINDEX'): Promise<IndexData | null> {
+  try {
+    const res = await fetch(`${TCBS_API}/stock-insight/v1/intraday/index-indicators?index=${index}`);
+    if (!res.ok) throw new Error('Index API Error');
+    const data = await res.json();
+    // Dữ liệu TCBS trả về mảng các chỉ số hoặc object tùy endpoint. 
+    // Giả định cấu trúc quen thuộc: { data: [{ index: 'VNINDEX', value: 1280, ... }] }
+    // Nếu là endpoint indicator trực tiếp: [{ "index": "VNINDEX", "value": 1280.5, "changedMsg": "-2.5", "percentChange": "-0.2" }]
+    const item = Array.isArray(data) ? data.find((i: any) => i.index === index) : data;
+    
+    if (!item) return null;
+
+    return {
+      index: item.index,
+      value: parseFloat(item.value || 0),
+      change: parseFloat(item.changedMsg || 0),
+      percentChange: parseFloat(item.percentChange || 0),
+      volume: 0 // Endpoint này có thể không trả volume, ta sẽ lấy từ market-watch nếu cần
+    };
+  } catch (error) {
+    console.error(`Lỗi lấy dữ liệu Index ${index}:`, error);
+    return null;
+  }
+}

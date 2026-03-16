@@ -5,7 +5,7 @@ import { Send, Trash2, TrendingUp, BarChart3, Newspaper, Globe, ChevronDown, Loa
 import { aiRouter } from '../services/ai/aiRouter';
 import { AIModelType, ChatMessage } from '../services/ai/aiProvider';
 import { scanMarket, formatScanResultForAI } from '../services/marketScanner';
-import { fetchStockData, formatStockDataForAI } from '../services/stockScanner';
+import { fetchStockData, formatStockDataForAI, fetchIndexData } from '../services/stockScanner';
 import { firebaseService } from '../services/firebaseService';
 import { AppState } from '../types';
 
@@ -91,6 +91,7 @@ const InvestmentPanel: React.FC<InvestmentPanelProps> = ({ config }) => {
   // News/Macro tab states  
   const [newsResult, setNewsResult] = useState('');
   const [macroResult, setMacroResult] = useState('');
+  const [marketContext, setMarketContext] = useState<string>('');
 
   // Setup AI keys
   useEffect(() => {
@@ -110,6 +111,19 @@ const InvestmentPanel: React.FC<InvestmentPanelProps> = ({ config }) => {
       const data = await firebaseService.getInvestmentChat(userId);
       if (data && data.length > 0) {
         setMessages(data);
+      }
+      
+      const dateStr = new Date().toLocaleDateString('vi-VN');
+      const savedMacro = await firebaseService.getMacroReport(dateStr);
+      if (savedMacro) setMacroResult(savedMacro);
+      
+      const savedNews = await firebaseService.getNewsReport(dateStr);
+      if (savedNews) setNewsResult(savedNews);
+
+      // Lấy dữ liệu Index để làm Context cho AI
+      const indexData = await fetchIndexData('VNINDEX');
+      if (indexData) {
+        setMarketContext(`Dữ liệu thị trường hiện tại (${dateStr}): VNINDEX ${indexData.value.toLocaleString('vi-VN')} điểm, biến động ${indexData.change > 0 ? '+' : ''}${indexData.change} (${indexData.percentChange}%).`);
       }
     };
     loadHistory();
@@ -172,7 +186,8 @@ const InvestmentPanel: React.FC<InvestmentPanelProps> = ({ config }) => {
 
   // Quick commands
   const isQuickCommand = (text: string): string | null => {
-    const cmd = text.trim().toLowerCase();
+    let cmd = text.trim().toLowerCase();
+    if (cmd.startsWith('/')) cmd = cmd.substring(1);
     if (['scan', 'hot', 'market', 'vdt', 'accum', 'break'].includes(cmd)) return cmd;
     return null;
   };
@@ -224,7 +239,10 @@ const InvestmentPanel: React.FC<InvestmentPanelProps> = ({ config }) => {
       } else {
         // Normal chat
         const history = getOptimizedHistory();
-        history.push({ role: 'user', content: userText });
+        const userPromptWithContext = marketContext 
+          ? `${marketContext}\n\nCâu hỏi: ${userText}`
+          : userText;
+        history.push({ role: 'user', content: userPromptWithContext });
         response = await sendToAI(history, SYSTEM_PROMPT);
       }
 
@@ -310,13 +328,19 @@ FORMAT BẮT BUỘC:
   // News scanner
   const scanNews = async () => {
     if (isLoading) return;
-    const cacheKey = `invest_news_${new Date().toISOString().split('T')[0]}`;
-    const cached = localStorage.getItem(cacheKey);
-    if (cached) { setNewsResult(cached); return; }
-
+    const dateStr = new Date().toLocaleDateString('vi-VN');
+    
     setIsLoading(true);
     setNewsResult('');
     try {
+      // Thử lấy từ Firebase trước
+      const savedNews = await firebaseService.getNewsReport(dateStr);
+      if (savedNews) {
+        setNewsResult(savedNews);
+        setIsLoading(false);
+        return;
+      }
+
       // Fetch RSS from financial sources via CORS proxy
       const rssSources = [
         'https://vneconomy.vn/thi-truong.rss',
@@ -349,7 +373,7 @@ FORMAT BẮT BUỘC:
       const prompt = `Dưới đây là tin tức tài chính hôm nay:\n\n${allNews.slice(0, 10).join('\n\n')}\n\nPhân tích mức độ ảnh hưởng đến thị trường chứng khoán VN. Đánh giá rủi ro: Thấp/Trung bình/Cao. Giải thích ngắn gọn.`;
       const result = await sendToAI([{ role: 'user', content: prompt }], SYSTEM_PROMPT);
       setNewsResult(result);
-      localStorage.setItem(cacheKey, result);
+      firebaseService.saveNewsReport(dateStr, result).catch(console.error);
     } catch (error: any) {
       setNewsResult(`❌ Lỗi: ${error.message}`);
     } finally {
@@ -362,11 +386,11 @@ FORMAT BẮT BUỘC:
     if (isLoading) return;
     const dateStr = new Date().toLocaleDateString('vi-VN');
     
-    // Thử tải từ Firebase trước
     setIsLoading(true);
     setMacroResult('');
     
     try {
+      // 1. Thử tải từ Firebase trước
       const savedReport = await firebaseService.getMacroReport(dateStr);
       if (savedReport) {
         setMacroResult(savedReport);
@@ -374,19 +398,37 @@ FORMAT BẮT BUỘC:
         return;
       }
       
-      const prompt = `Hôm nay là ${dateStr}. Hãy tạo báo cáo vĩ mô thị trường chứng khoán Việt Nam gồm:
-1. Tóm tắt bối cảnh kinh tế
-2. Rủi ro hệ thống (1-5 điểm)
+      // 2. Lấy dữ liệu VNINDEX thực tế
+      const indexData = await fetchIndexData('VNINDEX');
+      const indexText = indexData 
+        ? `Dữ liệu thị trường hiện tại: VNINDEX đạt ${indexData.value.toLocaleString('vi-VN')} điểm, thay đổi ${indexData.change > 0 ? '+' : ''}${indexData.change} (${indexData.percentChange}%).`
+        : 'Không lấy được dữ liệu Index thời gian thực.';
+
+      const prompt = `Hôm nay là ${dateStr}. ${indexText}
+Hãy tạo báo cáo vĩ mô thị trường chứng khoán Việt Nam gồm các mục sau (Sử dụng cấu trúc [COLLAPSE: Tiêu đề] Nội dung [ENDCOLLAPSE] cho các phần 1, 2, 5):
+
+[COLLAPSE: 1. Tóm tắt bối cảnh kinh tế]
+(Nội dung tóm tắt dựa trên số liệu thực tế VNINDEX đã cung cấp)
+[ENDCOLLAPSE]
+
+[COLLAPSE: 2. Rủi ro hệ thống (1-5 điểm)]
+(Phân tích rủi ro dựa trên biến động)
+[ENDCOLLAPSE]
+
 3. Nhóm ngành tích cực 1-3 tháng tới
 4. 5 mã cổ phiếu đáng chú ý (giá <= 60.000 VND)
-5. Nhóm ngành cần thận trọng
+
+[COLLAPSE: 5. Nhóm ngành cần thận trọng]
+(Nội dung các ngành rủi ro)
+[ENDCOLLAPSE]
+
 6. Chiến lược gợi ý
 7. Tự phản biện
 
-Viết bằng Markdown, chuyên sâu, khách quan.`;
+YÊU CẦU: KHÔNG ĐƯỢC TỰ BỊA SỐ LIỆU VNINDEX KHÁC VỚI DỮ LIỆU ĐÃ CUNG CẤP. Viết bằng Markdown, chuyên sâu.`;
+
       const result = await sendToAI([{ role: 'user', content: prompt }], SYSTEM_PROMPT);
       setMacroResult(result);
-      // Lưu lại Firebase
       firebaseService.saveMacroReport(dateStr, result).catch(console.error);
     } catch (error: any) {
       setMacroResult(`❌ Lỗi: ${error.message}`);
@@ -398,8 +440,24 @@ Viết bằng Markdown, chuyên sâu, khách quan.`;
   // Render markdown-like content (basic)
   const renderContent = (text: string) => {
     if (!text) return '';
+    
+    // Convert collapsible custom tags first
+    let processed = text;
+    const collapseRegex = /\[COLLAPSE: (.*?)\]([\s\S]*?)\[ENDCOLLAPSE\]/g;
+    processed = processed.replace(collapseRegex, (match, title, content) => {
+      return `<details class="group bg-cyan-900/10 border border-cyan-500/20 rounded my-2 overflow-hidden">
+        <summary class="flex items-center justify-between px-3 py-2 cursor-pointer list-none text-cyan-400 font-bold text-xs hover:bg-cyan-500/10 transition-colors">
+          <span>${title}</span>
+          <span class="group-open:rotate-180 transition-transform">▼</span>
+        </summary>
+        <div class="px-3 py-2 text-gray-300 text-xs leading-relaxed border-t border-cyan-500/10">
+          ${content.trim().replace(/\n/g, '<br/>')}
+        </div>
+      </details>`;
+    });
+
     // Convert markdown to basic HTML
-    let html = text
+    let html = processed
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
       .replace(/^### (.*$)/gm, '<h4 class="text-cyan-300 font-bold mt-3 mb-1">$1</h4>')
@@ -439,7 +497,23 @@ Viết bằng Markdown, chuyên sâu, khách quan.`;
   const [selectedSector, setSelectedSector] = useState<string | null>(null);
 
   return (
-    <div className="flex flex-col h-full bg-[#05070a] text-gray-200 overflow-hidden" style={{ fontFamily: "'Inter', sans-serif" }}>
+    <div className="flex flex-col h-full text-gray-200 overflow-hidden relative" style={{ 
+      fontFamily: "'Inter', sans-serif",
+      background: 'radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%)'
+    }}>
+      {/* Space Background effect */}
+      <div className="absolute inset-0 pointer-events-none opacity-50 overflow-hidden">
+        {/* Stardust Layer */}
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-30"></div>
+        
+        {/* Animated Nebulas */}
+        <div className="absolute top-[-20%] left-[-10%] w-[100%] h-[100%] bg-purple-900/20 blur-[120px] rounded-full animate-[pulse_15s_infinite]"></div>
+        <div className="absolute bottom-[-20%] right-[-10%] w-[100%] h-[100%] bg-blue-900/20 blur-[120px] rounded-full animate-[pulse_20s_infinite_reverse]"></div>
+        
+        {/* Twinkling Stars (Simulated with random divs if needed, but using a texture is more efficient) */}
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/tiny-stars.png')] opacity-20"></div>
+      </div>
+
       {/* Header with sub-tabs */}
       <div className="shrink-0 bg-[#0a0f19]/95 border-b border-cyan-500/20 px-4 py-3">
         <div className="flex items-center justify-between mb-3">
