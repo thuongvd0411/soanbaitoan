@@ -16,24 +16,33 @@ export interface MarketData {
  */
 export async function getStockData(symbol: string): Promise<MarketData[] | null> {
   try {
-    // Lấy 260 phiên để đủ cho các chỉ số MA200, MA150...
-    const url = `${TCBS_API}/stock-insight/v2/stock/bars-long-term?ticker=${symbol.toUpperCase()}&type=stock&resolution=D&countBack=260`;
-    const res = await fetch(url);
+    const ticker = symbol.toUpperCase();
+    const countBack = 260;
+    const tcbsUrl = `${TCBS_API}/stock-insight/v2/stock/bars-long-term?ticker=${ticker}&type=stock&resolution=D&countBack=${countBack}`;
+    
+    // Sử dụng proxy để tránh lỗi CORS trên trình duyệt
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(tcbsUrl)}`;
+    
+    const res = await fetch(proxyUrl);
     if (!res.ok) {
-      console.warn(`[MarketDataService] No market data available for ${symbol}`);
+      console.warn(`[MarketDataService] Proxy error or No market data available for ${ticker}`);
       return null;
     }
     
     const json = await res.json();
-    const bars = json.data || [];
+    // allorigins trả về data trong trường 'contents' dưới dạng string JSON
+    if (!json.contents) return null;
+    
+    const dataObj = JSON.parse(json.contents);
+    const bars = dataObj.data || [];
     
     if (bars.length === 0) {
-      console.warn(`[MarketDataService] Empty data for ${symbol}`);
+      // console.warn(`[MarketDataService] Empty data for ${ticker}`);
       return null;
     }
 
     return bars.map((b: any) => ({
-      symbol: symbol.toUpperCase(),
+      symbol: ticker,
       open: b.open || 0,
       high: b.high || 0,
       low: b.low || 0,

@@ -616,6 +616,41 @@ export const firebaseService = {
             console.error("Firebase saveNewsReport error:", error);
             throw error;
         }
+    },
+
+    /**
+     * Lấy dữ liệu thị trường từ Firestore
+     */
+    async getMarketData(symbol: string): Promise<any | null> {
+        if (!symbol) return null;
+        try {
+            const docRef = doc(db, 'market_data', symbol.toUpperCase());
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                return docSnap.data();
+            }
+            return null;
+        } catch (error) {
+            console.error(`Firebase getMarketData error for ${symbol}:`, error);
+            return null;
+        }
+    },
+
+    /**
+     * Cập nhật dữ liệu thị trường vào Firestore
+     */
+    async updateMarketData(symbol: string, data: any): Promise<void> {
+        if (!symbol || !data) return;
+        try {
+            const docRef = doc(db, 'market_data', symbol.toUpperCase());
+            await setDoc(docRef, {
+                ...data,
+                updatedAt: new Date().toISOString()
+            }, { merge: true });
+        } catch (error) {
+            console.error(`Firebase updateMarketData error for ${symbol}:`, error);
+            throw error;
+        }
     }
 };
 

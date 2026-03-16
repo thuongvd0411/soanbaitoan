@@ -1,11 +1,12 @@
 // components/InvestmentPanel.tsx — Trợ lý Đầu Tư AI (Cyberpunk Terminal)
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Send, Trash2, TrendingUp, BarChart3, Newspaper, Globe, ChevronDown, Loader2, Search, Zap } from 'lucide-react';
+import { Send, Trash2, TrendingUp, BarChart3, Newspaper, Globe, ChevronDown, Loader2, Search, Zap, RefreshCcw } from 'lucide-react';
 import { aiRouter } from '../services/ai/aiRouter';
 import { AIModelType, ChatMessage } from '../services/ai/aiProvider';
-import { scanMarket, formatScanResultForAI } from '../services/marketScanner';
+import { scanMarket, formatScanResultForAI, TOP_TICKERS } from '../services/marketScanner';
 import { fetchStockData, formatStockDataForAI, fetchIndexData } from '../services/stockScanner';
+import { syncMarketToFirebase } from '../services/updateMarketData';
 import { firebaseService } from '../services/firebaseService';
 import { AppState } from '../types';
 
@@ -188,7 +189,7 @@ const InvestmentPanel: React.FC<InvestmentPanelProps> = ({ config }) => {
   const isQuickCommand = (text: string): string | null => {
     let cmd = text.trim().toLowerCase();
     if (cmd.startsWith('/')) cmd = cmd.substring(1);
-    if (['scan', 'hot', 'market', 'vdt', 'accum', 'break'].includes(cmd)) return cmd;
+    if (['scan', 'hot', 'market', 'vdt', 'accum', 'break', 'sync', 'update'].includes(cmd)) return cmd;
     return null;
   };
 
@@ -206,21 +207,28 @@ const InvestmentPanel: React.FC<InvestmentPanelProps> = ({ config }) => {
       const quickCmd = isQuickCommand(userText);
 
       if (quickCmd) {
-        // Quick command: scan market
-        setScanProgress('Đang quét thị trường...');
-        const cmdUpper = quickCmd.toUpperCase() as any;
-        const result = await scanMarket(cmdUpper, (msg) => {
-          setScanProgress(msg);
-        });
-        setScanProgress('');
+        // Quick command: scan or sync
+        if (quickCmd === 'sync' || quickCmd === 'update') {
+          setIsLoading(true);
+          await syncMarketToFirebase(TOP_TICKERS, (msg) => setScanProgress(msg));
+          setIsLoading(false);
+          setScanProgress('');
+          response = '✅ Dữ liệu thị trường đã được cập nhật vào Firestore thành công. Bây giờ bạn có thể dùng lệnh /SCAN để phân tích.';
+        } else {
+          setScanProgress('Đang quét thị trường...');
+          const cmdUpper = quickCmd.toUpperCase() as any;
+          const result = await scanMarket(cmdUpper, (msg) => {
+            setScanProgress(msg);
+          });
+          setScanProgress('');
 
-        const dataText = formatScanResultForAI(result, cmdUpper);
-        const history = getOptimizedHistory();
-        history.push({ role: 'user', content: `${SCAN_PROMPT}\n\n${dataText}` });
-        
-        // Gọi AI, yêu cầu ngắn gọn cực độ
-        response = await sendToAI(history, SYSTEM_PROMPT + '\nTRẢ LỜI NGẮN GỌN TỐI ĐA 400 TỪ.');
-
+          const dataText = formatScanResultForAI(result, cmdUpper);
+          const history = getOptimizedHistory();
+          history.push({ role: 'user', content: `${SCAN_PROMPT}\n\n${dataText}` });
+          
+          // Gọi AI, yêu cầu ngắn gọn cực độ
+          response = await sendToAI(history, SYSTEM_PROMPT + '\nTRẢ LỜI NGẮN GỌN TỐI ĐA 400 TỪ.');
+        }
       } else if (isStockTicker(userText.toUpperCase())) {
         // Stock ticker analysis
         const ticker = userText.toUpperCase();
@@ -576,7 +584,19 @@ YÊU CẦU: KHÔNG ĐƯỢC TỰ BỊA SỐ LIỆU VNINDEX KHÁC VỚI DỮ LI�
               <span>STATUS: <span className="text-green-400">[ONLINE]</span></span>
               <span>ENC: AES-256</span>
               {scanProgress && <span className="text-cyan-400 animate-pulse">{scanProgress}</span>}
-              <div className="ml-auto flex gap-2 relative">
+              <div className="ml-auto flex items-center gap-3 relative">
+                <button 
+                  onClick={() => {
+                    setIsLoading(true);
+                    syncMarketToFirebase(TOP_TICKERS, (msg) => setScanProgress(msg))
+                      .then(() => { setIsLoading(false); setScanProgress(''); });
+                  }}
+                  className="flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 transition-colors text-[10px] font-mono uppercase bg-cyan-500/10 px-2 py-1 rounded"
+                >
+                  <RefreshCcw size={10} className={isLoading ? 'animate-spin' : ''} />
+                  SYNC DATA
+                </button>
+
                 <button 
                   onClick={() => setShowPurgeMenu(!showPurgeMenu)} 
                   className="text-gray-600 hover:text-red-400 transition-colors text-[10px] font-mono uppercase focus:outline-none"
@@ -630,7 +650,7 @@ YÊU CẦU: KHÔNG ĐƯỢC TỰ BỊA SỐ LIỆU VNINDEX KHÁC VỚI DỮ LI�
 
             {/* Quick commands */}
             <div className="px-4 py-2 border-t border-cyan-500/10 flex flex-wrap gap-2 shrink-0">
-              {['SCAN', 'HOT', 'MARKET', 'VDT', 'ACCUM', 'BREAK'].map(cmd => (
+              {['SCAN', 'HOT', 'MARKET', 'VDT', 'ACCUM', 'BREAK', 'SYNC'].map(cmd => (
                 <button
                   key={cmd}
                   onClick={() => { setInput(`/${cmd}`); handleSend(); }}
@@ -650,10 +670,22 @@ YÊU CẦU: KHÔNG ĐƯỢC TỰ BỊA SỐ LIỆU VNINDEX KHÁC VỚI DỮ LI�
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                  placeholder="Enter command..."
+                  placeholder="Enter command (e.g. /scan, /sync)..."
                   className="flex-1 bg-transparent border-none text-gray-200 font-mono text-sm outline-none placeholder:text-gray-700"
                   disabled={isLoading}
                 />
+                <button
+                  onClick={() => {
+                    setIsLoading(true);
+                    syncMarketToFirebase(TOP_TICKERS, (msg) => setScanProgress(msg))
+                      .then(() => { setIsLoading(false); setScanProgress(''); });
+                  }}
+                  className="text-cyan-600 hover:text-cyan-400 transition-colors p-1"
+                  title="Đồng bộ dữ liệu thị trường vào Firestore"
+                  disabled={isLoading}
+                >
+                  <RefreshCcw size={16} className={isLoading ? 'animate-spin' : ''} />
+                </button>
                 <button
                   onClick={handleSend}
                   disabled={!input.trim() || isLoading}

@@ -3,17 +3,30 @@ import { getStockData } from './marketDataService';
 import { scanVDT } from './vdtScanner';
 import { scanAccumulation } from './accumulationScanner';
 import { scanBreakout } from './breakoutScanner';
+import { firebaseService } from './firebaseService';
 
-// Danh sách top ~80 mã thanh khoản cao trên HOSE
-const TOP_TICKERS = [
-  'VNM','VCB','BID','CTG','TCB','MBB','VPB','HPG','HSG','NKG',
-  'SSI','VND','VCI','HCM','SHS','FPT','MWG','PNJ','FRT','DGW',
-  'VHM','NVL','DIG','DXG','KDH','NLG','GAS','PVD','PVS','BSR',
-  'PLX','VCG','HHV','LCG','C4G','FCN','KSB','ACB','SHB','STB',
-  'EIB','MSN','VRE','PDR','VIC','SAB','REE','POW','NT2','PPC',
-  'GMD','VTP','HAH','VOS','ANV','ASM','BCM','DPM','DCM','GVR',
-  'PHR','SBT','HAG','LPB','OCB','TPB','HDG','PC1','GEX','CMG',
-  'TLH','SMC','POM','IJC','IDC','CEO','HQC','SCR','TCH','TIG'
+// Danh sách ~250 mã thanh khoản cao (HOSE, HNX, UPCOM)
+export const TOP_TICKERS = [
+  // Ngân hàng
+  'VCB','BID','CTG','TCB','MBB','VPB','ACB','HDB','STB','SHB','TPB','MSB','LPB','VIB','EIB','OCB','BAB','BVB','NAB','VBB','ABB','SSB','SGB',
+  // Thép & Khai khoáng
+  'HPG','HSG','NKG','TLH','SMC','POM','VGS','TVN','KSA','KSH','NBC','THT','TVD',
+  // Chứng khoán
+  'SSI','VND','VCI','HCM','SHS','MBS','FTS','BSI','CTS','AGR','VIX','ORS','TVS','BVS','SBS','VDS','WSS','VIG','APS','TCI','APG','IVS',
+  // Bất động sản & Xây dựng
+  'VHM','VIC','VRE','NVL','PDR','DIG','DXG','NLG','KDH','CEO','IDC','KBC','SZC','ITA','HQC','SCR','LDG','DXS','HDC','QCG','TDH','CEO','L14','L18','IDJ','NTC','SIP','D2D','TIP','LHG','VGC','VCG','HHV','LCG','C4G','FCN','KSB','TCD','HT1','BCC','VCS','PTB','NNC','DHA','IJC','BCM','AGG','HDG','VPH','GVR','PHR','DPR','TRC','DRI',
+  // Công nghệ & Bán lẻ
+  'FPT','MWG','PNJ','FRT','DGW','PET','CTR','VGI','VTP','CMG','ELC','ITD','SGT','ABC',
+  // Năng lượng (Dầu khí, Điện)
+  'GAS','PVD','PVS','BSR','PLX','OIL','PVT','PVP','PVB','PVC','POW','NT2','PC1','TV2','QTP','HND','PPC','VSH','GEG','TTA','BCG',
+  // Hàng tiêu dùng & Thực phẩm
+  'VNM','MSN','SAB','BHN','VCF','QNS','SBT','LSS','SLS','DBC','BAF','VHC','ANV','IDI','PAN','MPC','FMC','CMX','GIL','MSH','TNG','VGT','TCM','STK','MML','MCH','VEA','TLP','SCS','ACV','NAS','VOS','HAH','GMD','SKG',
+  // Phân bón & Hóa chất
+  'DGC','DPM','DCM','LAS','BFC','DDV','CSV','HVT','TVN',
+  // Dược phẩm
+  'DHG','TRA','IMP','DMC','DHT','DVN','AMV','JVC',
+  // Cao su & Gỗ & Khác
+  'GVR','PHR','DPR','TRC','DRI','PTB','SAV','TTF','MSH','HT1','BCC','VCS','BMI','BVH','PGI','MIG','VNR'
 ];
 
 export interface MarketScanResult {
@@ -50,60 +63,46 @@ export async function scanMarket(
   command: ScanCommandType = 'SCAN',
   onProgress?: (msg: string) => void
 ): Promise<MarketScanResult> {
-  const results: StockData[] = [];
+  const allValidStocks: StockData[] = [];
+  const batchSize = 10; // Quét song song 10 mã mỗi đợt để tránh bị block và tăng tốc
   
-  if (onProgress) onProgress(`Scanning ${TOP_TICKERS.length} symbols...`);
+  if (onProgress) onProgress(`Starting deep scan for ${TOP_TICKERS.length} symbols...`);
   
-  for (let i = 0; i < TOP_TICKERS.length; i++) {
-    const symbol = TOP_TICKERS[i];
+  for (let i = 0; i < TOP_TICKERS.length; i += batchSize) {
+    const batch = TOP_TICKERS.slice(i, i + batchSize);
     
-    // Step 1: Fetch market data
-    if (onProgress && i % 10 === 0) onProgress(`Fetching data & applying rules: ${i}/${TOP_TICKERS.length}...`);
+    if (onProgress) onProgress(`Fetching Data from Firebase: Batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(TOP_TICKERS.length / batchSize)}...`);
     
-    const bars = await getStockData(symbol);
-    
-    if (!bars || bars.length === 0) {
-      // Step 3: Bỏ qua khi không có data
-      // Không cần log riêng từng mã rỗng để tránh làm tràn terminal
-      continue;
-    }
-
-    const latest = bars[bars.length - 1];
-    const previous = bars.length > 1 ? bars[bars.length - 2] : latest;
-    
-    // Tính các chỉ số cơ bản cho StockData interface
-    const volumes20 = bars.slice(-20).map(b => b.volume);
-    const avgVolume20d = volumes20.length > 0 ? volumes20.reduce((a, b) => a + b, 0) / volumes20.length : 1;
-    const price = latest.close;
-    const prevClose = previous.close;
-    const changePercent = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
-    const volume = latest.volume;
-    const volumeRatio = avgVolume20d > 0 ? volume / avgVolume20d : 0;
-
-    const stockData: StockData = {
-      symbol,
-      price,
-      changePercent: Math.round(changePercent * 100) / 100,
-      volume,
-      avgVolume20d: Math.round(avgVolume20d),
-      foreignBuySell: 0,
-      marketCap: 0,
-      volumeRatio: Math.round(volumeRatio * 100) / 100,
-      historical: {
-        close: bars.map(b => b.close),
-        volume: bars.map(b => b.volume),
-        high: bars.map(b => b.high),
-        low: bars.map(b => b.low)
+    const batchPromises = batch.map(async (symbol) => {
+      // Step 5: Đọc dữ liệu từ Firestore trước
+      const marketData = await firebaseService.getMarketData(symbol);
+      
+      if (!marketData || !marketData.historical) {
+        return null;
       }
-    };
 
-    results.push(stockData);
+      const stock: StockData = {
+        symbol: marketData.symbol || symbol,
+        price: marketData.price || 0,
+        changePercent: Math.round(((marketData.price - (marketData.historical.close[marketData.historical.close.length - 2] || marketData.price)) / (marketData.historical.close[marketData.historical.close.length - 2] || marketData.price)) * 100 * 100) / 100,
+        volume: marketData.volume || 0,
+        avgVolume20d: Math.round(marketData.historical.volume.slice(-20).reduce((a: number, b: number) => a + b, 0) / 20),
+        foreignBuySell: 0,
+        marketCap: 0,
+        volumeRatio: Math.round((marketData.volume / (marketData.historical.volume.slice(-20).reduce((a: number, b: number) => a + b, 0) / 20)) * 100) / 100,
+        historical: marketData.historical
+      };
+      return stock;
+    });
+
+    const batchResults = await Promise.all(batchPromises);
+    for (const s of batchResults) {
+      if (s) allValidStocks.push(s);
+    }
   }
 
-  if (onProgress) onProgress(`Applying complex rules to ${results.length} valid stocks...`);
-
-  if (results.length === 0) {
-    if (onProgress) onProgress("No market data available");
+  if (allValidStocks.length === 0) {
+    if (onProgress) onProgress("Chưa có dữ liệu thị trường. Vui lòng bấm Cập nhật dữ liệu.");
     return {
       topAbnormal: [],
       strongestAccumulation: null,
@@ -111,7 +110,9 @@ export async function scanMarket(
     };
   }
 
-  const scoredResults = results.map(s => {
+  if (onProgress) onProgress(`Filtering ${allValidStocks.length} stocks using AI rules...`);
+
+  const scoredResults = allValidStocks.map(s => {
     const isVDT = scanVDT(s);
     const isAccum = scanAccumulation(s);
     const isBreakout = scanBreakout(s);
