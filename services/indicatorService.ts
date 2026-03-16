@@ -4,7 +4,7 @@
  * Tính Simple Moving Average (SMA)
  */
 export function calculateSMA(data: number[], period: number): number | null {
-  if (!data || data.length < period) return null;
+  if (!data || data.length < period || period <= 0) return null;
   const slice = data.slice(-period);
   const sum = slice.reduce((a, b) => a + b, 0);
   return sum / period;

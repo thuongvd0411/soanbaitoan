@@ -1,9 +1,9 @@
 import { getStockData } from './marketDataService';
 import { firebaseService } from './firebaseService';
-import { STOCK_UNIVERSE } from '../data/stockUniverse';
+import { UNIQUE_STOCK_UNIVERSE as STOCK_UNIVERSE } from '../data/stockUniverse';
 
 /**
- * Đồng bộ dữ liệu của một mã cổ phiếu vào Firestore (Snapshot + History)
+ * Đồng bộ dữ liệu của một mã cổ phiếu vào Firestore (Snapshot + Array History)
  */
 export async function syncStockToFirebase(symbol: string): Promise<boolean> {
   try {
@@ -16,7 +16,7 @@ export async function syncStockToFirebase(symbol: string): Promise<boolean> {
 
     const latest = bars[bars.length - 1];
     
-    // 1. Cập nhật market_data snapshot (loại bỏ historical để nhẹ DB)
+    // 1. Cập nhật market_data snapshot
     const marketDataSnapshot = {
       symbol: symbol.toUpperCase(),
       price: latest.close || 0,
@@ -28,26 +28,17 @@ export async function syncStockToFirebase(symbol: string): Promise<boolean> {
     };
     await firebaseService.updateMarketData(symbol, marketDataSnapshot);
 
-    // 2. Cập nhật market_history cho tất cả các phiên lấy được (batch update)
-    // Để tối ưu, chúng ta có thể chỉ update phiên mới nhất, nhưng để đảm bảo đủ 250 phiên 
-    // trong lần đầu chạy, chúng ta xử lý mảng bars.
-    // LƯU Ý: syncMarketToFirebase sẽ gọi sync cho từng mã.
-    
-    // Chỉ lưu 250 phiên gần nhất vào Firestore để tránh quá tải
-    const relevantBars = bars.slice(-250);
-    
-    const historyPromises = relevantBars.map(bar => {
-      const dateKey = bar.date.split('T')[0]; // Format: YYYY-MM-DD
-      return firebaseService.updateMarketHistory(symbol, dateKey, {
-        open: bar.open,
-        high: bar.high,
-        low: bar.low,
-        close: bar.close,
-        volume: bar.volume
-      });
-    });
+    // 2. Cập nhật market_history DẠNG MẢNG (Array) - Tối đa 250 phiên
+    const historyArray = bars.slice(-250).map(bar => ({
+      open: bar.open,
+      high: bar.high,
+      low: bar.low,
+      close: bar.close,
+      volume: bar.volume,
+      date: bar.date.split('T')[0]
+    }));
 
-    await Promise.all(historyPromises);
+    await firebaseService.updateMarketHistoryArray(symbol, historyArray);
     return true;
   } catch (error) {
     console.error(`[UpdateMarketData] Error syncing ${symbol}:`, error);
@@ -56,25 +47,24 @@ export async function syncStockToFirebase(symbol: string): Promise<boolean> {
 }
 
 /**
- * Đồng bộ toàn bộ Stock Universe vào Firestore
+ * Đồng bộ toàn bộ Stock Universe vào Firestore (Optimized)
  */
 export async function syncMarketToFirebase(onProgress?: (msg: string) => void): Promise<void> {
-  const batchSize = 5; // Giảm batch size để tránh overload Firestore write rát quá
+  const batchSize = 10; // Tăng lên 10 vì chỉ tốn 2 request/mã
   const tickers = STOCK_UNIVERSE;
   
-  if (onProgress) onProgress(`Bắt đầu đồng bộ ${tickers.length} mã vào Firestore...`);
+  if (onProgress) onProgress(`Bắt đầu đồng bộ ${tickers.length} mã (Cấu trúc tối ưu Array)...`);
 
   for (let i = 0; i < tickers.length; i += batchSize) {
     const batch = tickers.slice(i, i + batchSize);
-    if (onProgress) onProgress(`Đang đồng bộ Batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(tickers.length / batchSize)}...`);
+    if (onProgress) onProgress(`Batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(tickers.length / batchSize)}...`);
     
-    const promises = batch.map(ticker => syncStockToFirebase(ticker));
-    await Promise.all(promises);
+    // Xử lý song song trong batch
+    await Promise.all(batch.map(ticker => syncStockToFirebase(ticker)));
     
-    // Nghỉ 200ms giữa các batch
-    await new Promise(r => setTimeout(r, 200));
+    // Nghỉ nhẹ 100ms
+    await new Promise(r => setTimeout(r, 100));
   }
   
-  if (onProgress) onProgress(`✅ Hoàn tất đồng bộ dữ liệu vào Firestore.`);
+  if (onProgress) onProgress(`✅ Hoàn tất đồng bộ thần tốc vào Firestore.`);
 }
-

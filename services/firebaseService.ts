@@ -655,39 +655,39 @@ export const firebaseService = {
     },
 
     /**
-     * Cập nhật dữ liệu lịch sử (OHLC) vào Firestore
-     * Cấu trúc: market_history/{symbol}/daily/{date}
+     * Cập nhật dữ liệu lịch sử (OHLC) vào Firestore DẠNG MẢNG (ARRAY)
+     * Cấu trúc mới: market_history/{symbol} -> { history: [...] }
+     * Ưu điểm: Chỉ mất 1 lần Write thay vì 250 lần. Quét cũng chỉ mất 1 lần Read.
      */
-    async updateMarketHistory(symbol: string, date: string, data: any): Promise<void> {
-        if (!symbol || !date || !data) return;
+    async updateMarketHistoryArray(symbol: string, historyData: any[]): Promise<void> {
+        if (!symbol || !historyData || historyData.length === 0) return;
         try {
-            // date format: YYYY-MM-DD
-            const docRef = doc(db, 'market_history', symbol.toUpperCase(), 'daily', date);
+            const docRef = doc(db, 'market_history', symbol.toUpperCase());
             await setDoc(docRef, {
-                ...data,
+                history: historyData,
                 updatedAt: new Date().toISOString()
             }, { merge: true });
         } catch (error) {
-            console.error(`Firebase updateMarketHistory error for ${symbol} on ${date}:`, error);
-            // Không throw để tránh dừng cả quá trình sync hàng loạt
+            console.error(`Firebase updateMarketHistoryArray error for ${symbol}:`, error);
         }
     },
 
     /**
-     * Lấy dữ liệu lịch sử N phiên gần nhất
+     * Lấy dữ liệu lịch sử N phiên gần nhất (Từ document duy nhất)
      */
     async getMarketHistory(symbol: string, limitCount: number = 250): Promise<any[]> {
         if (!symbol) return [];
         try {
-            const collRef = collection(db, 'market_history', symbol.toUpperCase(), 'daily');
-            const q = query(collRef, orderBy('__name__', 'desc'), limit(limitCount));
-            const querySnapshot = await getDocs(q);
-            const results: any[] = [];
-            querySnapshot.forEach((doc) => {
-                results.push(doc.data());
-            });
-            // Trả về mảng sắp xếp theo thời gian tăng dần (cũ đến mới)
-            return results.reverse();
+            const docRef = doc(db, 'market_history', symbol.toUpperCase());
+            const docSnap = await getDoc(docRef);
+            
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                const history = data.history || [];
+                // Trả về N phiên gần nhất (history thường đã theo trật tự thời gian)
+                return history.slice(-limitCount);
+            }
+            return [];
         } catch (error) {
             console.error(`Firebase getMarketHistory error for ${symbol}:`, error);
             return [];

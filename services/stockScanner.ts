@@ -54,7 +54,7 @@ export async function runFullMarketScan(command: string = 'SCAN'): Promise<ScanR
       let score = 0;
 
       // Rule: VCP / Xu hướng tăng (Stage 2)
-      if (latestPrice > ma150 && latestPrice > ma200 && ma150 > ma200 && rsi > 40) {
+      if (ma150 && ma200 && latestPrice > ma150 && latestPrice > ma200 && ma150 > ma200 && rsi > 40) {
         patterns.push('VCP/Uptrend');
         score += 40;
       }
