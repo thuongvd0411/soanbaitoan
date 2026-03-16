@@ -1,5 +1,5 @@
-// services/marketScanner.ts — Quét toàn bộ thị trường, kết hợp các Scanner
-import { StockData, fetchStockData } from './stockScanner';
+import { StockData } from './stockScanner';
+import { getStockData } from './marketDataService';
 import { scanVDT } from './vdtScanner';
 import { scanAccumulation } from './accumulationScanner';
 import { scanBreakout } from './breakoutScanner';
@@ -48,21 +48,67 @@ function calculateMoneyFlowScore(stock: StockData, isVDT: boolean, isAccum: bool
 
 export async function scanMarket(
   command: ScanCommandType = 'SCAN',
-  onProgress?: (current: number, total: number) => void
+  onProgress?: (msg: string) => void
 ): Promise<MarketScanResult> {
   const results: StockData[] = [];
-  const batchSize = 5; 
   
-  for (let i = 0; i < TOP_TICKERS.length; i += batchSize) {
-    const batch = TOP_TICKERS.slice(i, i + batchSize);
-    const promises = batch.map(ticker => fetchStockData(ticker));
-    const batchResults = await Promise.all(promises);
+  if (onProgress) onProgress(`Scanning ${TOP_TICKERS.length} symbols...`);
+  
+  for (let i = 0; i < TOP_TICKERS.length; i++) {
+    const symbol = TOP_TICKERS[i];
     
-    for (const data of batchResults) {
-      if (data && data.historical.close.length > 0) results.push(data);
+    // Step 1: Fetch market data
+    if (onProgress && i % 10 === 0) onProgress(`Fetching data & applying rules: ${i}/${TOP_TICKERS.length}...`);
+    
+    const bars = await getStockData(symbol);
+    
+    if (!bars || bars.length === 0) {
+      // Step 3: Bỏ qua khi không có data
+      // Không cần log riêng từng mã rỗng để tránh làm tràn terminal
+      continue;
     }
+
+    const latest = bars[bars.length - 1];
+    const previous = bars.length > 1 ? bars[bars.length - 2] : latest;
     
-    if (onProgress) onProgress(Math.min(i + batchSize, TOP_TICKERS.length), TOP_TICKERS.length);
+    // Tính các chỉ số cơ bản cho StockData interface
+    const volumes20 = bars.slice(-20).map(b => b.volume);
+    const avgVolume20d = volumes20.length > 0 ? volumes20.reduce((a, b) => a + b, 0) / volumes20.length : 1;
+    const price = latest.close;
+    const prevClose = previous.close;
+    const changePercent = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
+    const volume = latest.volume;
+    const volumeRatio = avgVolume20d > 0 ? volume / avgVolume20d : 0;
+
+    const stockData: StockData = {
+      symbol,
+      price,
+      changePercent: Math.round(changePercent * 100) / 100,
+      volume,
+      avgVolume20d: Math.round(avgVolume20d),
+      foreignBuySell: 0,
+      marketCap: 0,
+      volumeRatio: Math.round(volumeRatio * 100) / 100,
+      historical: {
+        close: bars.map(b => b.close),
+        volume: bars.map(b => b.volume),
+        high: bars.map(b => b.high),
+        low: bars.map(b => b.low)
+      }
+    };
+
+    results.push(stockData);
+  }
+
+  if (onProgress) onProgress(`Applying complex rules to ${results.length} valid stocks...`);
+
+  if (results.length === 0) {
+    if (onProgress) onProgress("No market data available");
+    return {
+      topAbnormal: [],
+      strongestAccumulation: null,
+      scanTime: new Date().toLocaleTimeString('vi-VN')
+    };
   }
 
   const scoredResults = results.map(s => {

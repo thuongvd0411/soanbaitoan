@@ -209,8 +209,8 @@ const InvestmentPanel: React.FC<InvestmentPanelProps> = ({ config }) => {
         // Quick command: scan market
         setScanProgress('Đang quét thị trường...');
         const cmdUpper = quickCmd.toUpperCase() as any;
-        const result = await scanMarket(cmdUpper, (current, total) => {
-          setScanProgress(`Đang quét ${current}/${total} mã...`);
+        const result = await scanMarket(cmdUpper, (msg) => {
+          setScanProgress(msg);
         });
         setScanProgress('');
 
@@ -405,7 +405,7 @@ FORMAT BẮT BUỘC:
         : 'Không lấy được dữ liệu Index thời gian thực.';
 
       const prompt = `Hôm nay là ${dateStr}. ${indexText}
-Hãy tạo báo cáo vĩ mô thị trường chứng khoán Việt Nam gồm các mục sau (Sử dụng cấu trúc [COLLAPSE: Tiêu đề] Nội dung [ENDCOLLAPSE] cho các phần 1, 2, 5):
+Hãy tạo báo cáo vĩ mô thị trường chứng khoán Việt Nam gồm các mục sau (SỬ DỤNG CẤU TRÚC [COLLAPSE: Tiêu đề] Nội dung [ENDCOLLAPSE] CHO CÁC PHẦN 1, 2, 6, 7):
 
 [COLLAPSE: 1. Tóm tắt bối cảnh kinh tế]
 (Nội dung tóm tắt dựa trên số liệu thực tế VNINDEX đã cung cấp)
@@ -418,12 +418,15 @@ Hãy tạo báo cáo vĩ mô thị trường chứng khoán Việt Nam gồm cá
 3. Nhóm ngành tích cực 1-3 tháng tới
 4. 5 mã cổ phiếu đáng chú ý (giá <= 60.000 VND)
 
-[COLLAPSE: 5. Nhóm ngành cần thận trọng]
-(Nội dung các ngành rủi ro)
+5. Nhóm ngành cần thận trọng
+
+[COLLAPSE: 6. Chiến lược gợi ý]
+(Nội dung chiến lược)
 [ENDCOLLAPSE]
 
-6. Chiến lược gợi ý
-7. Tự phản biện
+[COLLAPSE: 7. Tự phản biện]
+(Nội dung phản biện)
+[ENDCOLLAPSE]
 
 YÊU CẦU: KHÔNG ĐƯỢC TỰ BỊA SỐ LIỆU VNINDEX KHÁC VỚI DỮ LIỆU ĐÃ CUNG CẤP. Viết bằng Markdown, chuyên sâu.`;
 
