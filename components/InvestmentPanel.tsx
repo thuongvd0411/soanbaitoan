@@ -39,7 +39,9 @@ Bạn đồng thời là một Giáo sư kinh tế học có tầm nhìn vĩ mô
 - Tập trung vào diễn biến thị trường hiện tại và dự báo trong 3 tháng tới.
 - Khả năng tìm kiếm, tổng hợp và thống kê số liệu từ các nguồn uy tín: Cafef, Vietstock, VnEconomy, Bloomberg VN...
 - Trả lời chuyên sâu, có tính phản biện và thực tế.
-- Phong cách: Đẳng cấp, trí tuệ, điềm tĩnh nhưng quyết đoán.
+- Phong cách: Đẳng cấp, trí tài trí, điềm tĩnh nhưng quyết đoán.
+
+DỮ LIỆU THỊ TRƯỜNG: Hệ thống sẽ cung cấp dữ liệu VNINDEX mới nhất trong nội dung câu hỏi. Bạn PHẢI sử dụng dữ liệu này để trả lời các câu hỏi về giá trị chỉ số hiện tại, thay vì trả lời rằng mình không có dữ liệu thời gian thực.
 
 TUYỆT ĐỐI KHÔNG CHÀO HỎI rườm rà. Hãy đi thẳng vào vấn đề. Sử dụng Markdown để trình bày số liệu và bảng biểu.`;
 
@@ -119,6 +121,15 @@ const InvestmentPanel: React.FC<InvestmentPanelProps> = ({ config }) => {
     if (config.openaiApiKey) aiRouter.setOpenAIKey(config.openaiApiKey);
   }, [config.primaryApiKey, config.secondaryApiKey, config.selectedKeyMode, config.openaiApiKey]);
 
+  // Function to refresh market index data
+  const refreshMarketContext = useCallback(async () => {
+    const dateStr = new Date().toLocaleDateString('vi-VN');
+    const indexData = await fetchIndexData('VNINDEX');
+    if (indexData) {
+      setMarketContext(`[DỮ LIỆU THỊ TRƯỜNG THỰC TẾ - CẬP NHẬT ${new Date().toLocaleTimeString('vi-VN')} ${dateStr}]: VNINDEX hiện tại đạt ${indexData.value?.toLocaleString('vi-VN')} điểm, biến động ${indexData.change > 0 ? '+' : ''}${indexData.change} (${indexData.percentChange}%).`);
+    }
+  }, []);
+
   // Load chat history from Firebase
   useEffect(() => {
     const loadHistory = async () => {
@@ -134,14 +145,11 @@ const InvestmentPanel: React.FC<InvestmentPanelProps> = ({ config }) => {
       const savedNews = await firebaseService.getNewsReport(dateStr);
       if (savedNews) setNewsResult(savedNews);
 
-      // Lấy dữ liệu Index để làm Context cho AI
-      const indexData = await fetchIndexData('VNINDEX');
-      if (indexData) {
-        setMarketContext(`Dữ liệu thị trường hiện tại (${dateStr}): VNINDEX ${indexData.value.toLocaleString('vi-VN')} điểm, biến động ${indexData.change > 0 ? '+' : ''}${indexData.change} (${indexData.percentChange}%).`);
-      }
+      // Lấy dữ liệu Index ban đầu
+      await refreshMarketContext();
     };
     loadHistory();
-  }, [userId]);
+  }, [userId, refreshMarketContext]);
 
   // Save chat history
   useEffect(() => {
@@ -258,9 +266,11 @@ const InvestmentPanel: React.FC<InvestmentPanelProps> = ({ config }) => {
         }
 
       } else {
-        // Normal chat
+        // Normal chat - Always refresh context for the most accurate data
+        await refreshMarketContext();
+        
         const history = getOptimizedHistory();
-        const userPromptWithContext = (!isExpertMode && marketContext)
+        const userPromptWithContext = marketContext 
           ? `${marketContext}\n\nCâu hỏi: ${userText}`
           : userText;
         history.push({ role: 'user', content: userPromptWithContext });
