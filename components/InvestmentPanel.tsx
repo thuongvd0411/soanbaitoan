@@ -21,17 +21,14 @@ interface InvestmentPanelProps {
   config: AppState;
 }
 
-const SYSTEM_PROMPT = `Bạn là Alla – chuyên gia phân tích tài chính và giáo sư kinh tế.
-Bạn giúp nhà đầu tư cá nhân phân tích cổ phiếu Việt Nam.
+const SYSTEM_PROMPT = `Bạn là Robot Quét Dữ Liệu Thị Trường (SCAN MODE).
+Nhiệm vụ: Cung cấp thông số kỹ thuật, biến động giá và khối lượng một cách khô khan, chính xác nhất.
 
-Nhiệm vụ:
-* phát hiện dòng tiền lớn
-* đánh giá động lượng ngắn hạn
-* phát hiện volume bất thường
-* phân tích rủi ro
-
-TUYỆT ĐỐI KHÔNG CHÀO HỎI, KHÔNG DẪC DẮT. HÃY ĐI THẲNG VÀO KẾT QUẢ.
-Trả lời ngắn gọn, rõ ràng, dựa trên dữ liệu. Sử dụng Markdown formatting.`;
+QUY TẮC:
+- Không chào hỏi, không xưng tên.
+- Chỉ tập trung vào dữ liệu và chỉ báo (RSI, MA, Volume).
+- Trả lời cực kỳ ngắn gọn, chủ yếu bằng bảng biểu hoặc danh sách gạch đầu dòng.
+- Không tư vấn chiến lược, chỉ báo cáo thực trạng dữ liệu.`;
 
 const EXPERT_SYSTEM_PROMPT = `Bạn là Alla – Chuyên gia phân tích chứng khoán Việt Nam và các tài sản tài chính như vàng, bạc, bất động sản. 
 Bạn đồng thời là một Giáo sư kinh tế học có tầm nhìn vĩ mô sâu sắc.
@@ -252,18 +249,28 @@ const InvestmentPanel: React.FC<InvestmentPanelProps> = ({ config }) => {
           response = await sendToAI(history, SYSTEM_PROMPT + '\nTRẢ LỜI NGẮN GỌN TỐI ĐA 400 TỪ.');
         }
       } else if (isStockTicker(userText.toUpperCase())) {
-        // Stock ticker analysis
+        // Stock ticker analysis - Always use DIRECT fetch
         const ticker = userText.toUpperCase();
-        setScanProgress(`Đang lấy dữ liệu ${ticker}...`);
-        const stockData = await fetchStockData(ticker);
+        setScanProgress(`Đang lấy dữ liệu thực tế ${ticker}...`);
+        const bars = await getStockData(ticker);
         setScanProgress('');
-
-        if (stockData) {
-          const dataText = formatStockDataForAI(stockData);
-          const prompt = `${STOCK_ANALYSIS_PROMPT}\n\nDữ liệu thị trường:\n${dataText}\n\nPhân tích dòng tiền, động lượng và rủi ro ngắn hạn của cổ phiếu ${ticker}.`;
-          response = await sendToAI([{ role: 'user', content: prompt }], SYSTEM_PROMPT);
+        
+        if (bars && bars.length > 0) {
+          const latest = bars[bars.length - 1];
+          const recentBars = bars.slice(-5).map(b => `${b.date.split('T')[0]}: ${b.close}`).join('|');
+          const dataText = `Mã: ${ticker}, Giá: ${latest.close}k, Vol: ${latest.volume.toLocaleString()}. Lịch sử 5 phiên: ${recentBars}`;
+          
+          if (isExpertMode) {
+            // Alla talks about the stock
+            const prompt = `Dữ liệu ${ticker}: ${dataText}\n\nAnh muốn nhờ em phân tích mã này dựa trên tầm nhìn vĩ mô và tình hình hiện tại.`;
+            response = await sendToAI([{ role: 'user', content: prompt }], EXPERT_SYSTEM_PROMPT);
+          } else {
+            // Robotic scanner analysis
+            const prompt = `${STOCK_ANALYSIS_PROMPT}\n\nDữ liệu thị trường:\n${dataText}\n\nPhân tích kỹ thuật mã ${ticker}.`;
+            response = await sendToAI([{ role: 'user', content: prompt }], SYSTEM_PROMPT);
+          }
         } else {
-          response = `Không thể lấy dữ liệu cho mã ${ticker}. Vui lòng kiểm tra lại mã cổ phiếu.`;
+          response = `Không thể kết nối lấy dữ liệu thực tế cho mã ${ticker} lúc này. Anh vui lòng kiểm tra lại proxy hoặc thử lại sau nhé.`;
         }
 
       } else {
