@@ -2573,8 +2573,8 @@ export default function App() {
         </div>
       )}
 
-      {/* ALLA CHATBOT ASSISTANT - Nút nổi chỉ hiện khi đã có đề bài để tránh trùng lặp */}
-      {!isViewerMode && (
+      {/* ALLA CHATBOT ASSISTANT - Nút nổi chỉ hiện ở tab Soạn bài để tránh che khuất chức năng khác */}
+      {!isViewerMode && activeTab === 'main' && (
         <>
           <button 
             onClick={() => setIsChatOpen(!isChatOpen)}
