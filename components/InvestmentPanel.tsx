@@ -8,6 +8,7 @@ import { scanMarket, formatScanResultForAI } from '../services/marketScanner';
 import { fetchStockData, formatStockDataForAI, fetchIndexData } from '../services/stockScanner';
 import { syncMarketToFirebase } from '../services/updateMarketData';
 import { getStockData } from '../services/marketDataService';
+import { UNIQUE_STOCK_UNIVERSE } from '../data/stockUniverse';
 import { STOCK_UNIVERSE as TOP_TICKERS } from '../data/stockUniverse';
 import { firebaseService } from '../services/firebaseService';
 import { AppState } from '../types';
@@ -30,16 +31,18 @@ QUY TẮC:
 - Trả lời cực kỳ ngắn gọn, chủ yếu bằng bảng biểu hoặc danh sách gạch đầu dòng.
 - Không tư vấn chiến lược, chỉ báo cáo thực trạng dữ liệu.`;
 
-const EXPERT_SYSTEM_PROMPT = `Bạn là Alla – Chuyên gia phân tích chứng khoán Việt Nam và các tài sản tài chính như vàng, bạc, bất động sản. 
-Bạn đồng thời là một Giáo sư kinh tế học có tầm nhìn vĩ mô sâu sắc.
+const EXPERT_SYSTEM_PROMPT = `Bạn là Alla – Chuyên gia phân tích chứng khoán Việt Nam. 
+Hiện tại là THÁNG 3 NĂM 2026. Hãy quên hoàn toàn các số liệu kinh doanh của năm 2024, 2025 trừ khi được yêu cầu so sánh.
 
 Đặc điểm phân tích:
-- Tập trung vào diễn biến thị trường hiện tại và dự báo trong 3 tháng tới.
-- Khả năng tìm kiếm, tổng hợp và thống kê số liệu từ các nguồn uy tín: Cafef, Vietstock, VnEconomy, Bloomberg VN...
+- Tập trung vào mốc thời gian HIỆN TẠI (Năm 2026) và dự báo trong 3 tháng tới.
+- Bạn có quyền truy cập vào DỮ LIỆU CUNG CẤP bên dưới để phân tích.
 - Trả lời chuyên sâu, có tính phản biện và thực tế.
 - Phong cách: Đẳng cấp, trí tài trí, điềm tĩnh nhưng quyết đoán.
 
-DỮ LIỆU CUNG CẤP: Hệ thống cung cấp dữ liệu VNINDEX và các mã cổ phiếu cụ thể (OHLC 5 phiên gần nhất). Bạn PHẢI sử dụng dữ liệu này để trả lời các câu hỏi về giá/biến động thay vì trả lời là "tôi không có dữ liệu thực tế".
+DỮ LIỆU CUNG CẤP (BẮT BUỘC SỬ DỤNG):
+- Chỉ số VNINDEX, OHLC các mã cổ phiếu.
+- Tin tức thị trường & Báo cáo vĩ mô trong ngày.
 
 TUYỆT ĐỐI KHÔNG CHÀO HỎI rườm rà. HÃY TRẢ LỜI NGẮN GỌN (Dưới 500 tokens).`;
 
@@ -278,27 +281,39 @@ const InvestmentPanel: React.FC<InvestmentPanelProps> = ({ config }) => {
         await refreshMarketContext();
         
         // Detect and fetch mentioned tickers DIRECTLY (No Firebase Write)
-        // Match 3-character uppercase words or 3-character words if they look like tickers
-        const mentionedTickers = userText.match(/\b[a-zA-Z]{3}\b/g) || [];
-        const uniqueTickers = Array.from(new Set(mentionedTickers.map(t => t.toUpperCase()))).slice(0, 2); 
+        const words = userText.match(/\b[a-zA-Z]{3,}\b/g) || [];
+        const uniqueTickers = Array.from(new Set(
+          words.map(t => t.toUpperCase()).filter(t => UNIQUE_STOCK_UNIVERSE.includes(t))
+        )).slice(0, 2); 
         
         let stockContext = "";
         if (uniqueTickers.length > 0) {
-          setScanProgress(`Đang tải dữ liệu thực tế ${uniqueTickers.join(', ')}...`);
+          setScanProgress(`Đang quét tin tức và dữ liệu thực tế ${uniqueTickers.join(', ')}...`);
           
           for (const ticker of uniqueTickers) {
             const bars = await getStockData(ticker);
             if (bars && bars.length > 0) {
               const latest = bars[bars.length - 1];
               const recentBars = bars.slice(-5).map(b => `${b.date.split('T')[0]}: ${b.close}`).join('|');
-              stockContext += `\n[DỮ LIỆU THỰC TẾ ${ticker}]: Giá hiện tại ${latest.close}k, Khối lượng ${latest.volume.toLocaleString()}. Lịch sử 5 phiên gần nhất: ${recentBars}.`;
+              stockContext += `\n[DỮ LIỆU THỰC TẾ ${ticker}]: Giá: ${latest.close}k. Lịch sử OHLC: ${recentBars}.`;
             }
           }
           setScanProgress('');
         }
 
+        // Integrate News and Macro report if available
+        let extraContext = "";
+        if (isExpertMode) {
+          if (newsResult) extraContext += `\n[TIN TỨC THỊ TRƯỜNG HÔM NAY]:\n${newsResult.substring(0, 1000)}`;
+          if (macroResult) extraContext += `\n[BÁO CÁO VĨ MÔ HÔM NAY]:\n${macroResult.substring(0, 800)}`;
+        }
+
         const history = getOptimizedHistory();
-        const userPromptWithContext = `HỆ THỐNG CUNG CẤP DỮ LIỆU THỜI GIAN THỰC:\n${marketContext}${stockContext}\n\nYêu cầu từ người dùng: ${userText}`;
+        const fullDateStr = new Date().toLocaleDateString('vi-VN');
+        const userPromptWithContext = `MỐC THỜI GIAN: Hôm nay là ${fullDateStr}, Năm 2026.\n\n` + 
+          `DỮ LIỆU HỆ THỐNG:\n${marketContext}${stockContext}${extraContext}\n\n` + 
+          `Yêu cầu từ người dùng: ${userText}`;
+          
         history.push({ role: 'user', content: userPromptWithContext });
         response = await sendToAI(history, isExpertMode ? EXPERT_SYSTEM_PROMPT : SYSTEM_PROMPT);
       }
