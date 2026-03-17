@@ -39,7 +39,7 @@ Bạn đồng thời là một Giáo sư kinh tế học có tầm nhìn vĩ mô
 - Trả lời chuyên sâu, có tính phản biện và thực tế.
 - Phong cách: Đẳng cấp, trí tài trí, điềm tĩnh nhưng quyết đoán.
 
-DỮ LIỆU THỊ TRƯỜNG: Hệ thống cung cấp dữ liệu VNINDEX và các mã cổ phiếu cụ thể (OHLC 5 phiên gần nhất). Bạn PHẢI sử dụng dữ liệu này để trả lời.
+DỮ LIỆU CUNG CẤP: Hệ thống cung cấp dữ liệu VNINDEX và các mã cổ phiếu cụ thể (OHLC 5 phiên gần nhất). Bạn PHẢI sử dụng dữ liệu này để trả lời các câu hỏi về giá/biến động thay vì trả lời là "tôi không có dữ liệu thực tế".
 
 TUYỆT ĐỐI KHÔNG CHÀO HỎI rườm rà. HÃY TRẢ LỜI NGẮN GỌN (Dưới 500 tokens).`;
 
@@ -278,8 +278,9 @@ const InvestmentPanel: React.FC<InvestmentPanelProps> = ({ config }) => {
         await refreshMarketContext();
         
         // Detect and fetch mentioned tickers DIRECTLY (No Firebase Write)
-        const mentionedTickers = userText.match(/\b[A-Z]{3,}\b/g) || [];
-        const uniqueTickers = Array.from(new Set(mentionedTickers)).slice(0, 2); // Limit to 2 tickers to save tokens
+        // Match 3-character uppercase words or 3-character words if they look like tickers
+        const mentionedTickers = userText.match(/\b[a-zA-Z]{3}\b/g) || [];
+        const uniqueTickers = Array.from(new Set(mentionedTickers.map(t => t.toUpperCase()))).slice(0, 2); 
         
         let stockContext = "";
         if (uniqueTickers.length > 0) {
@@ -289,16 +290,15 @@ const InvestmentPanel: React.FC<InvestmentPanelProps> = ({ config }) => {
             const bars = await getStockData(ticker);
             if (bars && bars.length > 0) {
               const latest = bars[bars.length - 1];
-              // Format OHLC of last 5 sessions for context (under 500 tokens)
               const recentBars = bars.slice(-5).map(b => `${b.date.split('T')[0]}: ${b.close}`).join('|');
-              stockContext += `\n[LIVE ${ticker}]: Giá: ${latest.close}k, Vol: ${latest.volume.toLocaleString()}. Lịch sử 5 phiên: ${recentBars}.`;
+              stockContext += `\n[DỮ LIỆU THỰC TẾ ${ticker}]: Giá hiện tại ${latest.close}k, Khối lượng ${latest.volume.toLocaleString()}. Lịch sử 5 phiên gần nhất: ${recentBars}.`;
             }
           }
           setScanProgress('');
         }
 
         const history = getOptimizedHistory();
-        const userPromptWithContext = `${marketContext}${stockContext}\n\nCâu hỏi: ${userText}`;
+        const userPromptWithContext = `HỆ THỐNG CUNG CẤP DỮ LIỆU THỜI GIAN THỰC:\n${marketContext}${stockContext}\n\nYêu cầu từ người dùng: ${userText}`;
         history.push({ role: 'user', content: userPromptWithContext });
         response = await sendToAI(history, isExpertMode ? EXPERT_SYSTEM_PROMPT : SYSTEM_PROMPT);
       }
