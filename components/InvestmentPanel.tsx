@@ -7,6 +7,7 @@ import { AIModelType, ChatMessage } from '../services/ai/aiProvider';
 import { scanMarket, formatScanResultForAI } from '../services/marketScanner';
 import { fetchStockData, formatStockDataForAI, fetchIndexData } from '../services/stockScanner';
 import { syncMarketToFirebase } from '../services/updateMarketData';
+import { getStockData } from '../services/marketDataService';
 import { STOCK_UNIVERSE as TOP_TICKERS } from '../data/stockUniverse';
 import { firebaseService } from '../services/firebaseService';
 import { AppState } from '../types';
@@ -41,9 +42,9 @@ Bạn đồng thời là một Giáo sư kinh tế học có tầm nhìn vĩ mô
 - Trả lời chuyên sâu, có tính phản biện và thực tế.
 - Phong cách: Đẳng cấp, trí tài trí, điềm tĩnh nhưng quyết đoán.
 
-DỮ LIỆU THỊ TRƯỜNG: Hệ thống sẽ cung cấp dữ liệu VNINDEX mới nhất trong nội dung câu hỏi. Bạn PHẢI sử dụng dữ liệu này để trả lời các câu hỏi về giá trị chỉ số hiện tại, thay vì trả lời rằng mình không có dữ liệu thời gian thực.
+DỮ LIỆU THỊ TRƯỜNG: Hệ thống cung cấp dữ liệu VNINDEX và các mã cổ phiếu cụ thể (OHLC 5 phiên gần nhất). Bạn PHẢI sử dụng dữ liệu này để trả lời.
 
-TUYỆT ĐỐI KHÔNG CHÀO HỎI rườm rà. Hãy đi thẳng vào vấn đề. Sử dụng Markdown để trình bày số liệu và bảng biểu.`;
+TUYỆT ĐỐI KHÔNG CHÀO HỎI rườm rà. HÃY TRẢ LỜI NGẮN GỌN (Dưới 500 tokens).`;
 
 const STOCK_ANALYSIS_PROMPT = `Bạn là một trader có kinh nghiệm đang đánh giá nhanh cổ phiếu cho chiến lược swing 1–3 tháng.
 
@@ -269,10 +270,28 @@ const InvestmentPanel: React.FC<InvestmentPanelProps> = ({ config }) => {
         // Normal chat - Always refresh context for the most accurate data
         await refreshMarketContext();
         
+        // Detect and fetch mentioned tickers DIRECTLY (No Firebase Write)
+        const mentionedTickers = userText.match(/\b[A-Z]{3,}\b/g) || [];
+        const uniqueTickers = Array.from(new Set(mentionedTickers)).slice(0, 2); // Limit to 2 tickers to save tokens
+        
+        let stockContext = "";
+        if (uniqueTickers.length > 0) {
+          setScanProgress(`Đang tải dữ liệu thực tế ${uniqueTickers.join(', ')}...`);
+          
+          for (const ticker of uniqueTickers) {
+            const bars = await getStockData(ticker);
+            if (bars && bars.length > 0) {
+              const latest = bars[bars.length - 1];
+              // Format OHLC of last 5 sessions for context (under 500 tokens)
+              const recentBars = bars.slice(-5).map(b => `${b.date.split('T')[0]}: ${b.close}`).join('|');
+              stockContext += `\n[LIVE ${ticker}]: Giá: ${latest.close}k, Vol: ${latest.volume.toLocaleString()}. Lịch sử 5 phiên: ${recentBars}.`;
+            }
+          }
+          setScanProgress('');
+        }
+
         const history = getOptimizedHistory();
-        const userPromptWithContext = marketContext 
-          ? `${marketContext}\n\nCâu hỏi: ${userText}`
-          : userText;
+        const userPromptWithContext = `${marketContext}${stockContext}\n\nCâu hỏi: ${userText}`;
         history.push({ role: 'user', content: userPromptWithContext });
         response = await sendToAI(history, isExpertMode ? EXPERT_SYSTEM_PROMPT : SYSTEM_PROMPT);
       }
