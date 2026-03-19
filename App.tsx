@@ -965,8 +965,8 @@ export default function App() {
     primaryApiKey: localStorage.getItem('math_app_primary_api_key') || '',
     secondaryApiKey: localStorage.getItem('math_app_secondary_api_key') || '',
     openaiApiKey: localStorage.getItem('math_app_openai_api_key') || '',
-    openclawApiKey: localStorage.getItem('math_app_openclaw_api_key') || 'sk-openclaw-token',
-    openclawUrl: localStorage.getItem('math_app_openclaw_url') || 'https://public-cows-sing.loca.lt/v1',
+    openclawApiKey: localStorage.getItem('math_app_openclaw_api_key') || '684555a8e838303994fccd60f654e6e71bd13c71c31f5c9c',
+    openclawUrl: localStorage.getItem('math_app_openclaw_url') || 'https://mathai-service.loca.lt/v1',
     selectedKeyMode: (localStorage.getItem('math_app_selected_key_mode') as 'system' | 'primary' | 'secondary') || 'system'
   });
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -1253,10 +1253,18 @@ export default function App() {
     // Khởi tạo/Cập nhật OpenClaw URL nếu đang ở mặc định cũ (Tránh lỗi Mixed Content trên Web)
     const currentOpenClawUrl = localStorage.getItem('math_app_openclaw_url');
     const oldDefault = 'http://localhost:1337/v1';
-    const newDefault = 'https://public-cows-sing.loca.lt/v1';
-    if (!currentOpenClawUrl || currentOpenClawUrl === oldDefault) {
+    const oldDefault2 = 'https://public-cows-sing.loca.lt/v1';
+    const newDefault = 'https://mathai-service.loca.lt/v1';
+    const currentOpenClawKey = localStorage.getItem('math_app_openclaw_api_key');
+    const defaultKey = '684555a8e838303994fccd60f654e6e71bd13c71c31f5c9c';
+
+    if (!currentOpenClawUrl || currentOpenClawUrl === oldDefault || currentOpenClawUrl === oldDefault2) {
       localStorage.setItem('math_app_openclaw_url', newDefault);
       setConfig(prev => ({ ...prev, openclawUrl: newDefault }));
+    }
+    if (!currentOpenClawKey || currentOpenClawKey === 'sk-openclaw-token' || currentOpenClawKey === '') {
+      localStorage.setItem('math_app_openclaw_api_key', defaultKey);
+      setConfig(prev => ({ ...prev, openclawApiKey: defaultKey }));
     }
 
     // Load Custom API Key
