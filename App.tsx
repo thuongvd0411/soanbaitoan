@@ -26,6 +26,7 @@ import { onSnapshot, doc } from 'firebase/firestore';
 import { db } from './services/firebaseService';
 import { Student, StudyRecord, Schedule } from './types';
 import ChatbotPanel from './components/ChatbotPanel';
+import { aiRouter } from './services/ai/aiRouter';
 
 
 const APP_VERSION = "v5.4.8";
@@ -1269,6 +1270,15 @@ export default function App() {
       setConfig(prev => ({ ...prev, openclawApiKey: defaultKey }));
     }
 
+    // Đồng bộ aiRouter
+    if (newDefault && defaultKey) {
+      aiRouter.setOpenClawConfig(localStorage.getItem('math_app_openclaw_url') || newDefault, localStorage.getItem('math_app_openclaw_api_key') || defaultKey);
+    }
+    const env = (import.meta as any).env || {};
+    const geminiKey = (config.selectedKeyMode === 'primary' ? config.primaryApiKey : config.secondaryApiKey) || env.VITE_GEMINI_API_KEY;
+    if (geminiKey) aiRouter.setGeminiKey(geminiKey);
+    if (config.openaiApiKey) aiRouter.setOpenAIKey(config.openaiApiKey);
+
     // Load Custom API Key
     const savedKey = localStorage.getItem('math_app_custom_api_key');
     if (savedKey) {
@@ -1295,7 +1305,7 @@ export default function App() {
           // NEW: Nếu đề có gán cho học sinh cụ thể, tự động điền tên từ hệ thống quản lý
           if (data.config?.assignedStudentId) {
             firebaseService.getManagementStudents().then(allStudents => {
-              const student = allStudents.find(s => s.id === data.config.assignedStudentId);
+              const student = allStudents.find(s => s.id === (data.config as any).assignedStudentId);
               if (student) {
                 setStudentName(student.fullName);
                 setStudentClass(student.className || `Lớp ${data.config.grade || 12}`);

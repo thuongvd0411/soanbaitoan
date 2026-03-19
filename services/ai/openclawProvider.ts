@@ -6,7 +6,7 @@ export class OpenClawProvider implements AIProvider {
   private baseUrl: string;
   private apiKey: string;
 
-  constructor(baseUrl: string = 'http://localhost:1337/v1', apiKey: string = 'open-claw-key') {
+  constructor(baseUrl: string = 'https://047fbf02aaaa93a0-14-177-42-188.serveousercontent.com/v1', apiKey: string = '684555a8e838303994fccd60f654e6e71bd13c71c31f5c9c') {
     this.baseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
     this.apiKey = apiKey;
   }

@@ -120,7 +120,10 @@ const InvestmentPanel: React.FC<InvestmentPanelProps> = ({ config }) => {
     
     if (geminiKey) aiRouter.setGeminiKey(geminiKey);
     if (config.openaiApiKey) aiRouter.setOpenAIKey(config.openaiApiKey);
-  }, [config.primaryApiKey, config.secondaryApiKey, config.selectedKeyMode, config.openaiApiKey]);
+    if (config.openclawUrl && config.openclawApiKey) {
+      aiRouter.setOpenClawConfig(config.openclawUrl, config.openclawApiKey);
+    }
+  }, [config.primaryApiKey, config.secondaryApiKey, config.selectedKeyMode, config.openaiApiKey, config.openclawUrl, config.openclawApiKey]);
 
   // Function to refresh market index data
   const refreshMarketContext = useCallback(async () => {
@@ -291,7 +294,7 @@ const InvestmentPanel: React.FC<InvestmentPanelProps> = ({ config }) => {
           setScanProgress(`Đang quét tin tức và dữ liệu thực tế ${uniqueTickers.join(', ')}...`);
           
           for (const ticker of uniqueTickers) {
-            const bars = await getStockData(ticker);
+            const bars = await getStockData(ticker) as any[];
             if (bars && bars.length > 0) {
               const latest = bars[bars.length - 1];
               const recentBars = bars.slice(-5).map(b => `${b.date.split('T')[0]}: ${b.close}`).join('|');
