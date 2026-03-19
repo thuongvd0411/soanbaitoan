@@ -965,8 +965,8 @@ export default function App() {
     primaryApiKey: localStorage.getItem('math_app_primary_api_key') || '',
     secondaryApiKey: localStorage.getItem('math_app_secondary_api_key') || '',
     openaiApiKey: localStorage.getItem('math_app_openai_api_key') || '',
-    openclawApiKey: localStorage.getItem('math_app_openclaw_api_key') || 'open-claw-key',
-    openclawUrl: localStorage.getItem('math_app_openclaw_url') || 'http://localhost:1337/v1',
+    openclawApiKey: localStorage.getItem('math_app_openclaw_api_key') || 'sk-openclaw-token',
+    openclawUrl: localStorage.getItem('math_app_openclaw_url') || 'https://public-cows-sing.loca.lt/v1',
     selectedKeyMode: (localStorage.getItem('math_app_selected_key_mode') as 'system' | 'primary' | 'secondary') || 'system'
   });
   const [questions, setQuestions] = useState<Question[]>([]);
