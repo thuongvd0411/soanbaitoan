@@ -702,30 +702,30 @@ const Sidebar = ({
             )}
           </div>
 
-          <div className="mb-6 flex bg-gray-100 p-1 rounded-2xl border border-gray-200 shadow-inner">
+          <div className="mb-6 grid grid-cols-2 gap-2">
             <button
               onClick={() => setActiveTab('main')}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'main' ? 'bg-white text-primary shadow-lg border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
+              className={`flex items-center justify-center gap-2 py-3.5 rounded-2xl text-xs font-black uppercase transition-all duration-300 ${activeTab === 'main' ? 'bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-lg shadow-blue-500/25 scale-[1.02]' : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600 border border-gray-200'}`}
             >
-              <PlusCircle size={14} /> Soạn bài
+              <PlusCircle size={16} /> Soạn bài
             </button>
             <button
               onClick={() => setActiveTab('edu')}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'edu' ? 'bg-white text-indigo-600 shadow-lg border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
+              className={`flex items-center justify-center gap-2 py-3.5 rounded-2xl text-xs font-black uppercase transition-all duration-300 ${activeTab === 'edu' ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/25 scale-[1.02]' : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600 border border-gray-200'}`}
             >
-              <Users size={14} /> Lớp học
+              <Users size={16} /> Lớp học
             </button>
             <button
               onClick={() => setActiveTab('invest')}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'invest' ? 'bg-[#0a0f19] text-cyan-400 shadow-[0_0_10px_rgba(0,240,255,0.3)] border border-cyan-500/30' : 'text-gray-400 hover:text-gray-600'}`}
+              className={`flex items-center justify-center gap-2 py-3.5 rounded-2xl text-xs font-black uppercase transition-all duration-300 ${activeTab === 'invest' ? 'bg-gradient-to-br from-[#0a0f19] to-[#0d1b2a] text-cyan-400 shadow-lg shadow-cyan-500/20 ring-1 ring-cyan-500/40 scale-[1.02]' : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600 border border-gray-200'}`}
             >
-              <TrendingUp size={14} /> AI Đầu tư
+              <TrendingUp size={16} /> AI Đầu tư
             </button>
             <button
               onClick={() => setActiveTab('openclaw')}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'openclaw' ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-gray-600'}`}
+              className={`flex items-center justify-center gap-2 py-3.5 rounded-2xl text-xs font-black uppercase transition-all duration-300 ${activeTab === 'openclaw' ? 'bg-gradient-to-br from-blue-500 to-blue-700 text-white shadow-lg shadow-blue-500/25 scale-[1.02]' : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600 border border-gray-200'}`}
             >
-              <Sparkles size={14} /> OpenClaw
+              <Sparkles size={16} /> OpenClaw
             </button>
           </div>
 
@@ -798,33 +798,34 @@ const Sidebar = ({
               <p className="text-[10px] font-black text-purple-700 uppercase mb-3 tracking-tighter italic">Ai Là Triệu Phú Toán Học</p>
               <button onClick={() => { onStartGame(); onClose(); }} disabled={isLoading} className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-black py-3 rounded-xl shadow-lg active:scale-95 transition-all text-[10px] uppercase border-b-4 border-indigo-800">BẮT ĐẦU CHƠI</button>
             </div>
-          </div>
-          <div className="mt-8 space-y-3">
-            <button
-              onClick={() => { onVoiceCompose(); onClose(); }}
-              disabled={isLoading || isListening}
-              className={`w-full py-4 rounded-xl flex items-center justify-center gap-3 font-black uppercase text-sm transition-all shadow-lg mb-3 ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:scale-105 active:scale-95'}`}
-            >
-              {isListening ? <MicOff size={22} /> : <Mic size={22} />}
-              {isListening ? 'Alla Đang Nghe...' : 'Soạn bằng Giọng nói'}
-            </button>
 
-            <button onClick={() => { onGenerate(); onClose(); }} disabled={isLoading} className="w-full bg-primary hover:bg-blue-800 text-white font-black py-4 rounded-xl shadow-xl flex items-center justify-center gap-2 uppercase tracking-tight transition-all border-b-4 border-blue-900"> {isLoading ? <Loader2 className="animate-spin" /> : <PlusCircle size={22} />} Soạn bộ câu hỏi AI </button>
+            <div className="mt-8 space-y-3">
+              <button
+                onClick={() => { onVoiceCompose(); onClose(); }}
+                disabled={isLoading || isListening}
+                className={`w-full py-4 rounded-xl flex items-center justify-center gap-3 font-black uppercase text-sm transition-all shadow-lg mb-3 ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:scale-105 active:scale-95'}`}
+              >
+                {isListening ? <MicOff size={22} /> : <Mic size={22} />}
+                {isListening ? 'Alla Đang Nghe...' : 'Soạn bằng Giọng nói'}
+              </button>
 
-            <button
-              onClick={() => { onSync(); }}
-              disabled={isSyncing}
-              className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 font-black py-3 rounded-xl flex items-center justify-center gap-2 uppercase text-[10px] transition-all border border-blue-100"
-            >
-              <Cloud className={isSyncing ? "animate-pulse" : ""} size={18} />
-              {isSyncing ? "Đang đồng bộ..." : "Đồng bộ đám mây"}
-            </button>
+              <button onClick={() => { onGenerate(); onClose(); }} disabled={isLoading} className="w-full bg-primary hover:bg-blue-800 text-white font-black py-4 rounded-xl shadow-xl flex items-center justify-center gap-2 uppercase tracking-tight transition-all border-b-4 border-blue-900"> {isLoading ? <Loader2 className="animate-spin" /> : <PlusCircle size={22} />} Soạn bộ câu hỏi AI </button>
 
-            <div className="flex gap-2"> <button onClick={onShowHistory} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2.5 rounded-xl text-[10px] uppercase flex items-center justify-center gap-1 transition-colors"><History size={14} /> Lịch sử</button> <button onClick={onShowBank} className="flex-1 bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold py-2.5 rounded-xl text-[10px] border border-amber-200 uppercase flex items-center justify-center gap-1 transition-colors"><Database size={14} /> Kho lưu</button> </div>
-            <button onClick={onShowStats} className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-black py-3 rounded-xl flex items-center justify-center gap-2 uppercase text-[10px] transition-all border border-indigo-100">
-              <Trophy size={18} />
-              Thống kê điểm số
-            </button>
+              <button
+                onClick={() => { onSync(); }}
+                disabled={isSyncing}
+                className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 font-black py-3 rounded-xl flex items-center justify-center gap-2 uppercase text-[10px] transition-all border border-blue-100"
+              >
+                <Cloud className={isSyncing ? "animate-pulse" : ""} size={18} />
+                {isSyncing ? "Đang đồng bộ..." : "Đồng bộ đám mây"}
+              </button>
+
+              <div className="flex gap-2"> <button onClick={onShowHistory} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2.5 rounded-xl text-[10px] uppercase flex items-center justify-center gap-1 transition-colors"><History size={14} /> Lịch sử</button> <button onClick={onShowBank} className="flex-1 bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold py-2.5 rounded-xl text-[10px] border border-amber-200 uppercase flex items-center justify-center gap-1 transition-colors"><Database size={14} /> Kho lưu</button> </div>
+              <button onClick={onShowStats} className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-black py-3 rounded-xl flex items-center justify-center gap-2 uppercase text-[10px] transition-all border border-indigo-100">
+                <Trophy size={18} />
+                Thống kê điểm số
+              </button>
+            </div>
           </div>
         </div>
         {!isViewerMode && activeTab === 'edu' && (
@@ -835,13 +836,6 @@ const Sidebar = ({
                 <span className="font-black text-[10px] uppercase tracking-tighter">Công cụ lớp học</span>
               </div>
               <div className="grid grid-cols-1 gap-3">
-                <button
-                  onClick={() => { setHideValues(!hideValues); onClose(); }}
-                  className="w-full flex items-center justify-between p-3 bg-white rounded-xl border border-indigo-200 text-indigo-700 font-bold text-[10px] uppercase shadow-sm active:scale-95 transition-all"
-                >
-                  {hideValues ? 'Hiện số dư/học phí' : 'Ẩn số dư/học phí'}
-                  <DollarSign size={14} />
-                </button>
                 <button
                   onClick={() => { setSelectedStudentId(null); onClose(); }}
                   className="w-full flex items-center justify-between p-3 bg-white rounded-xl border border-indigo-200 text-indigo-700 font-bold text-[10px] uppercase shadow-sm active:scale-95 transition-all"
@@ -2031,7 +2025,7 @@ export default function App() {
                   onAddRecord={() => setIsAddingRecord(true)}
                 />
 
-                <RevenueBreakdown students={students} hideValues={hideValues} />
+                <RevenueBreakdown students={students} hideValues={hideValues} onToggleHideValues={() => setHideValues(!hideValues)} />
 
                 <StudentList
                   students={students || []}

@@ -1,13 +1,15 @@
 import React, { useState, useMemo } from 'react';
 import { Student, StudyRecord, Schedule } from '../types';
 import { calculateMonthlyStats, formatCurrency, formatDate } from '../utils/helpers';
+import { Eye, EyeOff } from 'lucide-react';
 
 interface Props {
     students: Student[];
     hideValues: boolean;
+    onToggleHideValues?: () => void;
 }
 
-const RevenueBreakdown: React.FC<Props> = ({ students, hideValues }) => {
+const RevenueBreakdown: React.FC<Props> = ({ students, hideValues, onToggleHideValues }) => {
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [isExpanded, setIsExpanded] = useState(false);
@@ -65,6 +67,15 @@ const RevenueBreakdown: React.FC<Props> = ({ students, hideValues }) => {
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>
                         </div>
                         <h2 className="text-lg md:text-xl font-black text-slate-800 uppercase tracking-tight">Doanh Thu Tạm Tính</h2>
+                        {onToggleHideValues && (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onToggleHideValues(); }}
+                                className="ml-2 p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition-all"
+                                title={hideValues ? 'Hiện số dư' : 'Ẩn số dư'}
+                            >
+                                {hideValues ? <EyeOff size={16} /> : <Eye size={16} />}
+                            </button>
+                        )}
                     </div>
                     <p className="text-xs font-bold text-slate-500 uppercase tracking-widest pl-13">Tháng {selectedMonth + 1} / {selectedYear}</p>
                 </div>

@@ -1,3 +1,4 @@
+// TODO: Sửa lỗi AI Đầu tư — đang chờ xử lý (Issue #4)
 // components/InvestmentPanel.tsx — Trợ lý Đầu Tư AI (Cyberpunk Terminal)
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
