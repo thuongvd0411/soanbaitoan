@@ -95,10 +95,27 @@ export const OpenClawChat: React.FC = () => {
     }
   };
 
+  const sanitizeUrl = (url: string) => {
+    let clean = url.trim();
+    if (!clean) return clean;
+    if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
+      clean = 'https://' + clean;
+    }
+    // Remote trailing slashes
+    clean = clean.replace(/\/+$/, '');
+    // Ensure /v1
+    if (!clean.endsWith('/v1')) {
+      clean = clean + '/v1';
+    }
+    return clean;
+  };
+
   const handleUpdateConfig = () => {
-    localStorage.setItem('math_app_openclaw_url', openclawUrl);
+    const finalUrl = sanitizeUrl(openclawUrl);
+    setOpenclawUrl(finalUrl);
+    localStorage.setItem('math_app_openclaw_url', finalUrl);
     localStorage.setItem('math_app_openclaw_api_key', openclawKey);
-    aiRouter.setOpenClawConfig(openclawUrl, openclawKey);
+    aiRouter.setOpenClawConfig(finalUrl, openclawKey);
     checkConnection();
     setShowConfig(false);
   };

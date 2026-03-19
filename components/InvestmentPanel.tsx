@@ -111,6 +111,65 @@ const InvestmentPanel: React.FC<InvestmentPanelProps> = ({ config }) => {
   const [macroResult, setMacroResult] = useState('');
   const [marketContext, setMarketContext] = useState<string>('');
 
+  // Owned Portfolio states
+  const [ownedStocks, setOwnedStocks] = useState<string[]>([]);
+  const [ownedStockInput, setOwnedStockInput] = useState('');
+  const [ownedPortfolioResult, setOwnedPortfolioResult] = useState('');
+
+  // Load owned stocks
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('math_app_owned_stocks');
+      if (saved) setOwnedStocks(JSON.parse(saved));
+    } catch (e) { console.error('Error loading owned stocks', e); }
+  }, []);
+
+  const addOwnedStock = () => {
+    const ticker = ownedStockInput.trim().toUpperCase();
+    if (!ticker || !/^[A-Z]{3}$/.test(ticker)) {
+      setOwnedStockInput('');
+      return;
+    }
+    if (!ownedStocks.includes(ticker)) {
+      const newList = [...ownedStocks, ticker];
+      setOwnedStocks(newList);
+      localStorage.setItem('math_app_owned_stocks', JSON.stringify(newList));
+    }
+    setOwnedStockInput('');
+  };
+
+  const removeOwnedStock = (ticker: string) => {
+    const newList = ownedStocks.filter(t => t !== ticker);
+    setOwnedStocks(newList);
+    localStorage.setItem('math_app_owned_stocks', JSON.stringify(newList));
+  };
+
+  const analyzeOwnedPortfolio = async () => {
+    if (ownedStocks.length === 0 || isLoading) return;
+    setIsLoading(true);
+    setOwnedPortfolioResult('');
+    setScanProgress('Đang tải dữ liệu danh mục...');
+    try {
+      let dataText = '';
+      for (const ticker of ownedStocks) {
+        const stockData = await fetchStockData(ticker);
+        if (stockData) {
+          dataText += `\n[${ticker}]:\n${formatStockDataForAI(stockData)}\n`;
+        }
+      }
+      setScanProgress('AI đang chấm điểm...');
+      const prompt = `Đây là danh mục cổ phiếu tôi đang sở hữu gồm các mã: ${ownedStocks.join(', ')}\n\nDữ liệu thị trường hiện tại của các mã này:\n${dataText}\n\nHãy chấm điểm từng mã trong danh mục này (thang điểm 1-10 về độ khỏe dòng tiền và xu hướng) và đưa ra lời khuyên ngắn gọn (Giữ / Cơ cấu bán / Canh mua thêm) dựa trên phân tích kỹ thuật.
+Yêu cầu trả lời dạng [COLLAPSE: Tên Mã] Nội dung [ENDCOLLAPSE].`;
+      const result = await sendToAI([{ role: 'user', content: prompt }], SYSTEM_PROMPT);
+      setOwnedPortfolioResult(result);
+    } catch (error: any) {
+      setOwnedPortfolioResult(`❌ Lỗi phân tích: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+      setScanProgress('');
+    }
+  };
+
   // Setup AI keys
   useEffect(() => {
     const env = (import.meta as any).env || {};
@@ -287,7 +346,7 @@ const InvestmentPanel: React.FC<InvestmentPanelProps> = ({ config }) => {
         // Detect and fetch mentioned tickers DIRECTLY (No Firebase Write)
         const words = userText.match(/\b[a-zA-Z]{3,}\b/g) || [];
         const uniqueTickers = Array.from(new Set(
-          words.map(t => t.toUpperCase()).filter(t => UNIQUE_STOCK_UNIVERSE.includes(t))
+          words.map(t => t.toUpperCase()).filter(t => UNIQUE_STOCK_UNIVERSE.includes(t as any))
         )).slice(0, 2); 
         
         let stockContext = "";
@@ -295,7 +354,7 @@ const InvestmentPanel: React.FC<InvestmentPanelProps> = ({ config }) => {
           setScanProgress(`Đang quét tin tức và dữ liệu thực tế ${uniqueTickers.join(', ')}...`);
           
           for (const ticker of uniqueTickers) {
-            const bars = await getStockData(ticker) as any[];
+            const bars = await getStockData(ticker as string) as any[];
             if (bars && bars.length > 0) {
               const latest = bars[bars.length - 1];
               const recentBars = bars.slice(-5).map(b => `${b.date.split('T')[0]}: ${b.close}`).join('|');
@@ -450,21 +509,42 @@ FORMAT BẮT BUỘC:
       ];
       let allNews: string[] = [];
 
+      const proxies = [
+        (url: string) => `https://falling-math-0dcf.antigravity.workers.dev/?url=${encodeURIComponent(url)}`,
+        (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+        (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`
+      ];
+
       for (const source of rssSources) {
-        try {
-          const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(source)}`;
-          const res = await fetch(proxyUrl);
-          const data = await res.json();
-          const parser = new DOMParser();
-          const xml = parser.parseFromString(data.contents, 'text/xml');
-          const items = xml.querySelectorAll('item');
-          for (let i = 0; i < Math.min(items.length, 5); i++) {
-            const title = items[i].querySelector('title')?.textContent || '';
-            const desc = (items[i].querySelector('description')?.textContent || '').replace(/<[^>]*>?/gm, '').trim();
-            const link = items[i].querySelector('link')?.textContent || '';
-            allNews.push(`- ${title}\n  ${desc}\n  Link: ${link}`);
+        for (const proxyFn of proxies) {
+          try {
+            const proxyUrl = proxyFn(source);
+            const res = await fetch(proxyUrl, { 
+              signal: (AbortSignal as any).timeout ? (AbortSignal as any).timeout(8000) : undefined 
+            });
+            if (!res.ok) continue;
+
+            const xmlText = await res.text();
+            if (!xmlText) continue;
+
+            const parser = new DOMParser();
+            const xml = parser.parseFromString(xmlText, 'text/xml');
+            const items = xml.querySelectorAll('item');
+            
+            // Nếu parse ra bị lỗi html (ví dụ proxy trả về trang block)
+            if (items.length === 0) continue;
+
+            for (let i = 0; i < Math.min(items.length, 5); i++) {
+              const title = items[i].querySelector('title')?.textContent || '';
+              const desc = (items[i].querySelector('description')?.textContent || '').replace(/<[^>]*>?/gm, '').trim();
+              const link = items[i].querySelector('link')?.textContent || '';
+              allNews.push(`- ${title}\n  ${desc}\n  Link: ${link}`);
+            }
+            break; // Parse thành công tin của trang này thì break vòng lặp proxy, qua trang rss tiếp theo
+          } catch (e) {
+            console.warn(`RSS proxy error for ${source}:`, e);
           }
-        } catch (e) { console.warn('RSS error:', e); }
+        }
       }
 
       if (allNews.length === 0) {
@@ -843,6 +923,62 @@ YÊU CẦU: KHÔNG ĐƯỢC TỰ BỊA SỐ LIỆU VNINDEX KHÁC VỚI DỮ LI�
                   ))}
                 </div>
               )}
+            </div>
+
+            {/* Danh mục Của Tôi */}
+            <div className="bg-[#0a0f19] border border-cyan-500/20 rounded p-4 relative overflow-hidden">
+               <div className="absolute top-0 left-0 w-1 h-full bg-purple-500"></div>
+               <h3 className="text-sm font-mono text-purple-400 uppercase mb-3 ml-2 flex items-center justify-between">
+                 <span>Cổ Phiếu Đang Sở Hữu</span>
+                 <span className="text-[10px] bg-purple-500/20 px-2 py-0.5 rounded text-purple-300">Tính năng theo dõi tự động</span>
+               </h3>
+               
+               <div className="flex gap-2 mb-3 pl-2">
+                 <input
+                   type="text"
+                   value={ownedStockInput}
+                   onChange={(e) => setOwnedStockInput(e.target.value.toUpperCase())}
+                   onKeyDown={(e) => e.key === 'Enter' && addOwnedStock()}
+                   placeholder="Nhập mã (VD: HPG)..."
+                   className="flex-1 max-w-[150px] bg-black/50 border border-purple-500/20 text-gray-200 font-mono text-sm px-3 py-1.5 rounded outline-none focus:border-purple-400 placeholder:text-gray-700"
+                 />
+                 <button
+                   onClick={addOwnedStock}
+                   disabled={!ownedStockInput.trim() || isLoading}
+                   className="px-3 py-1.5 border border-purple-500/50 text-purple-400 font-mono text-[10px] uppercase hover:bg-purple-500/20 transition-all disabled:opacity-30 rounded"
+                 >
+                   + Thêm
+                 </button>
+                 <button
+                   onClick={analyzeOwnedPortfolio}
+                   disabled={ownedStocks.length === 0 || isLoading}
+                   className="ml-auto px-4 py-1.5 bg-gradient-to-r from-purple-600 to-cyan-600 text-white font-mono text-[10px] uppercase hover:from-purple-500 hover:to-cyan-500 transition-all disabled:opacity-30 rounded shadow-[0_0_10px_rgba(168,85,247,0.4)]"
+                 >
+                   Chấm Điểm Danh Mục
+                 </button>
+               </div>
+
+               <div className="flex flex-wrap gap-2 mb-3 pl-2">
+                 {ownedStocks.length === 0 ? (
+                   <span className="text-xs font-mono text-gray-600 italic">Chưa có mã nào trong danh mục.</span>
+                 ) : (
+                   ownedStocks.map(ticker => (
+                     <div key={ticker} className="flex items-center gap-1 px-2 py-1 bg-purple-500/10 border border-purple-500/30 rounded">
+                       <span className="text-purple-300 font-bold font-mono text-xs">{ticker}</span>
+                       <button onClick={() => removeOwnedStock(ticker)} className="text-gray-500 hover:text-red-400 ml-1">
+                         <Trash2 size={12} />
+                       </button>
+                     </div>
+                   ))
+                 )}
+               </div>
+
+               {ownedPortfolioResult && (
+                 <div
+                   className="mt-3 bg-black/40 border border-purple-500/20 rounded p-4 text-sm font-mono text-purple-200 leading-relaxed ml-2"
+                   dangerouslySetInnerHTML={{ __html: renderContent(ownedPortfolioResult) }}
+                 />
+               )}
             </div>
 
             {/* Chấm điểm cổ phiếu */}
