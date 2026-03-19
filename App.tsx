@@ -966,7 +966,7 @@ export default function App() {
     secondaryApiKey: localStorage.getItem('math_app_secondary_api_key') || '',
     openaiApiKey: localStorage.getItem('math_app_openai_api_key') || '',
     openclawApiKey: localStorage.getItem('math_app_openclaw_api_key') || '684555a8e838303994fccd60f654e6e71bd13c71c31f5c9c',
-    openclawUrl: localStorage.getItem('math_app_openclaw_url') || 'https://mathai-service.loca.lt/v1',
+    openclawUrl: localStorage.getItem('math_app_openclaw_url') || 'https://5624104c555df7f9-14-177-42-188.serveousercontent.com/v1',
     selectedKeyMode: (localStorage.getItem('math_app_selected_key_mode') as 'system' | 'primary' | 'secondary') || 'system'
   });
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -1254,8 +1254,8 @@ export default function App() {
     const currentOpenClawUrl = localStorage.getItem('math_app_openclaw_url');
     const isHttpsSite = window.location.protocol === 'https:';
     const isLocalhostUrl = currentOpenClawUrl?.includes('localhost') || currentOpenClawUrl?.includes('127.0.0.1');
-    const oldDefaultHttps = 'https://public-cows-sing.loca.lt/v1';
-    const newDefault = 'https://mathai-service.loca.lt/v1';
+    const oldDefaultHttps = 'https://mathai-service.loca.lt/v1';
+    const newDefault = 'https://5624104c555df7f9-14-177-42-188.serveousercontent.com/v1';
     const currentOpenClawKey = localStorage.getItem('math_app_openclaw_api_key');
     const defaultKey = '684555a8e838303994fccd60f654e6e71bd13c71c31f5c9c';
 
