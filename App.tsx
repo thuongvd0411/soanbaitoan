@@ -1250,6 +1250,15 @@ export default function App() {
     const saved = localStorage.getItem('math_app_history');
     if (saved) setHistory(JSON.parse(saved));
 
+    // Khởi tạo/Cập nhật OpenClaw URL nếu đang ở mặc định cũ (Tránh lỗi Mixed Content trên Web)
+    const currentOpenClawUrl = localStorage.getItem('math_app_openclaw_url');
+    const oldDefault = 'http://localhost:1337/v1';
+    const newDefault = 'https://public-cows-sing.loca.lt/v1';
+    if (!currentOpenClawUrl || currentOpenClawUrl === oldDefault) {
+      localStorage.setItem('math_app_openclaw_url', newDefault);
+      setConfig(prev => ({ ...prev, openclawUrl: newDefault }));
+    }
+
     // Load Custom API Key
     const savedKey = localStorage.getItem('math_app_custom_api_key');
     if (savedKey) {
