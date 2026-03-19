@@ -26,6 +26,7 @@ import { onSnapshot, doc } from 'firebase/firestore';
 import { db } from './services/firebaseService';
 import { Student, StudyRecord, Schedule } from './types';
 import ChatbotPanel from './components/ChatbotPanel';
+import { OpenClawChat } from './components/OpenClawChat';
 import { aiRouter } from './services/ai/aiRouter';
 
 
@@ -491,8 +492,8 @@ interface SidebarProps {
   isSyncing: boolean;
   isOpen: boolean;
   onClose: () => void;
-  activeTab: 'main' | 'edu' | 'invest';
-  setActiveTab: (tab: 'main' | 'edu' | 'invest') => void;
+  activeTab: 'main' | 'edu' | 'invest' | 'openclaw';
+  setActiveTab: (tab: 'main' | 'edu' | 'invest' | 'openclaw') => void;
   hideValues: boolean;
   setHideValues: (v: boolean) => void;
   setSelectedStudentId: (id: string | null) => void;
@@ -719,6 +720,12 @@ const Sidebar = ({
               className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'invest' ? 'bg-[#0a0f19] text-cyan-400 shadow-[0_0_10px_rgba(0,240,255,0.3)] border border-cyan-500/30' : 'text-gray-400 hover:text-gray-600'}`}
             >
               <TrendingUp size={14} /> AI Đầu tư
+            </button>
+            <button
+              onClick={() => setActiveTab('openclaw')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${activeTab === 'openclaw' ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-400 hover:text-gray-600'}`}
+            >
+              <Sparkles size={14} /> OpenClaw
             </button>
           </div>
 
@@ -998,7 +1005,7 @@ export default function App() {
 
   // States cho Học sinh làm bài
   // --- QUẢN LÝ HỌC TẬP STATE ---
-  const [activeTab, setActiveTab] = useState<'main' | 'edu' | 'invest'>('main');
+  const [activeTab, setActiveTab] = useState<'main' | 'edu' | 'invest' | 'openclaw'>('main');
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [editingRecord, setEditingRecord] = useState<StudyRecord | null>(null);
@@ -1969,6 +1976,12 @@ export default function App() {
             >
               AI Đầu Tư
             </button>
+            <button
+              onClick={() => setActiveTab('openclaw')}
+              className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'openclaw' ? 'bg-white text-primary shadow-sm' : 'text-white/70'}`}
+            >
+              OpenClaw
+            </button>
           </div>
         )}
       </header>
@@ -1999,6 +2012,8 @@ export default function App() {
       <main className={`flex-1 overflow-y-auto h-screen relative no-print ${activeTab === 'invest' ? 'bg-[#05070a] p-0' : 'bg-gray-200/40 p-3 md:p-10'}`}>
         {activeTab === 'invest' ? (
           <InvestmentPanel config={config} />
+        ) : activeTab === 'openclaw' ? (
+          <OpenClawChat />
         ) : activeTab === 'edu' ? (
           <div className="max-w-7xl mx-auto w-full flex flex-col gap-8 animate-in fade-in duration-500">
             {/* PHẦN QUẢN LÝ HỌC TẬP - PORTED FROM quanlyhoc */}
