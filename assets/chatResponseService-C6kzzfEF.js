@@ -1,4 +1,4 @@
-import{chatAIService as a}from"./chatAIService-BsiPejI9.js";import"./index-Bqc08exA.js";const t={},s={async generateResponse(i,c,o){const h=`${i}_${c}`;if(t[h]&&Date.now()-t[h].timestamp<300*1e3)return t[h].response;const e=`
+import{chatAIService as a}from"./chatAIService-DWmTGNn5.js";import"./index-BF096RSL.js";const t={},s={async generateResponse(i,c,o){const h=`${i}_${c}`;if(t[h]&&Date.now()-t[h].timestamp<300*1e3)return t[h].response;const e=`
 BẠN LÀ: Alla Assistant - Quản lý hệ thống của anh Thưởng.
 NHIỆM VỤ: Báo cáo kết quả tìm kiếm dữ liệu dựa trên tóm tắt bên dưới.
 
