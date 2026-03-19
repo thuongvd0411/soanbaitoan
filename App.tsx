@@ -1250,15 +1250,17 @@ export default function App() {
     const saved = localStorage.getItem('math_app_history');
     if (saved) setHistory(JSON.parse(saved));
 
-    // Khởi tạo/Cập nhật OpenClaw URL nếu đang ở mặc định cũ (Tránh lỗi Mixed Content trên Web)
+    // Khởi tạo/Cập nhật OpenClaw URL nếu đang ở mặc định cũ hoặc bị lỗi Mixed Content (localhost trên site HTTPS)
     const currentOpenClawUrl = localStorage.getItem('math_app_openclaw_url');
-    const oldDefault = 'http://localhost:1337/v1';
-    const oldDefault2 = 'https://public-cows-sing.loca.lt/v1';
+    const isHttpsSite = window.location.protocol === 'https:';
+    const isLocalhostUrl = currentOpenClawUrl?.includes('localhost') || currentOpenClawUrl?.includes('127.0.0.1');
+    const oldDefaultHttps = 'https://public-cows-sing.loca.lt/v1';
     const newDefault = 'https://mathai-service.loca.lt/v1';
     const currentOpenClawKey = localStorage.getItem('math_app_openclaw_api_key');
     const defaultKey = '684555a8e838303994fccd60f654e6e71bd13c71c31f5c9c';
 
-    if (!currentOpenClawUrl || currentOpenClawUrl === oldDefault || currentOpenClawUrl === oldDefault2) {
+    // FORCE update if it's localhost on an HTTPS site OR it matches the old broken tunnel
+    if (!currentOpenClawUrl || (isHttpsSite && isLocalhostUrl) || currentOpenClawUrl === oldDefaultHttps) {
       localStorage.setItem('math_app_openclaw_url', newDefault);
       setConfig(prev => ({ ...prev, openclawUrl: newDefault }));
     }
