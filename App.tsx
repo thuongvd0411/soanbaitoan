@@ -622,6 +622,38 @@ const Sidebar = ({
                       )}
                     </div>
                   </div>
+
+                  <div>
+                    <label className="text-[9px] font-black text-blue-500 uppercase mb-1 block underline">OpenClaw (Local AI) Config</label>
+                    <div className="space-y-2">
+                       <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="Link OpenClaw (VD: http://localhost:1337/v1)..."
+                          className="w-full border border-blue-200 rounded-xl p-3 text-[10px] focus:ring-2 ring-blue-500/20 outline-none bg-white shadow-inner"
+                          value={config.openclawUrl || ''}
+                          onChange={(e) => {
+                            const newUrl = e.target.value;
+                            setConfig((prev: AppState) => ({ ...prev, openclawUrl: newUrl }));
+                            localStorage.setItem('math_app_openclaw_url', newUrl);
+                          }}
+                        />
+                      </div>
+                      <div className="relative">
+                        <input
+                          type="password"
+                          placeholder="OpenClaw API Key (nếu có)..."
+                          className="w-full border border-blue-200 rounded-xl p-3 text-[10px] focus:ring-2 ring-blue-500/20 outline-none bg-white shadow-inner"
+                          value={config.openclawApiKey || ''}
+                          onChange={(e) => {
+                            const newKey = e.target.value;
+                            setConfig((prev: AppState) => ({ ...prev, openclawApiKey: newKey }));
+                            localStorage.setItem('math_app_openclaw_api_key', newKey);
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Lựa chọn chế độ Key */}
@@ -933,6 +965,8 @@ export default function App() {
     primaryApiKey: localStorage.getItem('math_app_primary_api_key') || '',
     secondaryApiKey: localStorage.getItem('math_app_secondary_api_key') || '',
     openaiApiKey: localStorage.getItem('math_app_openai_api_key') || '',
+    openclawApiKey: localStorage.getItem('math_app_openclaw_api_key') || 'open-claw-key',
+    openclawUrl: localStorage.getItem('math_app_openclaw_url') || 'http://localhost:1337/v1',
     selectedKeyMode: (localStorage.getItem('math_app_selected_key_mode') as 'system' | 'primary' | 'secondary') || 'system'
   });
   const [questions, setQuestions] = useState<Question[]>([]);

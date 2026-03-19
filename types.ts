@@ -95,6 +95,8 @@ export interface AppState {
   primaryApiKey?: string;
   secondaryApiKey?: string;
   openaiApiKey?: string;
+  openclawApiKey?: string;
+  openclawUrl?: string;
   selectedKeyMode: 'system' | 'primary' | 'secondary';
   // Game state
   gameStatus: GameStatus;

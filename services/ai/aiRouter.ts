@@ -3,10 +3,12 @@
 import { AIProvider, AIModelType, ChatMessage } from './aiProvider';
 import { GeminiProvider } from './geminiProvider';
 import { OpenAIProvider } from './openaiProvider';
+import { OpenClawProvider } from './openclawProvider';
 
 export class AIRouter {
   private geminiProvider: AIProvider | null = null;
   private openaiProvider: AIProvider | null = null;
+  private openclawProvider: AIProvider | null = null;
 
   setGeminiKey(key: string) {
     if (key) {
@@ -20,16 +22,27 @@ export class AIRouter {
     }
   }
 
+  setOpenClawConfig(url: string, key: string) {
+    this.openclawProvider = new OpenClawProvider(url, key);
+  }
+
   async sendMessage(
     model: AIModelType,
     messages: ChatMessage[],
     systemPrompt?: string
   ): Promise<string> {
-    if (model === 'gpt') {
+    if (model === 'gpt' || model === 'gpt-nano') {
       if (!this.openaiProvider) {
         throw new Error('Chưa nhập OpenAI API Key. Vui lòng nhập key trong phần Cấu hình.');
       }
       return this.openaiProvider.sendMessage(messages, systemPrompt);
+    }
+
+    if (model === 'openclaw') {
+      if (!this.openclawProvider) {
+        this.openclawProvider = new OpenClawProvider(); // Default config
+      }
+      return this.openclawProvider.sendMessage(messages, systemPrompt);
     }
 
     // Default: Gemini
@@ -40,7 +53,8 @@ export class AIRouter {
   }
 
   hasProvider(model: AIModelType): boolean {
-    if (model === 'gpt') return !!this.openaiProvider;
+    if (model === 'gpt' || model === 'gpt-nano') return !!this.openaiProvider;
+    if (model === 'openclaw') return true; // Default provider is always available
     return !!this.geminiProvider;
   }
 }
