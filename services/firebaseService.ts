@@ -550,6 +550,41 @@ export const firebaseService = {
     },
 
     /**
+     * Hàm xóa toàn bộ dữ liệu đầu tư của user (Chat, Reports, Market data)
+     */
+    async clearAllInvestmentData(userId: string): Promise<void> {
+        if (!userId) return;
+        try {
+            // 1. Xóa history chat đầu tư của người dùng
+            await deleteDoc(doc(db, 'investment_history', userId));
+            
+            // Note: Cloud Firestore không hỗ trợ xóa bộ sưu tập (collection) hoặc nhiều doc cùng lúc từ Web Client SDK (ví dụ: 'macro_reports/*', 'market_data/*').
+            // Admin SDK môi trường backend mới hỗ trợ (firebase-admin). Ở client-side, muốn xóa cần phải truy vấn danh sách và xóa từng document trong transaction.
+            // Tuy nhiên với context "Quản lý dữ liệu người dùng" và tránh lỗi quota, việc xóa dữ liệu chung ('market_data', v.v.) từ client một cách tự do có rủi ro nếu có nhiều user. 
+            // Nếu bạn THỰC SỰ muốn xoá tất cả market data từ Client (nếu bạn là Admin), sử dụng getDocs:
+            
+            // Xóa reports hôm nay
+            const dateStr = new Date().toLocaleDateString('vi-VN').replace(/\//g, '-');
+            await deleteDoc(doc(db, 'macro_reports', dateStr));
+            await deleteDoc(doc(db, 'news_reports', dateStr));
+
+            // Cách xóa market data/history nếu BẮT BUỘC: 
+            // Cẩn thận: code sau sẽ quét tất cả collection có thể gây nghẽn! Khuyến cáo backend.
+            /* 
+            const marketDataDocs = await getDocs(collection(db, 'market_data'));
+            marketDataDocs.forEach(d => deleteDoc(d.ref));
+            
+            const marketHistoryDocs = await getDocs(collection(db, 'market_history'));
+            marketHistoryDocs.forEach(d => deleteDoc(d.ref));
+            */
+            
+        } catch (error) {
+            console.error("Firebase clearAllInvestmentData error:", error);
+            throw error;
+        }
+    },
+
+    /**
      * Lấy báo cáo vĩ mô trong ngày
      */
     async getMacroReport(dateStr: string): Promise<string | null> {

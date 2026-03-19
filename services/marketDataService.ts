@@ -13,11 +13,13 @@ export interface MarketData {
 
 // Danh sách các proxy CORS công cộng (Đã lọc bỏ typo và site chết)
 const PROXY_TEMPLATES = [
-  // 1. AllOrigins RAW (Nhanh và ổn định nhất)
+  // 1. Cloudflare Worker dành riêng cho dự án (Khuyến nghị)
+  (url: string) => `https://falling-math-0dcf.antigravity.workers.dev/?url=${encodeURIComponent(url)}`,
+  // 2. AllOrigins RAW (Nhanh và ổn định nhất)
   (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  // 2. CodeTabs (Dự phòng tốt)
+  // 3. CodeTabs (Dự phòng tốt)
   (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
-  // 3. CorsProxy.io (Dự phòng cuối)
+  // 4. CorsProxy.io (Dự phòng cuối)
   (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
 ];
 
