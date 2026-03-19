@@ -57,7 +57,13 @@ export class OpenClawProvider implements AIProvider {
       return data.choices?.[0]?.message?.content || 'Không có phản hồi từ OpenClaw.';
     } catch (error: any) {
       if (error instanceof TypeError && error.message === 'Failed to fetch') {
-        throw new Error('Không thể kết nối tới OpenClaw. Anh hãy kiểm tra xem OpenClaw đã được bật tại ' + this.baseUrl + ' chưa nhé!');
+        const isHttps = window.location.protocol === 'https:';
+        const isLocalHost = this.baseUrl.includes('localhost') || this.baseUrl.includes('127.0.0.1');
+        
+        if (isHttps && isLocalHost) {
+          throw new Error('Lỗi bảo mật trình duyệt (Mixed Content): Trình duyệt không cho phép trang web HTTPS kết nối tới HTTP (localhost). Anh hãy chạy ứng dụng ở LOCAL (http://localhost:5173) hoặc dùng link HTTPS (Ngrok) cho OpenClaw nhé!');
+        }
+        throw new Error(`Không thể kết nối tới OpenClaw. Anh hãy kiểm tra xem OpenClaw đã được bật tại ${this.baseUrl} chưa, hoặc có lỗi CORS không nhé!`);
       }
       throw error;
     }
