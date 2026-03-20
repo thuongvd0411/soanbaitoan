@@ -119,15 +119,26 @@ const InvestmentPanel: React.FC<InvestmentPanelProps> = ({ config }) => {
 
   // Load owned stocks
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('math_app_owned_stocks');
-      if (saved) setOwnedStocks(JSON.parse(saved));
-    } catch (e) { console.error('Error loading owned stocks', e); }
-  }, []);
+    const loadOwnedStocks = async () => {
+      try {
+        // Ưu tiên Firebase để đồng bộ máy khác
+        const cloudStocks = await firebaseService.getOwnedStocks(userId);
+        if (cloudStocks && cloudStocks.length > 0) {
+          setOwnedStocks(cloudStocks);
+          localStorage.setItem('math_app_owned_stocks', JSON.stringify(cloudStocks));
+        } else {
+          // Fallback LocalStorage
+          const saved = localStorage.getItem('math_app_owned_stocks');
+          if (saved) setOwnedStocks(JSON.parse(saved));
+        }
+      } catch (e) { console.error('Error loading owned stocks', e); }
+    };
+    loadOwnedStocks();
+  }, [userId]);
 
-  const addOwnedStock = () => {
+  const addOwnedStock = async () => {
     const ticker = ownedStockInput.trim().toUpperCase();
-    if (!ticker || !/^[A-Z]{3}$/.test(ticker)) {
+    if (!ticker || !/^[A-Z]{3,5}$/.test(ticker)) {
       setOwnedStockInput('');
       return;
     }
@@ -135,14 +146,18 @@ const InvestmentPanel: React.FC<InvestmentPanelProps> = ({ config }) => {
       const newList = [...ownedStocks, ticker];
       setOwnedStocks(newList);
       localStorage.setItem('math_app_owned_stocks', JSON.stringify(newList));
+      // Sync to Firebase
+      await firebaseService.saveOwnedStocks(userId, newList);
     }
     setOwnedStockInput('');
   };
 
-  const removeOwnedStock = (ticker: string) => {
+  const removeOwnedStock = async (ticker: string) => {
     const newList = ownedStocks.filter(t => t !== ticker);
     setOwnedStocks(newList);
     localStorage.setItem('math_app_owned_stocks', JSON.stringify(newList));
+    // Sync to Firebase
+    await firebaseService.saveOwnedStocks(userId, newList);
   };
 
   const analyzeOwnedPortfolio = async () => {
@@ -208,12 +223,16 @@ Yêu cầu trả lời dạng [COLLAPSE: Tên Mã - Điểm số] Nội dung chi
       }
       
       const dateStr = new Date().toLocaleDateString('vi-VN');
-      // Load Macro từ LocalStorage (Ưu tiên yêu cầu của anh)
-      const localMacro = localStorage.getItem('alla_macro_report');
-      if (localMacro) setMacroResult(localMacro);
-      else {
-        const savedMacro = await firebaseService.getMacroReport(dateStr);
-        if (savedMacro) setMacroResult(savedMacro);
+      
+      // Load Macro từ Firebase trước để đồng bộ máy khác (giúp tiết kiệm quota)
+      const savedMacro = await firebaseService.getMacroReport(dateStr);
+      if (savedMacro) {
+        setMacroResult(savedMacro);
+        localStorage.setItem('alla_macro_report', savedMacro);
+      } else {
+        // Fallback LocalStorage
+        const localMacro = localStorage.getItem('alla_macro_report');
+        if (localMacro) setMacroResult(localMacro);
       }
       
       const savedNews = await firebaseService.getNewsReport(dateStr);
@@ -612,8 +631,9 @@ LƯU Ý: Viết phong cách chuyên gia, sắc sảo, không nói nước đôi.
 
       const result = await sendToAI([{ role: 'user', content: prompt }], EXPERT_SYSTEM_PROMPT);
       setMacroResult(result);
-      // 2. Lưu vào local để ghi đè báo cáo cũ
+      // 2. Lưu vào local và Firebase để đồng bộ
       localStorage.setItem('alla_macro_report', result);
+      await firebaseService.saveMacroReport(dateStr, result);
     } catch (error: any) {
       setMacroResult(`❌ Lỗi: ${error.message}`);
     } finally {
@@ -971,9 +991,16 @@ LƯU Ý: Viết phong cách chuyên gia, sắc sảo, không nói nước đôi.
                    <span className="text-xs font-mono text-gray-600 italic">Chưa có mã nào trong danh mục.</span>
                  ) : (
                    ownedStocks.map(ticker => (
-                     <div key={ticker} className="flex items-center gap-1 px-2 py-1 bg-purple-500/10 border border-purple-500/30 rounded">
+                     <div key={ticker} className="flex items-center gap-1 px-2 py-1 bg-purple-500/10 border border-purple-500/30 rounded group">
                        <span className="text-purple-300 font-bold font-mono text-xs">{ticker}</span>
-                       <button onClick={() => removeOwnedStock(ticker)} className="text-gray-500 hover:text-red-400 ml-1">
+                       <button 
+                         onClick={() => handleTickerNewsScan(ticker)} 
+                         className="text-cyan-500 hover:text-cyan-400 opacity-60 group-hover:opacity-100 transition-opacity ml-1"
+                         title={`Quét tin 24h cho ${ticker}`}
+                       >
+                         <Newspaper size={12} />
+                       </button>
+                       <button onClick={() => removeOwnedStock(ticker)} className="text-gray-500 hover:text-red-400 ml-0.5">
                          <Trash2 size={12} />
                        </button>
                      </div>

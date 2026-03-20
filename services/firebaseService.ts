@@ -727,6 +727,40 @@ export const firebaseService = {
             console.error(`Firebase getMarketHistory error for ${symbol}:`, error);
             return [];
         }
+    },
+    /**
+     * Lấy danh mục cổ phiếu của người dùng
+     */
+    async getOwnedStocks(userId: string): Promise<string[]> {
+        if (!userId) return [];
+        try {
+            const docRef = doc(db, 'user_portfolios', userId);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                return docSnap.data().stocks || [];
+            }
+            return [];
+        } catch (error) {
+            console.error("Firebase getOwnedStocks error:", error);
+            return [];
+        }
+    },
+
+    /**
+     * Lưu danh mục cổ phiếu của người dùng
+     */
+    async saveOwnedStocks(userId: string, stocks: string[]): Promise<void> {
+        if (!userId || !stocks) return;
+        try {
+            const docRef = doc(db, 'user_portfolios', userId);
+            await setDoc(docRef, {
+                stocks,
+                lastUpdated: new Date().toISOString()
+            }, { merge: true });
+        } catch (error) {
+            console.error("Firebase saveOwnedStocks error:", error);
+            throw error;
+        }
     }
 };
 
