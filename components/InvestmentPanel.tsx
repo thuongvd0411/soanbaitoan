@@ -110,6 +110,7 @@ const InvestmentPanel: React.FC<InvestmentPanelProps> = ({ config }) => {
   const [newsResult, setNewsResult] = useState('');
   const [macroResult, setMacroResult] = useState('');
   const [marketContext, setMarketContext] = useState<string>('');
+  const [newsTickerInput, setNewsTickerInput] = useState(''); // State mới cho ô nhập mã quét tin 24h
 
   // Owned Portfolio states
   const [ownedStocks, setOwnedStocks] = useState<string[]>([]);
@@ -207,8 +208,13 @@ Yêu cầu trả lời dạng [COLLAPSE: Tên Mã - Điểm số] Nội dung chi
       }
       
       const dateStr = new Date().toLocaleDateString('vi-VN');
-      const savedMacro = await firebaseService.getMacroReport(dateStr);
-      if (savedMacro) setMacroResult(savedMacro);
+      // Load Macro từ LocalStorage (Ưu tiên yêu cầu của anh)
+      const localMacro = localStorage.getItem('alla_macro_report');
+      if (localMacro) setMacroResult(localMacro);
+      else {
+        const savedMacro = await firebaseService.getMacroReport(dateStr);
+        if (savedMacro) setMacroResult(savedMacro);
+      }
       
       const savedNews = await firebaseService.getNewsReport(dateStr);
       if (savedNews) setNewsResult(savedNews);
@@ -491,22 +497,21 @@ FORMAT BẮT BUỘC:
   };
 
   // News scanner
-  const scanNews = async () => {
+  const scanNews = async (targetTicker?: string) => {
     if (isLoading) return;
     setIsLoading(true);
-    setNewsResult('');
+    if (!targetTicker) setNewsResult('');
+    
     try {
-      // Bỏ qua lấy từ Firebase để luôn lấy tin mới nhất (Realtime)
-      
-      // Fetch RSS từ các nguồn tài chính uy tín
-      // Sử dụng rss2json API để tránh block CORS và parse XML khó khăn
       const rssUrls = [
-        'https://vneconomy.vn/thi-truong.rss',
-        'https://cafef.vn/thi-truong-chung-khoan.rss',
+        'https://vietstock.vn/rss/chung-khoan.rss',
+        'https://vietstock.vn/rss/vi-mo.rss',
         'https://vnexpress.net/rss/kinh-doanh.rss'
       ];
       
       let allNews: string[] = [];
+      const now = Date.now();
+      const oneDayInMs = 24 * 60 * 60 * 1000;
       
       for (const rssUrl of rssUrls) {
         try {
@@ -514,9 +519,13 @@ FORMAT BẮT BUỘC:
           if (res.ok) {
             const data = await res.json();
             if (data.items && data.items.length > 0) {
-              data.items.slice(0, 5).forEach((item: any) => {
-                const cleanDesc = (item.description || '').replace(/<[^>]*>?/gm, '').trim();
-                allNews.push(`- ${item.title}\n  ${cleanDesc}\n  Link: ${item.link}`);
+              data.items.forEach((item: any) => {
+                // Lọc tin trong 24h
+                const pubDate = new Date(item.pubDate).getTime();
+                if (now - pubDate <= oneDayInMs) {
+                  const cleanDesc = (item.description || '').replace(/<[^>]*>?/gm, '').trim();
+                  allNews.push(`- ${item.title}\n  ${cleanDesc}\n  Link: ${item.link}`);
+                }
               });
             }
           }
@@ -526,19 +535,36 @@ FORMAT BẮT BUỘC:
       }
 
       if (allNews.length === 0) {
-        setNewsResult('Không thể lấy tin tức Realtime lúc này. Anh thử lại sau nhé.');
+        const msg = 'Không tìm thấy tin tức tài chính nào mới trong 24 giờ qua.';
+        if (!targetTicker) setNewsResult(msg);
+        else return msg;
         return;
       }
 
-      const prompt = `Dưới đây là tin tức tài chính Việt Nam mới nhất vừa cập nhật:\n\n${allNews.slice(0, 12).join('\n\n')}\n\nBạn là chuyên gia phân tích tin tức thị trường. Hãy phân tích mức độ ảnh hưởng của các tin trên đến thị trường chứng khoán VN (VNINDEX) trong ngắn hạn. Đánh giá rủi ro (Thấp/Trung bình/Cao). TRẢ LỜI NGẮN GỌN, TRỰC DIỆN.`;
+      let prompt = "";
+      if (targetTicker) {
+        prompt = `Dưới đây là tổng hợp tin tức tài chính Việt Nam trong 24 giờ qua:\n\n${allNews.join('\n\n')}\n\nBạn là chuyên gia phân tích. Hãy lọc ra các tin tức có liên quan TRỰC TIẾP hoặc GIÁN TIẾP ảnh hưởng đến mã cổ phiếu [${targetTicker}]. Nếu có tin hot, hãy nhấn mạnh. Nếu không thấy tin liên quan, hãy trả lời "Không thấy tin tức đặc biệt cho ${targetTicker} trong 24h qua".`;
+      } else {
+        prompt = `Dưới đây là tin tức tài chính Việt Nam mới nhất trong 24 giờ qua:\n\n${allNews.slice(0, 15).join('\n\n')}\n\nBạn là chuyên gia phân tích. Hãy tổng hợp các tin tức NHẠY CẢM có khả năng tác động mạnh tới thị trường chứng khoán VN. TRẢ LỜI NGẮN GỌN, TRỰC DIỆN.`;
+      }
+
       const result = await sendToAI([{ role: 'user', content: prompt }], SYSTEM_PROMPT);
+      if (targetTicker) return result;
       setNewsResult(result);
-      // Không lưu vào Firebase nữa theo yêu cầu Realtime
     } catch (error: any) {
-      setNewsResult(`❌ Lỗi: ${error.message}`);
+      const errorMsg = `❌ Lỗi quét tin: ${error.message}`;
+      if (targetTicker) return errorMsg;
+      setNewsResult(errorMsg);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleTickerNewsScan = async (ticker: string) => {
+    setActiveSubTab('news');
+    setNewsTickerInput(ticker);
+    const result = await scanNews(ticker);
+    if (result) setNewsResult(result as string);
   };
 
   // Macro dashboard
@@ -549,9 +575,7 @@ FORMAT BẮT BUỘC:
     setMacroResult('');
     
     try {
-      // Bỏ qua tải từ Firebase để đảm bảo Realtime
-      
-      // Lấy dữ liệu VNINDEX thực tế
+      // 1. Luôn lấy dữ liệu thực tế khi bấm nút
       const indexData = await fetchIndexData('VNINDEX');
       const indexText = indexData 
         ? `Dữ liệu thị trường hiện tại: VNINDEX đạt ${indexData.value.toLocaleString('vi-VN')} điểm, thay đổi ${indexData.change > 0 ? '+' : ''}${indexData.change} (${indexData.percentChange}%).`
@@ -584,11 +608,12 @@ Yêu cầu cấu trúc (SỬ DỤNG [COLLAPSE: Tiêu đề] Nội dung [ENDCOLLA
 (Nếu giả thuyết tích cực sai, kịch bản xấu nhất sẽ là gì?)
 [ENDCOLLAPSE]
 
-LƯU Ý: Viết phong cách chuyên gia, sắc sảo, không nói nước đôi. Sử dụng Markdown. Quay lại Realtime hoàn toàn.`;
+LƯU Ý: Viết phong cách chuyên gia, sắc sảo, không nói nước đôi. Sử dụng Markdown.`;
 
       const result = await sendToAI([{ role: 'user', content: prompt }], EXPERT_SYSTEM_PROMPT);
       setMacroResult(result);
-      // Không lưu vào Firebase để giữ tính Realtime
+      // 2. Lưu vào local để ghi đè báo cáo cũ
+      localStorage.setItem('alla_macro_report', result);
     } catch (error: any) {
       setMacroResult(`❌ Lỗi: ${error.message}`);
     } finally {
@@ -625,8 +650,15 @@ LƯU Ý: Viết phong cách chuyên gia, sắc sảo, không nói nước đôi.
       .replace(/^- (.*$)/gm, '<div class="pl-3 border-l border-cyan-800 my-1">• $1</div>')
       .replace(/\n\n/g, '<br/><br/>')
       .replace(/\n/g, '<br/>');
+
+    // MÀU SẮC ĐỘNG theo từ khóa (Yêu cầu mới)
+    const dangerWords = /(rủi ro|tiêu cực|giảm|cảnh báo|suy yếu|thủng|bán|xấu|thận trọng)/gi;
+    const successWords = /(tích cực|cơ hội|tăng|dẫn sóng|tiềm năng|mua|bùng nổ|tốt|hấp dẫn)/gi;
     
-    // Tables
+    html = html.replace(dangerWords, '<span class="text-rose-400 font-bold">$1</span>');
+    html = html.replace(successWords, '<span class="text-emerald-400 font-bold">$1</span>');
+    
+    // Tables (already included logic below)
     if (html.includes('|')) {
       html = html.replace(/\|(.+)\|/g, (match) => {
         const cells = match.split('|').filter(c => c.trim());
@@ -1032,16 +1064,39 @@ LƯU Ý: Viết phong cách chuyên gia, sắc sảo, không nói nước đôi.
         {/* NEWS TAB */}
         {activeSubTab === 'news' && (
           <div className="flex-1 overflow-y-auto p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-mono text-cyan-400 uppercase tracking-wider text-sm">Quét tin Kinh Tế</h2>
-              <button
-                onClick={scanNews}
-                disabled={isLoading}
-                className="px-4 py-2 border border-cyan-500 text-cyan-400 font-mono text-xs uppercase hover:bg-cyan-400 hover:text-[#05070a] transition-all disabled:opacity-30 rounded flex items-center gap-2"
-              >
-                {isLoading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
-                Quét tin hôm nay
-              </button>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+              <h2 className="font-mono text-cyan-400 uppercase tracking-wider text-sm flex items-center gap-2">
+                <Globe size={16} /> 
+                Quét tin Kinh Tế 24h
+              </h2>
+              
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1 md:w-40">
+                  <input 
+                    type="text"
+                    value={newsTickerInput}
+                    onChange={(e) => setNewsTickerInput(e.target.value.toUpperCase())}
+                    onKeyDown={(e) => e.key === 'Enter' && handleTickerNewsScan(newsTickerInput)}
+                    placeholder="Mã (VD: FPT)"
+                    className="w-full bg-black/50 border border-cyan-500/30 text-cyan-200 font-mono text-xs px-3 py-2 rounded outline-none focus:border-cyan-400 placeholder:text-gray-700"
+                  />
+                </div>
+                <button
+                  onClick={() => handleTickerNewsScan(newsTickerInput)}
+                  disabled={isLoading || !newsTickerInput.trim()}
+                  className="px-3 py-2 border border-purple-500/50 text-purple-400 font-mono text-[10px] uppercase hover:bg-purple-500/20 transition-all disabled:opacity-30 rounded whitespace-nowrap"
+                >
+                  Quét tin mã
+                </button>
+                <button
+                  onClick={() => scanNews()}
+                  disabled={isLoading}
+                  className="px-4 py-2 border border-cyan-500 text-cyan-400 font-mono text-xs uppercase hover:bg-cyan-400 hover:text-[#05070a] transition-all disabled:opacity-30 rounded flex items-center gap-2 whitespace-nowrap"
+                >
+                  {isLoading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+                  Quét tin tổng hợp
+                </button>
+              </div>
             </div>
             {newsResult ? (
               <div
